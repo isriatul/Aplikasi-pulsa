@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "RONEY CELL"
+version = "1.0.0"
+id = "artifacts/roney-cell"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21418
+
+[services.development]
+run = "pnpm --filter @workspace/roney-cell run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/roney-cell", "run", "build" ]
+publicDir = "artifacts/roney-cell/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21418"
+BASE_PATH = "/"
