@@ -10,12 +10,13 @@ interface TransactionModalProps {
   balance: number;
   errorMessage?: string;
   refId?: string;
+  memberName?: string;
   onConfirm: () => void;
   onClose: () => void;
 }
 
 export default function TransactionModal({
-  phase, product, phone, operator, balance, errorMessage, refId, onConfirm, onClose,
+  phase, product, phone, operator, balance, errorMessage, refId, memberName, onConfirm, onClose,
 }: TransactionModalProps) {
   return (
     <div

@@ -9,10 +9,15 @@ import { fetchBalance, deductBalance } from "@/lib/firebase";
 import { sendTransaction, generateRefId } from "@/lib/digiflazz";
 import { loadConfig } from "@/lib/config";
 import { saveTransaction } from "@/lib/transactions";
+import { Member, TYPE_LABELS, TYPE_COLORS } from "@/lib/members";
 
 type ModalPhase = "confirm" | "loading" | "success" | "failed" | "insufficient" | null;
 
-export default function Home() {
+interface HomeProps {
+  member?: Member | null;
+}
+
+export default function Home({ member }: HomeProps) {
   const [phone, setPhone] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [activeCategory, setActiveCategory] = useState<ProductCategory>("pulsa");
@@ -21,6 +26,7 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState("");
   const [lastRefId, setLastRefId] = useState("");
 
+  const memberType = member?.type ?? "retail";
   const operator: Operator | null = detectOperator(phone);
 
   const handleBalanceChange = useCallback((val: number) => {
@@ -116,10 +122,7 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <div
               className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{
-                background: "linear-gradient(135deg, hsl(210 90% 55%) 0%, hsl(230 80% 40%) 100%)",
-                boxShadow: "0 0 16px rgba(59,130,246,0.4)",
-              }}
+              style={{ background: "linear-gradient(135deg, hsl(210 90% 55%) 0%, hsl(230 80% 40%) 100%)", boxShadow: "0 0 16px rgba(59,130,246,0.4)" }}
             >
               <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -128,19 +131,23 @@ export default function Home() {
               </svg>
             </div>
             <div>
-              <h1
-                className="font-black text-lg leading-none tracking-tight"
-                style={{
-                  background: "linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                }}
-              >
+              <h1 className="font-black text-lg leading-none tracking-tight"
+                style={{ background: "linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                 RONEY CELL
               </h1>
               <p className="text-[10px] text-muted-foreground tracking-widest">SISTEM JUALAN PULSA</p>
             </div>
           </div>
+
+          {member && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border"
+              style={{ background: `${TYPE_COLORS[member.type]}15`, borderColor: `${TYPE_COLORS[member.type]}30` }}>
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: TYPE_COLORS[member.type] }} />
+              <span className="text-xs font-bold" style={{ color: TYPE_COLORS[member.type] }}>
+                {TYPE_LABELS[member.type]}
+              </span>
+            </div>
+          )}
         </div>
       </header>
 
@@ -148,6 +155,20 @@ export default function Home() {
       <div className="mb-4">
         <BalanceCard onBalanceChange={handleBalanceChange} />
       </div>
+
+      {/* Member price banner */}
+      {member && member.type !== "retail" && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl border"
+          style={{ background: `${TYPE_COLORS[member.type]}10`, borderColor: `${TYPE_COLORS[member.type]}25` }}>
+          <span className="text-lg">🎯</span>
+          <div>
+            <p className="text-xs font-bold" style={{ color: TYPE_COLORS[member.type] }}>
+              Harga {TYPE_LABELS[member.type]} Aktif
+            </p>
+            <p className="text-[10px] text-muted-foreground">Anda menikmati harga lebih murah dari retail</p>
+          </div>
+        </div>
+      )}
 
       {/* Phone Input */}
       <div className="mb-4">
@@ -161,28 +182,26 @@ export default function Home() {
           onSelect={setSelectedProduct}
           activeCategory={activeCategory}
           onCategoryChange={handleCategoryChange}
+          memberType={memberType}
         />
       </div>
 
       {/* Order Summary */}
       {selectedProduct && phone.length >= 9 && (
         <div className="mb-4 glass-card rounded-2xl p-4 border border-cyan-500/15">
-          <p className="text-xs text-muted-foreground tracking-widest uppercase font-semibold mb-3">
-            Ringkasan Pesanan
-          </p>
+          <p className="text-xs text-muted-foreground tracking-widest uppercase font-semibold mb-3">Ringkasan Pesanan</p>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold text-foreground">{selectedProduct.name}</p>
               <p className="text-xs text-muted-foreground mt-0.5">{phone}</p>
+              {member && member.type !== "retail" && (
+                <p className="text-[10px] mt-0.5" style={{ color: TYPE_COLORS[member.type] }}>
+                  Harga {TYPE_LABELS[member.type]}
+                </p>
+              )}
             </div>
-            <p
-              className="text-lg font-black"
-              style={{
-                background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-            >
+            <p className="text-lg font-black"
+              style={{ background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
               {formatRupiah(selectedProduct.price)}
             </p>
           </div>
@@ -207,17 +226,12 @@ export default function Home() {
       <div className="mt-6 text-center">
         <p className="text-xs text-muted-foreground">
           Dikuasakan oleh{" "}
-          <span style={{ background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 }}>
-            Digiflazz
-          </span>{" "}
-          &amp;{" "}
-          <span style={{ background: "linear-gradient(135deg, #34D399 0%, #10B981 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 }}>
-            Firebase
-          </span>
+          <span style={{ background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 }}>Digiflazz</span>
+          {" "}&amp;{" "}
+          <span style={{ background: "linear-gradient(135deg, #34D399 0%, #10B981 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 }}>Firebase</span>
         </p>
       </div>
 
-      {/* Transaction Modal */}
       {modalPhase && (
         <TransactionModal
           phase={modalPhase}
@@ -227,6 +241,7 @@ export default function Home() {
           balance={balance}
           errorMessage={errorMessage}
           refId={lastRefId}
+          memberName={member?.name}
           onConfirm={handleConfirmTransaction}
           onClose={handleCloseModal}
         />

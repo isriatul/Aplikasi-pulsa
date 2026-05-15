@@ -6,19 +6,29 @@ export interface AppConfig {
   briAccountName: string;
   danaNumber: string;
   danaName: string;
+  gopayNumber: string;
+  gopayName: string;
+  bcaAccountNumber: string;
+  bcaAccountName: string;
+  qrisImage: string;
   adminPin: string;
 }
 
 const CONFIG_KEY = "roneycell_config";
 
-const DEFAULT_CONFIG: AppConfig = {
+export const DEFAULT_CONFIG: AppConfig = {
   username: "",
   apiKey: "",
-  whatsappNumber: "",
+  whatsappNumber: "081288080752",
   briAccountNumber: "",
   briAccountName: "RONEY CELL",
-  danaNumber: "",
-  danaName: "RONEY CELL",
+  danaNumber: "081288080752",
+  danaName: "Isriatul Bahroni",
+  gopayNumber: "081288080752",
+  gopayName: "Isriatul Bahroni",
+  bcaAccountNumber: "7255211277",
+  bcaAccountName: "Isriatul Bahroni",
+  qrisImage: "",
   adminPin: "1234",
 };
 
@@ -46,10 +56,11 @@ export function buildOrderMessage(
   productName: string,
   price: number,
   operator: string | undefined,
-  refId: string
+  refId: string,
+  memberName?: string
 ): string {
   const now = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
-  return [
+  const lines = [
     `🧾 *BUKTI TRANSAKSI RONEY CELL*`,
     ``,
     `📱 No. Pelanggan : ${phone}`,
@@ -59,22 +70,23 @@ export function buildOrderMessage(
     `🔖 Ref ID        : ${refId}`,
     `⏰ Waktu         : ${now}`,
     `✅ Status        : BERJAYA`,
-    ``,
-    `Terima kasih kerana menggunakan RONEY CELL!`,
-  ].join("\n");
+  ];
+  if (memberName) lines.push(`👤 Member         : ${memberName}`);
+  lines.push(``, `Terima kasih kerana menggunakan RONEY CELL!`);
+  return lines.join("\n");
 }
 
-export function buildDepositMessage(amount: number, method: string, accountInfo: string): string {
+export function buildDepositMessage(amount: number, method: string, accountInfo: string, memberName?: string): string {
   const now = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
-  return [
+  const lines = [
     `💳 *KONFIRMASI DEPOSIT RONEY CELL*`,
     ``,
     `💰 Jumlah Transfer : Rp ${amount.toLocaleString("id-ID")}`,
     `🏦 Metode          : ${method}`,
     `📋 Ke Rekening     : ${accountInfo}`,
     `⏰ Waktu           : ${now}`,
-    ``,
-    `Sila hantar bukti transfer ini.`,
-    `Saldo akan dikreditkan selepas pengesahan.`,
-  ].join("\n");
+  ];
+  if (memberName) lines.push(`👤 Nama Member     : ${memberName}`);
+  lines.push(``, `Sila hantar bukti transfer ini.`, `Saldo akan dikreditkan selepas pengesahan.`);
+  return lines.join("\n");
 }

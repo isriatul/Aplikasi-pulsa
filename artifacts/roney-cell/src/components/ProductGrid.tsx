@@ -1,17 +1,17 @@
-import { useState } from "react";
-import { Product, ProductCategory, CATEGORY_META, getProductsByCategory, formatRupiah } from "@/lib/products";
+import { Product, ProductCategory, CATEGORY_META, getProductsByCategory, formatRupiah, MemberType } from "@/lib/products";
 
 interface ProductGridProps {
   selected: Product | null;
   onSelect: (product: Product) => void;
   activeCategory: ProductCategory;
   onCategoryChange: (cat: ProductCategory) => void;
+  memberType?: MemberType;
 }
 
 const CATEGORIES: ProductCategory[] = ["pulsa", "data", "pln", "game"];
 
-export default function ProductGrid({ selected, onSelect, activeCategory, onCategoryChange }: ProductGridProps) {
-  const products = getProductsByCategory(activeCategory);
+export default function ProductGrid({ selected, onSelect, activeCategory, onCategoryChange, memberType = "retail" }: ProductGridProps) {
+  const products = getProductsByCategory(activeCategory, memberType);
 
   return (
     <div className="glass-card rounded-2xl p-5">
@@ -19,7 +19,6 @@ export default function ProductGrid({ selected, onSelect, activeCategory, onCate
         Pilih Produk
       </label>
 
-      {/* Category tabs */}
       <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1 no-scrollbar">
         {CATEGORIES.map((cat) => {
           const meta = CATEGORY_META[cat];
@@ -30,12 +29,7 @@ export default function ProductGrid({ selected, onSelect, activeCategory, onCate
               onClick={() => onCategoryChange(cat)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex-shrink-0 border"
               style={isActive
-                ? {
-                    background: `${meta.color}20`,
-                    borderColor: `${meta.color}50`,
-                    color: meta.color,
-                    boxShadow: `0 0 12px ${meta.color}20`,
-                  }
+                ? { background: `${meta.color}20`, borderColor: `${meta.color}50`, color: meta.color, boxShadow: `0 0 12px ${meta.color}20` }
                 : { borderColor: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.45)" }
               }
             >
@@ -46,7 +40,6 @@ export default function ProductGrid({ selected, onSelect, activeCategory, onCate
         })}
       </div>
 
-      {/* Product grid - 2 cols for pulsa/pln, list for data/game */}
       {activeCategory === "pulsa" || activeCategory === "pln" ? (
         <div className="grid grid-cols-2 gap-3">
           {products.map((product) => (
@@ -83,10 +76,8 @@ function ProductCard({ product, selected, onSelect, compact }: {
         }
       >
         {product.badge && (
-          <div
-            className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full text-[10px] font-black tracking-wider text-gray-900"
-            style={{ background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)" }}
-          >
+          <div className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full text-[10px] font-black tracking-wider text-gray-900"
+            style={{ background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)" }}>
             {product.badge}
           </div>
         )}
@@ -105,7 +96,9 @@ function ProductCard({ product, selected, onSelect, compact }: {
             ? formatRupiah(product.nominal)
             : product.name}
         </p>
-        <p className="text-[11px] text-muted-foreground mt-0.5">{product.category === "pln" ? "Token PLN" : "Pulsa"}</p>
+        <p className="text-[11px] text-muted-foreground mt-0.5">
+          {product.category === "pln" ? "Token PLN" : "Pulsa"}
+        </p>
         <div className="mt-2.5 pt-2 border-t border-white/5">
           <p className="text-xs text-muted-foreground">Harga Jual</p>
           <p className="text-sm font-bold mt-0.5" style={{
@@ -129,20 +122,16 @@ function ProductCard({ product, selected, onSelect, compact }: {
         : { borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }
       }
     >
-      <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-        style={{ background: `${meta.color}15`, border: `1px solid ${meta.color}25` }}
-      >
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+        style={{ background: `${meta.color}15`, border: `1px solid ${meta.color}25` }}>
         {product.icon}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-sm font-bold text-foreground truncate">{product.name}</p>
           {product.badge && (
-            <span
-              className="px-1.5 py-0.5 rounded text-[9px] font-black text-gray-900 flex-shrink-0"
-              style={{ background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)" }}
-            >
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-black text-gray-900 flex-shrink-0"
+              style={{ background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)" }}>
               {product.badge}
             </span>
           )}
