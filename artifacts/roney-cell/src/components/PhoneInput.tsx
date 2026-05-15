@@ -1,12 +1,19 @@
 import { useRef } from "react";
-import { detectOperator, formatPhone } from "@/lib/operator";
+import { detectOperator } from "@/lib/operator";
 
 interface PhoneInputProps {
   value: string;
   onChange: (val: string) => void;
+  label?: string;
+  placeholder?: string;
 }
 
-export default function PhoneInput({ value, onChange }: PhoneInputProps) {
+export default function PhoneInput({
+  value,
+  onChange,
+  label = "Nombor Telefon Pelanggan",
+  placeholder = "Contoh: 08123456789",
+}: PhoneInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const operator = detectOperator(value);
 
@@ -18,7 +25,7 @@ export default function PhoneInput({ value, onChange }: PhoneInputProps) {
   return (
     <div className="glass-card rounded-2xl p-5">
       <label className="text-xs text-muted-foreground tracking-widest uppercase font-semibold block mb-3">
-        Nombor Telefon Pelanggan
+        {label}
       </label>
 
       <div className="relative">
@@ -33,7 +40,7 @@ export default function PhoneInput({ value, onChange }: PhoneInputProps) {
           ref={inputRef}
           type="tel"
           inputMode="numeric"
-          placeholder="Contoh: 08123456789"
+          placeholder={placeholder}
           value={value}
           onChange={handleChange}
           maxLength={14}

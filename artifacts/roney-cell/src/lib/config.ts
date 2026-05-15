@@ -21,7 +21,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   apiKey: "",
   whatsappNumber: "081288080752",
   briAccountNumber: "",
-  briAccountName: "RONEY CELL",
+  briAccountName: "Isriatul Bahroni",
   danaNumber: "081288080752",
   danaName: "Isriatul Bahroni",
   gopayNumber: "081288080752",
@@ -61,7 +61,7 @@ export function buildOrderMessage(
 ): string {
   const now = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
   const lines = [
-    `🧾 *BUKTI TRANSAKSI RONEY CELL*`,
+    `🧾 *BUKTI TRANSAKSI RoneyCell*`,
     ``,
     `📱 No. Pelanggan : ${phone}`,
     `📶 Operator      : ${operator ?? "Tidak dikesan"}`,
@@ -72,14 +72,14 @@ export function buildOrderMessage(
     `✅ Status        : BERJAYA`,
   ];
   if (memberName) lines.push(`👤 Member         : ${memberName}`);
-  lines.push(``, `Terima kasih kerana menggunakan RONEY CELL!`);
+  lines.push(``, `Terima kasih kerana menggunakan RoneyCell!`);
   return lines.join("\n");
 }
 
 export function buildDepositMessage(amount: number, method: string, accountInfo: string, memberName?: string): string {
   const now = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
   const lines = [
-    `💳 *KONFIRMASI DEPOSIT RONEY CELL*`,
+    `💳 *KONFIRMASI DEPOSIT RoneyCell*`,
     ``,
     `💰 Jumlah Transfer : Rp ${amount.toLocaleString("id-ID")}`,
     `🏦 Metode          : ${method}`,

@@ -52,7 +52,7 @@ function PinGate({ onUnlock }: { onUnlock: () => void }) {
             d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
       </div>
-      <h2 className="font-black text-xl text-foreground mb-1">Panel Admin</h2>
+      <h2 className="font-black text-xl text-foreground mb-1">Panel Owner</h2>
       <p className="text-sm text-muted-foreground mb-8 text-center">Masukkan PIN untuk akses panel owner</p>
       <form onSubmit={handleSubmit} className="w-full">
         <input type="password" inputMode="numeric" maxLength={8} value={pin}
@@ -601,7 +601,7 @@ function SettingsSection({ onLogout }: { onLogout: () => void }) {
         {saved ? "✓ Tetapan Disimpan!" : "Simpan Tetapan"}
       </button>
       <button onClick={onLogout} className="w-full py-3 rounded-2xl font-semibold text-sm text-muted-foreground border border-white/10 hover:bg-white/5 transition-all">
-        Log Keluar dari Panel Admin
+        Log Keluar dari Panel Owner
       </button>
     </div>
   );
