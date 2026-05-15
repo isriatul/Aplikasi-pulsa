@@ -3,40 +3,23 @@ import BalanceCard from "@/components/BalanceCard";
 import PhoneInput from "@/components/PhoneInput";
 import ProductGrid from "@/components/ProductGrid";
 import TransactionModal from "@/components/TransactionModal";
-import ConfigModal from "@/components/ConfigModal";
-import { Product, formatRupiah } from "@/lib/products";
+import { Product, ProductCategory, formatRupiah, getOperatorSku } from "@/lib/products";
 import { detectOperator, Operator } from "@/lib/operator";
 import { fetchBalance, deductBalance } from "@/lib/firebase";
 import { sendTransaction, generateRefId } from "@/lib/digiflazz";
-import { getOperatorSku } from "@/lib/products";
+import { loadConfig } from "@/lib/config";
+import { saveTransaction } from "@/lib/transactions";
 
 type ModalPhase = "confirm" | "loading" | "success" | "failed" | "insufficient" | null;
-
-interface DigiConfig {
-  username: string;
-  apiKey: string;
-}
-
-function loadConfig(): DigiConfig {
-  try {
-    const raw = localStorage.getItem("roneycell_config");
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return { username: "", apiKey: "" };
-}
-
-function saveConfig(cfg: DigiConfig) {
-  localStorage.setItem("roneycell_config", JSON.stringify(cfg));
-}
 
 export default function Home() {
   const [phone, setPhone] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [activeCategory, setActiveCategory] = useState<ProductCategory>("pulsa");
   const [balance, setBalance] = useState(0);
   const [modalPhase, setModalPhase] = useState<ModalPhase>(null);
   const [errorMessage, setErrorMessage] = useState("");
-  const [showConfig, setShowConfig] = useState(false);
-  const [config, setConfig] = useState<DigiConfig>(loadConfig);
+  const [lastRefId, setLastRefId] = useState("");
 
   const operator: Operator | null = detectOperator(phone);
 
@@ -44,18 +27,17 @@ export default function Home() {
     setBalance(val);
   }, []);
 
-  function handleSaveConfig(cfg: DigiConfig) {
-    setConfig(cfg);
-    saveConfig(cfg);
+  function handleCategoryChange(cat: ProductCategory) {
+    setActiveCategory(cat);
+    setSelectedProduct(null);
   }
 
   function handleSubmit() {
-    if (!phone || phone.length < 9) {
-      return;
-    }
+    if (!phone || phone.length < 9) return;
     if (!selectedProduct) return;
-    if (!config.username || !config.apiKey) {
-      setShowConfig(true);
+    const cfg = loadConfig();
+    if (!cfg.username || !cfg.apiKey) {
+      alert("Sila pergi ke tab Admin → Tetapan untuk mengisi username & API key Digiflazz terlebih dahulu.");
       return;
     }
     setModalPhase("confirm");
@@ -72,16 +54,25 @@ export default function Home() {
 
     setModalPhase("loading");
 
-    try {
-      const sku = getOperatorSku(operator?.name, selectedProduct.sku);
-      const refId = generateRefId();
+    const cfg = loadConfig();
+    const sku = getOperatorSku(operator?.name, selectedProduct.sku);
+    const refId = generateRefId();
+    setLastRefId(refId);
 
-      const result = await sendTransaction(
-        config,
+    try {
+      const result = await sendTransaction(cfg, phone, sku, refId);
+
+      saveTransaction({
+        id: refId,
+        date: new Date().toISOString(),
         phone,
-        sku,
-        refId
-      );
+        product: selectedProduct.name,
+        category: selectedProduct.category,
+        sellPrice: selectedProduct.price,
+        basePrice: selectedProduct.basePrice,
+        profit: selectedProduct.price - selectedProduct.basePrice,
+        status: result.success ? "success" : "failed",
+      });
 
       if (result.success) {
         await deductBalance(selectedProduct.price);
@@ -91,6 +82,17 @@ export default function Home() {
         setModalPhase("failed");
       }
     } catch (err: unknown) {
+      saveTransaction({
+        id: refId,
+        date: new Date().toISOString(),
+        phone,
+        product: selectedProduct.name,
+        category: selectedProduct.category,
+        sellPrice: selectedProduct.price,
+        basePrice: selectedProduct.basePrice,
+        profit: 0,
+        status: "failed",
+      });
       setErrorMessage(err instanceof Error ? err.message : "Ralat tidak diketahui");
       setModalPhase("failed");
     }
@@ -104,14 +106,12 @@ export default function Home() {
   const isFormValid = phone.length >= 9 && selectedProduct !== null;
 
   return (
-    <div className="min-h-dvh flex flex-col max-w-md mx-auto px-4 pb-8">
+    <div className="min-h-dvh flex flex-col max-w-md mx-auto px-4 pb-28">
       {/* Header */}
       <header className="sticky top-0 z-40 pt-safe">
         <div
           className="flex items-center justify-between py-4"
-          style={{
-            background: "linear-gradient(to bottom, hsl(220 40% 5%) 80%, transparent)",
-          }}
+          style={{ background: "linear-gradient(to bottom, hsl(220 40% 5%) 80%, transparent)" }}
         >
           <div className="flex items-center gap-3">
             <div
@@ -141,41 +141,8 @@ export default function Home() {
               <p className="text-[10px] text-muted-foreground tracking-widest">SISTEM JUALAN PULSA</p>
             </div>
           </div>
-
-          <button
-            onClick={() => setShowConfig(true)}
-            className="w-9 h-9 rounded-xl glass flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-              />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
         </div>
       </header>
-
-      {/* Config warning */}
-      {(!config.username || !config.apiKey) && (
-        <button
-          onClick={() => setShowConfig(true)}
-          className="mb-4 w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-yellow-500/30 bg-yellow-500/8 text-left"
-        >
-          <svg className="w-5 h-5 text-yellow-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-            />
-          </svg>
-          <div>
-            <p className="text-sm font-semibold text-yellow-400">Konfigurasi Diperlukan</p>
-            <p className="text-xs text-muted-foreground">Ketik di sini untuk masukkan username & API key Digiflazz</p>
-          </div>
-          <svg className="w-4 h-4 text-muted-foreground ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      )}
 
       {/* Balance */}
       <div className="mb-4">
@@ -187,9 +154,14 @@ export default function Home() {
         <PhoneInput value={phone} onChange={setPhone} />
       </div>
 
-      {/* Product Grid */}
+      {/* Product Grid with tabs */}
       <div className="mb-6">
-        <ProductGrid selected={selectedProduct} onSelect={setSelectedProduct} />
+        <ProductGrid
+          selected={selectedProduct}
+          onSelect={setSelectedProduct}
+          activeCategory={activeCategory}
+          onCategoryChange={handleCategoryChange}
+        />
       </div>
 
       {/* Order Summary */}
@@ -235,25 +207,11 @@ export default function Home() {
       <div className="mt-6 text-center">
         <p className="text-xs text-muted-foreground">
           Dikuasakan oleh{" "}
-          <span
-            style={{
-              background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              fontWeight: 700,
-            }}
-          >
+          <span style={{ background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 }}>
             Digiflazz
           </span>{" "}
           &amp;{" "}
-          <span
-            style={{
-              background: "linear-gradient(135deg, #34D399 0%, #10B981 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              fontWeight: 700,
-            }}
-          >
+          <span style={{ background: "linear-gradient(135deg, #34D399 0%, #10B981 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 }}>
             Firebase
           </span>
         </p>
@@ -268,17 +226,9 @@ export default function Home() {
           operator={operator}
           balance={balance}
           errorMessage={errorMessage}
+          refId={lastRefId}
           onConfirm={handleConfirmTransaction}
           onClose={handleCloseModal}
-        />
-      )}
-
-      {/* Config Modal */}
-      {showConfig && (
-        <ConfigModal
-          config={config}
-          onSave={handleSaveConfig}
-          onClose={() => setShowConfig(false)}
         />
       )}
     </div>
