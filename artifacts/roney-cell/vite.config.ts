@@ -28,6 +28,9 @@ if (!basePath) {
 
 export default defineConfig({
   base: basePath,
+  define: {
+    "import.meta.env.VITE_FONNTE_TOKEN": JSON.stringify(process.env.VITE_FONNTE_TOKEN ?? ""),
+  },
   plugins: [
     react(),
     tailwindcss(),
