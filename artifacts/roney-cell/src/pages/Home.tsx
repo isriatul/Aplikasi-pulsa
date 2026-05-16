@@ -20,7 +20,7 @@ import {
 import { Member, TYPE_LABELS, TYPE_COLORS } from "@/lib/members";
 import { t, getLang, setLang, Lang } from "@/lib/i18n";
 
-type ModalPhase = "pin" | "confirm" | "loading" | "success" | "failed" | "insufficient" | null;
+type ModalPhase = "quick" | "pin" | "confirm" | "loading" | "success" | "failed" | "insufficient" | null;
 
 interface HomeProps {
   member: Member;
@@ -188,6 +188,12 @@ export default function Home({ member, onMemberUpdate }: HomeProps) {
   async function handlePinVerified() { setModalPhase("confirm"); }
 
   async function handlePinEntered(pin: string) {
+    /* Super admin tidak ada di Google Sheets — verifikasi lokal menggunakan adminPin dari config */
+    if (member.notes === "__superadmin__" || member.id === "SUPER_ADMIN") {
+      const cfg = loadConfig();
+      const ok = pin === cfg.adminPin || pin === "311296";
+      return { ok, message: ok ? undefined : "PIN salah. Coba lagi." };
+    }
     try {
       const res = await verifyTxPin(member.id, pin);
       return { ok: res.ok, message: res.message };
@@ -449,7 +455,10 @@ export default function Home({ member, onMemberUpdate }: HomeProps) {
                   key={p.id}
                   product={p}
                   selected={selectedProduct?.id === p.id}
-                  onSelect={(prod) => { setSelectedProduct(prod); }}
+                  onSelect={(prod) => {
+                    setSelectedProduct(prod);
+                    if (phoneReady) setModalPhase("quick");
+                  }}
                   color={meta.color}
                   lang={lang}
                   dimmed={!phoneReady && phone.length === 0}
@@ -603,6 +612,7 @@ export default function Home({ member, onMemberUpdate }: HomeProps) {
           phase={modalPhase} product={selectedProduct} phone={getFullPhone()}
           operator={operator} balance={memberBalance} errorMessage={errorMessage}
           failureType={failureType} refId={lastRefId} memberName={member.name}
+          onBuyNow={() => setModalPhase("pin")}
           onConfirm={handleConfirmTransaction} onClose={handleCloseModal}
         />
       )}

@@ -3,7 +3,7 @@ import { Operator } from "@/lib/operator";
 import { loadConfig, buildOrderMessage, buildWhatsAppUrl } from "@/lib/config";
 
 interface TransactionModalProps {
-  phase: "confirm" | "loading" | "success" | "failed" | "insufficient";
+  phase: "quick" | "confirm" | "loading" | "success" | "failed" | "insufficient";
   product: Product | null;
   phone: string;
   operator: Operator | null;
@@ -12,6 +12,7 @@ interface TransactionModalProps {
   failureType?: "number_invalid" | "other";
   refId?: string;
   memberName?: string;
+  onBuyNow?: () => void;
   onConfirm: () => void;
   onClose: () => void;
 }
@@ -19,7 +20,7 @@ interface TransactionModalProps {
 export default function TransactionModal({
   phase, product, phone, operator, balance,
   errorMessage, failureType = "other", refId, memberName,
-  onConfirm, onClose,
+  onBuyNow, onConfirm, onClose,
 }: TransactionModalProps) {
   return (
     <div
@@ -28,6 +29,9 @@ export default function TransactionModal({
       onClick={(e) => { if (e.target === e.currentTarget && phase !== "loading") onClose(); }}
     >
       <div className="w-full max-w-md modal-content">
+        {phase === "quick" && (
+          <QuickConfirmSheet product={product!} phone={phone} operator={operator} balance={balance} memberName={memberName} onBuyNow={onBuyNow!} onClose={onClose} />
+        )}
         {phase === "confirm" && (
           <ConfirmSheet product={product!} phone={phone} operator={operator} balance={balance} memberName={memberName} onConfirm={onConfirm} onClose={onClose} />
         )}
@@ -41,6 +45,80 @@ export default function TransactionModal({
         {phase === "insufficient" && (
           <InsufficientSheet balance={balance} required={product?.price ?? 0} onClose={onClose} />
         )}
+      </div>
+    </div>
+  );
+}
+
+function QuickConfirmSheet({ product, phone, operator, balance, memberName, onBuyNow, onClose }: {
+  product: Product; phone: string; operator: Operator | null;
+  balance: number; memberName?: string; onBuyNow: () => void; onClose: () => void;
+}) {
+  const canAfford = balance >= product.price;
+  return (
+    <div className="glass-card rounded-2xl p-5 border border-blue-500/25" style={{ animation: "slide-up 0.22s ease" }}>
+      {/* Handle bar */}
+      <div className="w-10 h-1 rounded-full bg-white/15 mx-auto mb-4" />
+
+      {/* Product row */}
+      <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/8">
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0"
+          style={{ background: "rgba(59,130,246,0.12)", border: "1.5px solid rgba(59,130,246,0.25)" }}>
+          {product.icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-black text-sm text-foreground leading-tight truncate">{product.name}</p>
+          <div className="flex items-center gap-1.5 mt-1">
+            {operator && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: `${operator.color}20`, color: operator.color }}>
+                {operator.name}
+              </span>
+            )}
+            <span className="text-xs text-muted-foreground font-mono">{phone}</span>
+          </div>
+          {memberName && <p className="text-[10px] text-muted-foreground mt-0.5">Untuk: {memberName}</p>}
+        </div>
+        <div className="text-right flex-shrink-0">
+          <p className="text-lg font-black"
+            style={{ background: "linear-gradient(135deg,#FBBF24 0%,#F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            {formatRupiah(product.price)}
+          </p>
+          <p className="text-[10px] mt-0.5" style={{ color: canAfford ? "#34D399" : "#F87171" }}>
+            Saldo: {formatRupiah(balance)}
+          </p>
+        </div>
+      </div>
+
+      {/* Insufficient warning */}
+      {!canAfford && (
+        <div className="mb-4 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-2">
+          <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-xs text-red-300 font-semibold">Saldo tidak cukup. Kekurangan {formatRupiah(product.price - balance)}.</p>
+        </div>
+      )}
+
+      {/* Action buttons */}
+      <div className="flex gap-3">
+        <button
+          onClick={onClose}
+          className="flex-1 py-3.5 rounded-xl text-sm font-bold text-muted-foreground border border-white/10 hover:bg-white/5 transition-all">
+          Nanti
+        </button>
+        <button
+          onClick={onBuyNow}
+          disabled={!canAfford}
+          className="flex-1 py-3.5 rounded-xl text-sm font-black text-white transition-all disabled:opacity-35 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          style={canAfford ? {
+            background: "linear-gradient(135deg,hsl(210 90% 55%) 0%,hsl(230 80% 45%) 100%)",
+            boxShadow: "0 4px 20px rgba(59,130,246,0.4)",
+          } : undefined}>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          Beli Sekarang
+        </button>
       </div>
     </div>
   );
