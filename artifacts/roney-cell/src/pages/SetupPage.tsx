@@ -10,16 +10,15 @@ import { pingScript } from "@/lib/sheetsApi";
    Kode di bawah menangani SEMUA aksi lewat doGet().
 ───────────────────────────────────────────────────────── */
 const APPS_SCRIPT_CODE = `// ╔══════════════════════════════════════════════════════════════╗
-// ║          RoneyCell — Google Apps Script API v2               ║
+// ║       RoneyCell — Google Apps Script API v4 (FINAL)          ║
 // ╠══════════════════════════════════════════════════════════════╣
-// ║  SEMUA request melalui doGet (GET) untuk menghindari         ║
-// ║  masalah CORS redirect pada doPost.                          ║
-// ╠══════════════════════════════════════════════════════════════╣
-// ║  Cara deploy:                                                ║
-// ║  1. Extensions > Apps Script > Tempel kode ini               ║
-// ║  2. Deploy > New deployment > Web app                        ║
-// ║  3. Execute as: Me  |  Who has access: Anyone                ║
-// ║  4. Authorize > Copy URL > Paste di RoneyCell Setup          ║
+// ║  CARA DEPLOY YANG BENAR:                                     ║
+// ║  1. Buka spreadsheet kamu di Google Sheets                   ║
+// ║  2. Klik Extensions > Apps Script                            ║
+// ║  3. Hapus semua kode lama, tempel kode ini                   ║
+// ║  4. Ctrl+S untuk simpan                                      ║
+// ║  5. Deploy > New deployment > Web app                        ║
+// ║  6. Execute as: Me  |  Who has access: Anyone                ║
 // ╚══════════════════════════════════════════════════════════════╝
 
 const SS_ID    = "1WiFiPeRn7luGimAC53WTC4zgR4Oc4_0gZ-mVi0J0-J8";
@@ -27,132 +26,104 @@ const U_SHEET  = "Users";
 const T_SHEET  = "Transactions";
 const ADMIN_HP = "081288080752";
 
-/* ── Utilities ──────────────────────────────────── */
-
 function sha256(str) {
-  const raw = Utilities.computeDigest(
-    Utilities.DigestAlgorithm.SHA_256,
-    str,
-    Utilities.Charset.UTF_8
-  );
+  const raw = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, str, Utilities.Charset.UTF_8);
   return raw.map(b => ("0" + (b & 0xFF).toString(16)).slice(-2)).join("");
 }
-
 function respond(obj) {
-  const output = ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-  return output;
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
-function getSheet(name) {
-  return SpreadsheetApp.openById(SS_ID).getSheetByName(name);
+// PENTING: gunakan getActiveSpreadsheet() agar data masuk ke spreadsheet yang benar
+// (spreadsheet tempat script ini dibuka dari Extensions > Apps Script)
+function getSpreadsheet() {
+  try {
+    const active = SpreadsheetApp.getActiveSpreadsheet();
+    if (active) return active;
+  } catch(e) {}
+  return SpreadsheetApp.openById(SS_ID);
 }
+function getSheet(name) { return getSpreadsheet().getSheetByName(name); }
 
 function ensureSheets() {
-  const ss = SpreadsheetApp.openById(SS_ID);
+  const ss = getSpreadsheet();
   if (!ss.getSheetByName(U_SHEET)) {
     const s = ss.insertSheet(U_SHEET);
-    s.appendRow(["ID","Nama","Phone","Email","Password","TxPIN",
-                 "Role","Status","Saldo","Type","LoginMethod","DaftarPada"]);
+    s.appendRow(["ID","Nama","Phone","Email","Password","TxPIN","Role","Status","Saldo","Type","LoginMethod","DaftarPada"]);
     s.setFrozenRows(1);
   }
   if (!ss.getSheetByName(T_SHEET)) {
     const s = ss.insertSheet(T_SHEET);
-    s.appendRow(["RefID","Phone","Produk","Kategori","Harga",
-                 "HargaDasar","Profit","Status","Tanggal","Catatan"]);
+    s.appendRow(["RefID","Phone","Produk","Kategori","Harga","HargaDasar","Profit","Status","Tanggal","Catatan"]);
     s.setFrozenRows(1);
   }
 }
 
-/* ── Row finders ────────────────────────────────── */
-
 function findByPhone(phone) {
   const c = String(phone).replace(/\\D/g, "");
   const rows = getSheet(U_SHEET).getDataRange().getValues();
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][2]).replace(/\\D/g, "") === c)
-      return { row: i + 1, data: rows[i] };
-  }
+  for (let i = 1; i < rows.length; i++)
+    if (String(rows[i][2]).replace(/\\D/g, "") === c) return { row: i + 1, data: rows[i] };
   return null;
 }
-
 function findByEmail(email) {
   const rows = getSheet(U_SHEET).getDataRange().getValues();
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][3]).toLowerCase() === String(email).toLowerCase())
-      return { row: i + 1, data: rows[i] };
-  }
+  for (let i = 1; i < rows.length; i++)
+    if (String(rows[i][3]).toLowerCase() === String(email).toLowerCase()) return { row: i + 1, data: rows[i] };
   return null;
 }
-
 function findById(id) {
   const rows = getSheet(U_SHEET).getDataRange().getValues();
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][0]) === String(id))
-      return { row: i + 1, data: rows[i] };
-  }
+  for (let i = 1; i < rows.length; i++)
+    if (String(rows[i][0]) === String(id)) return { row: i + 1, data: rows[i] };
   return null;
 }
-
 function toUser(d) {
-  return {
-    id: String(d[0]), name: String(d[1]), phone: String(d[2]),
-    email: String(d[3]), role: String(d[6]), status: String(d[7]),
-    balance: Number(d[8]), type: String(d[9]),
-    loginMethod: String(d[10]), createdAt: String(d[11])
-  };
+  return { id:String(d[0]), name:String(d[1]), phone:String(d[2]), email:String(d[3]),
+           role:String(d[6]), status:String(d[7]), balance:Number(d[8]),
+           type:String(d[9]), loginMethod:String(d[10]), createdAt:String(d[11]) };
 }
-
-/* ── Main entry point (ALL requests come here) ─── */
 
 function doGet(e) {
   try {
     ensureSheets();
-    const p = e.parameter;
-    const action = p.action || "";
-
-    switch (action) {
-      // ── Auth ──
-      case "login":           return handleLogin(p);
-      case "register":        return handleRegister(p);
-
-      // ── Balance ──
-      case "getBalance":      return handleGetBalance(p);
-      case "updateBalance":   return handleUpdateBalance(p);
-
-      // ── Transactions ──
-      case "addTransaction":  return handleAddTxn(p);
-      case "refund":          return handleRefund(p);
-      case "getTransactions": return handleGetTxns(p);
-
-      // ── PIN ──
-      case "verifyTxPin":     return handleVerifyPin(p);
-
-      // ── Util ──
-      case "ping":
-        return respond({ ok: true, ts: new Date().toISOString() });
-
-      default:
-        return respond({ ok: false, message: "Unknown action: " + action });
-    }
-  } catch (err) {
-    return respond({ ok: false, message: String(err.message || err) });
-  }
+    const p = e.parameter, a = p.action || "";
+    if (a === "ping")           return respond({ ok:true, ts:new Date().toISOString() });
+    if (a === "debug")          return handleDebug();
+    if (a === "login")          return handleLogin(p);
+    if (a === "register")       return handleRegister(p);
+    if (a === "getBalance")     return handleGetBalance(p);
+    if (a === "updateBalance")  return handleUpdateBalance(p);
+    if (a === "addTransaction") return handleAddTxn(p);
+    if (a === "refund")         return handleRefund(p);
+    if (a === "getTransactions")return handleGetTxns(p);
+    if (a === "verifyTxPin")    return handleVerifyPin(p);
+    return respond({ ok:false, message:"Unknown action: " + a });
+  } catch(err) { return respond({ ok:false, message:String(err.message||err) }); }
 }
-
-/* doPost tetap ada sebagai fallback */
 function doPost(e) {
   try {
     ensureSheets();
     let p = Object.assign({}, e.parameter);
-    if (e.postData && e.postData.contents) {
-      try { Object.assign(p, JSON.parse(e.postData.contents)); } catch(x) {}
-    }
+    if (e.postData && e.postData.contents) try { Object.assign(p, JSON.parse(e.postData.contents)); } catch(x) {}
     return doGet({ parameter: p });
-  } catch (err) {
-    return respond({ ok: false, message: String(err.message || err) });
-  }
+  } catch(err) { return respond({ ok:false, message:String(err.message||err) }); }
+}
+
+/* ── Handler: Debug ─────────────────────────────── */
+
+function handleDebug() {
+  const ss = getSpreadsheet();
+  const sheets = ss ? ss.getSheets().map(function(s) { return s.getName(); }) : [];
+  const uSheet = getSheet(U_SHEET);
+  const rows = uSheet ? uSheet.getDataRange().getValues() : [];
+  return respond({
+    ok: true,
+    spreadsheetId: ss ? ss.getId() : null,
+    spreadsheetName: ss ? ss.getName() : null,
+    sheets: sheets,
+    userRows: Math.max(0, rows.length - 1)
+  });
 }
 
 /* ── Handler: Login ─────────────────────────────── */
