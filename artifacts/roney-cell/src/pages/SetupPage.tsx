@@ -45,18 +45,66 @@ function getSpreadsheet() {
 }
 function getSheet(name) { return getSpreadsheet().getSheetByName(name); }
 
+function formatHeader(sheet, numCols) {
+  const header = sheet.getRange(1, 1, 1, numCols);
+  header.setBackground("#1a73e8")
+        .setFontColor("#ffffff")
+        .setFontWeight("bold")
+        .setFontSize(10)
+        .setHorizontalAlignment("center")
+        .setVerticalAlignment("middle");
+  sheet.setRowHeight(1, 32);
+  sheet.setFrozenRows(1);
+  sheet.setColumnWidth(1, 160);   // ID
+  sheet.setColumnWidth(2, 160);   // Nama_Lengkap
+  sheet.setColumnWidth(3, 130);   // No_HP
+  sheet.setColumnWidth(4, 180);   // Email
+  sheet.setColumnWidth(5, 80);    // Password
+  sheet.setColumnWidth(6, 80);    // PIN_Transaksi
+  sheet.setColumnWidth(7, 80);    // Saldo
+  sheet.setColumnWidth(8, 80);    // Status
+  sheet.setColumnWidth(9, 80);    // Role
+  sheet.setColumnWidth(10, 110);  // Provider_Daftar
+  sheet.setColumnWidth(11, 180);  // Device_ID
+  sheet.setColumnWidth(12, 175);  // Tanggal_Waktu_Daftar
+}
+
+function formatTxnHeader(sheet) {
+  const header = sheet.getRange(1, 1, 1, 10);
+  header.setBackground("#0f9d58")
+        .setFontColor("#ffffff")
+        .setFontWeight("bold")
+        .setFontSize(10)
+        .setHorizontalAlignment("center")
+        .setVerticalAlignment("middle");
+  sheet.setRowHeight(1, 32);
+  sheet.setFrozenRows(1);
+  for (var c = 1; c <= 10; c++) sheet.setColumnWidth(c, 120);
+}
+
 function ensureSheets() {
   const ss = getSpreadsheet();
   if (!ss.getSheetByName(U_SHEET)) {
     const s = ss.insertSheet(U_SHEET);
     s.appendRow(["ID","Nama_Lengkap","No_HP","Email","Password","PIN_Transaksi","Saldo","Status","Role","Provider_Daftar","Device_ID","Tanggal_Waktu_Daftar"]);
-    s.setFrozenRows(1);
+    formatHeader(s, 12);
   }
   if (!ss.getSheetByName(T_SHEET)) {
     const s = ss.insertSheet(T_SHEET);
     s.appendRow(["RefID","Phone","Produk","Kategori","Harga","HargaDasar","Profit","Status","Tanggal","Catatan"]);
-    s.setFrozenRows(1);
+    formatTxnHeader(s);
   }
+}
+
+// Jalankan fungsi ini SATU KALI dari editor Apps Script (▶ Run)
+// untuk memformat sheet Users & Transactions yang sudah ada.
+function applyFormatting() {
+  const ss = getSpreadsheet();
+  const us = ss.getSheetByName(U_SHEET);
+  const ts = ss.getSheetByName(T_SHEET);
+  if (us) formatHeader(us, 12);
+  if (ts) formatTxnHeader(ts);
+  SpreadsheetApp.getUi().alert("✅ Format kolom berhasil diterapkan!");
 }
 
 function findByPhone(phone) {
