@@ -26,7 +26,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   requireAuth(req, res, () => {
-    if (req.member?.role !== "admin") {
+    if (req.member?.role !== "admin" && req.member?.role !== "superadmin") {
       res.status(403).json({ error: "Akses ditolak: hanya admin" });
       return;
     }
