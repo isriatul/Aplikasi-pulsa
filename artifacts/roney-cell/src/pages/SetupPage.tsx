@@ -21,7 +21,7 @@ const APPS_SCRIPT_CODE = `// ╔════════════════
 // ║  6. Execute as: Me  |  Who has access: Anyone                ║
 // ╚══════════════════════════════════════════════════════════════╝
 
-const SS_ID    = "1WiFiPeRn7luGimAC53WTC4zgR4Oc4_0gZ-mVi0J0-J8";
+const SS_ID    = "1M5aMxf1buxk8_HKBDml39uwdMdbRK-Pi4JqqsTycXJ8";
 const U_SHEET  = "Users";
 const T_SHEET  = "Transactions";
 const ADMIN_HP = "081288080752";
