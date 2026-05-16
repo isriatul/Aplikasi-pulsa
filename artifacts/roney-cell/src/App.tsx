@@ -9,6 +9,7 @@ import SetupPage from "@/pages/SetupPage";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { Member, clearSession } from "@/lib/members";
 import { loadConfig } from "@/lib/config";
+import { fetchApiToken, clearApiToken } from "@/lib/apiAuth";
 
 type Tab = "home" | "deposit" | "member" | "admin";
 type AppState = "checking" | "setup" | "login" | "app";
@@ -62,6 +63,13 @@ export default function App() {
       setMember(session);
       setAppState("app");
       if (isSuperAdmin(session)) setActiveTab("admin");
+      /* Pulihkan JWT setelah reload halaman */
+      void fetchApiToken({
+        memberId: session.id,
+        phone: session.phone,
+        role: isSuperAdmin(session) ? "admin" : "member",
+        name: session.name,
+      });
     } else {
       setAppState("login");
     }
@@ -77,10 +85,18 @@ export default function App() {
     setMember(m);
     setAppState("app");
     setActiveTab(isSuperAdmin(m) ? "admin" : "home");
+    /* Ambil JWT untuk proteksi endpoint API — fire-and-forget */
+    void fetchApiToken({
+      memberId: m.id,
+      phone: m.phone,
+      role: isSuperAdmin(m) ? "admin" : "member",
+      name: m.name,
+    });
   }
 
   function handleLogout() {
     clearAppSession();
+    clearApiToken();
     setMember(null);
     setAppState("login");
   }

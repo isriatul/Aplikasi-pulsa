@@ -1,5 +1,8 @@
 /* Semua panggilan Digiflazz dirutekan melalui backend (/api/digiflazz/*)
-   agar kredensial tetap aman di server dan IP Whitelist konsisten. */
+   agar kredensial tetap aman di server dan IP Whitelist konsisten.
+   Setiap request dilindungi JWT Bearer token. */
+
+import { getAuthHeaders } from "./apiAuth";
 
 export interface TransactionResult {
   success: boolean;
@@ -16,7 +19,7 @@ export async function sendTransaction(
 ): Promise<TransactionResult> {
   const res = await fetch("/api/digiflazz/topup", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify({
       buyer_sku_code: productCode,
       customer_no: customerNo,
@@ -72,7 +75,9 @@ export async function checkDigiflazzBalance(): Promise<{
   error?: string;
 }> {
   try {
-    const res = await fetch("/api/digiflazz/balance");
+    const res = await fetch("/api/digiflazz/balance", {
+      headers: getAuthHeaders(),
+    });
     const data = (await res.json()) as {
       data?: { deposit?: number };
       error?: string;
@@ -115,7 +120,7 @@ export async function sendTestTransaction(
 ): Promise<TestTransactionResult> {
   const res = await fetch("/api/digiflazz/test", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify({ buyer_sku_code: productCode, customer_no: customerNo }),
   });
   const data = (await res.json()) as TestTransactionResult & { error?: string };
