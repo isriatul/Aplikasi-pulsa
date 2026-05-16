@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { loadConfig, saveConfig } from "@/lib/config";
 import {
   ALL_PRODUCTS,
@@ -25,6 +25,11 @@ import {
   STATUS_LABELS,
   STATUS_COLORS,
 } from "@/lib/members";
+import {
+  getSheetUsers,
+  updateSheetUserStatus,
+  SheetUser,
+} from "@/lib/sheetsApi";
 
 type AdminTab = "report" | "prices" | "members" | "settings";
 
@@ -234,12 +239,181 @@ function PriceSection() {
 /* ─── MEMBERS ─── */
 type MemberView = "list" | "add" | "transfer";
 
+/* Pending members from Google Sheets */
+function SheetsPendingSection({ onRefreshed }: { onRefreshed?: (count: number) => void }) {
+  const [sheetPending, setSheetPending]     = useState<SheetUser[]>([]);
+  const [loadingSheets, setLoadingSheets]   = useState(true);
+  const [actionIds, setActionIds]           = useState<Record<string, "approving" | "rejecting">>({});
+  const [resultMsgs, setResultMsgs]         = useState<Record<string, string>>({});
+  const [sheetsError, setSheetsError]       = useState("");
+
+  const fetchPending = useCallback(async () => {
+    setLoadingSheets(true);
+    setSheetsError("");
+    try {
+      const users = await getSheetUsers();
+      const pending = users.filter((u) => u.status === "pending");
+      setSheetPending(pending);
+      onRefreshed?.(pending.length);
+    } catch (e: unknown) {
+      setSheetsError(e instanceof Error ? e.message : "Gagal memuat data.");
+    }
+    setLoadingSheets(false);
+  }, [onRefreshed]);
+
+  useEffect(() => { fetchPending(); }, [fetchPending]);
+
+  async function handleAction(userId: string, action: "active" | "rejected") {
+    setActionIds((p) => ({ ...p, [userId]: action === "active" ? "approving" : "rejecting" }));
+    try {
+      const res = await updateSheetUserStatus(userId, action);
+      const msg = action === "active"
+        ? (res.ok ? "✅ Disetujui! User bisa login." : `Gagal: ${res.message ?? "error"}`)
+        : (res.ok ? "❌ Ditolak." : `Gagal: ${res.message ?? "error"}`);
+      setResultMsgs((p) => ({ ...p, [userId]: msg }));
+      if (res.ok) {
+        setSheetPending((prev) => prev.filter((u) => u.id !== userId));
+        onRefreshed?.(sheetPending.length - 1);
+      }
+    } catch (e: unknown) {
+      setResultMsgs((p) => ({ ...p, [userId]: e instanceof Error ? e.message : "Error." }));
+    }
+    setActionIds((p) => { const n = { ...p }; delete n[userId]; return n; });
+  }
+
+  if (loadingSheets) {
+    return (
+      <div className="glass-card rounded-2xl p-5 border border-yellow-500/20">
+        <div className="flex items-center gap-3">
+          <div className="w-4 h-4 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+          <p className="text-sm text-muted-foreground">Memuat pendaftar dari Google Sheets...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (sheetsError) {
+    return (
+      <div className="glass-card rounded-2xl p-4 border border-red-500/25 bg-red-500/5">
+        <div className="flex items-start gap-3 mb-3">
+          <span className="text-xl">⚠️</span>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-red-300 mb-1">Gagal memuat data Sheets</p>
+            <p className="text-xs text-muted-foreground">{sheetsError}</p>
+            <p className="text-[11px] text-muted-foreground mt-1.5">
+              Pastikan Apps Script Anda mendukung <code className="bg-white/10 px-1 rounded">action=getUsers</code>.
+            </p>
+          </div>
+        </div>
+        <button onClick={fetchPending}
+          className="w-full py-2 rounded-lg text-xs font-bold bg-white/5 border border-white/10 text-muted-foreground hover:text-foreground transition-all">
+          🔄 Coba Lagi
+        </button>
+      </div>
+    );
+  }
+
+  if (sheetPending.length === 0) {
+    return (
+      <div className="glass-card rounded-2xl p-5 border border-white/6">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Pendaftar Baru (via App)</p>
+          <button onClick={fetchPending} className="text-xs text-muted-foreground hover:text-foreground transition-colors">🔄 Refresh</button>
+        </div>
+        <div className="text-center py-4">
+          <p className="text-2xl mb-2">🎉</p>
+          <p className="text-sm text-muted-foreground">Tidak ada pendaftar yang menunggu persetujuan.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Section header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+          <p className="text-sm font-black text-yellow-300">Pendaftar Baru Menunggu Persetujuan</p>
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-yellow-500/20 text-yellow-400">
+            {sheetPending.length}
+          </span>
+        </div>
+        <button onClick={fetchPending} className="text-xs text-muted-foreground hover:text-foreground transition-colors">🔄</button>
+      </div>
+
+      {sheetPending.map((u) => {
+        const busy = !!actionIds[u.id];
+        const result = resultMsgs[u.id];
+        return (
+          <div key={u.id} className="glass-card rounded-2xl p-4 border border-yellow-500/30"
+            style={{ background: "rgba(251,191,36,0.03)" }}>
+            {/* User info */}
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <p className="font-black text-foreground truncate">{u.name}</p>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-yellow-500/20 text-yellow-400 flex-shrink-0">
+                    PENDING
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">📱 {u.phone || "-"}</p>
+                {u.email && <p className="text-xs text-muted-foreground">✉️ {u.email}</p>}
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Daftar: {u.createdAt ? new Date(u.createdAt).toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" }) : "-"}
+                </p>
+              </div>
+              <div className="ml-3 flex-shrink-0">
+                <span className="text-xs font-semibold text-muted-foreground bg-white/5 border border-white/8 px-2 py-1 rounded-lg">
+                  {u.loginMethod === "phone" ? "📱 HP" : u.loginMethod === "email" ? "✉️ Email" : "👤 FB"}
+                </span>
+              </div>
+            </div>
+
+            {/* Result message */}
+            {result && (
+              <div className={`px-3 py-2 rounded-lg text-xs font-semibold mb-2 ${result.startsWith("✅") ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/20" : "bg-red-500/15 text-red-300 border border-red-500/20"}`}>
+                {result}
+              </div>
+            )}
+
+            {/* Actions */}
+            {!result && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleAction(u.id, "active")}
+                  disabled={busy}
+                  className="flex-1 py-2.5 rounded-xl text-xs font-black transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  style={{ background: "linear-gradient(135deg,rgba(16,185,129,0.2) 0%,rgba(5,150,105,0.15) 100%)", border: "1px solid rgba(16,185,129,0.35)", color: "#34D399" }}>
+                  {actionIds[u.id] === "approving"
+                    ? <><span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> Memproses...</>
+                    : <>✓ Setujui (Aktifkan)</>}
+                </button>
+                <button
+                  onClick={() => handleAction(u.id, "rejected")}
+                  disabled={busy}
+                  className="flex-1 py-2.5 rounded-xl text-xs font-black transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", color: "#F87171" }}>
+                  {actionIds[u.id] === "rejecting"
+                    ? <><span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> Memproses...</>
+                    : <>✕ Tolak</>}
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function MembersSection({ onMemberChange }: { onMemberChange?: () => void }) {
   const [view, setView] = useState<MemberView>("list");
   const [members, setMembers] = useState<Member[]>(() => loadMembers());
   const [transferTarget, setTransferTarget] = useState<Member | null>(null);
   const [filterStatus, setFilterStatus] = useState<MemberStatus | "all">("all");
   const [search, setSearch] = useState("");
+  const [sheetsPendingCount, setSheetsPendingCount] = useState(0);
 
   function refresh() { setMembers(loadMembers()); }
 
@@ -259,7 +433,8 @@ function MembersSection({ onMemberChange }: { onMemberChange?: () => void }) {
     return true;
   });
 
-  const pending = members.filter((m) => m.status === "pending").length;
+  const localPending = members.filter((m) => m.status === "pending").length;
+  const totalPending = localPending + sheetsPendingCount;
 
   if (view === "add") return <AddMemberForm onDone={() => { refresh(); setView("list"); }} onBack={() => setView("list")} />;
   if (view === "transfer" && transferTarget) return (
@@ -267,12 +442,15 @@ function MembersSection({ onMemberChange }: { onMemberChange?: () => void }) {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="font-bold text-foreground">Daftar Member</p>
-          <p className="text-xs text-muted-foreground">{members.length} total, {pending} menunggu</p>
+          <p className="font-bold text-foreground">Manajemen Member</p>
+          <p className="text-xs text-muted-foreground">
+            {members.length} member lokal
+            {totalPending > 0 && <span className="text-yellow-400 font-bold"> · {totalPending} menunggu</span>}
+          </p>
         </div>
         <button onClick={() => setView("add")}
           className="px-4 py-2 rounded-xl text-sm font-bold transition-all"
@@ -281,96 +459,111 @@ function MembersSection({ onMemberChange }: { onMemberChange?: () => void }) {
         </button>
       </div>
 
-      {/* Pending alert */}
-      {pending > 0 && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-yellow-500/30 bg-yellow-500/8">
-          <div className="w-2 h-2 rounded-full bg-yellow-400 pulse-dot" />
-          <p className="text-sm text-yellow-300 font-semibold">{pending} member menunggu persetujuan</p>
-          <button onClick={() => setFilterStatus("pending")} className="ml-auto text-xs text-yellow-400 underline">Lihat</button>
+      {/* ─── SHEETS PENDING SECTION ─── */}
+      <div className="rounded-2xl border border-yellow-500/15 overflow-hidden">
+        <div className="px-4 py-3 flex items-center gap-2 border-b border-yellow-500/10"
+          style={{ background: "rgba(251,191,36,0.06)" }}>
+          <span className="text-base">🕐</span>
+          <p className="text-xs font-black text-yellow-200 uppercase tracking-widest">Pending Members (via Pendaftaran App)</p>
         </div>
-      )}
-
-      {/* Search + filter */}
-      <div className="flex gap-2">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari nama / nomor..."
-          className="flex-1 px-3 py-2.5 rounded-xl text-sm bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-purple-500/60 transition-all" />
-        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as MemberStatus | "all")}
-          className="px-3 py-2.5 rounded-xl text-sm bg-white/5 border border-white/10 text-foreground focus:outline-none transition-all">
-          <option value="all">Semua</option>
-          <option value="pending">Menunggu</option>
-          <option value="approved">Diluluskan</option>
-          <option value="rejected">Ditolak</option>
-        </select>
+        <div className="p-4">
+          <SheetsPendingSection onRefreshed={setSheetsPendingCount} />
+        </div>
       </div>
 
-      {/* Member list */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-10">
-          <p className="text-4xl mb-3">👥</p>
-          <p className="text-sm text-muted-foreground">Tiada member ditemukan</p>
+      {/* ─── LOCAL MEMBERS LIST ─── */}
+      <div className="space-y-3">
+        <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">Member Lokal</p>
+
+        {/* Pending alert for local */}
+        {localPending > 0 && (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-yellow-500/30 bg-yellow-500/8">
+            <div className="w-2 h-2 rounded-full bg-yellow-400 pulse-dot" />
+            <p className="text-sm text-yellow-300 font-semibold">{localPending} member lokal menunggu</p>
+            <button onClick={() => setFilterStatus("pending")} className="ml-auto text-xs text-yellow-400 underline">Lihat</button>
+          </div>
+        )}
+
+        {/* Search + filter */}
+        <div className="flex gap-2">
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari nama / nomor..."
+            className="flex-1 px-3 py-2.5 rounded-xl text-sm bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-purple-500/60 transition-all" />
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as MemberStatus | "all")}
+            className="px-3 py-2.5 rounded-xl text-sm bg-white/5 border border-white/10 text-foreground focus:outline-none transition-all">
+            <option value="all">Semua</option>
+            <option value="pending">Menunggu</option>
+            <option value="approved">Diluluskan</option>
+            <option value="rejected">Ditolak</option>
+          </select>
         </div>
-      ) : (
-        <div className="space-y-3">
-          {filtered.map((m) => (
-            <div key={m.id} className="glass-card rounded-2xl p-4 border"
-              style={{ borderColor: m.status === "pending" ? "#FBBF2440" : "rgba(255,255,255,0.06)" }}>
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-bold text-foreground">{m.name}</p>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold"
-                      style={{ background: `${STATUS_COLORS[m.status]}20`, color: STATUS_COLORS[m.status] }}>
-                      {STATUS_LABELS[m.status]}
-                    </span>
+
+        {/* Member list */}
+        {filtered.length === 0 ? (
+          <div className="text-center py-10">
+            <p className="text-4xl mb-3">👥</p>
+            <p className="text-sm text-muted-foreground">Tiada member ditemukan</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filtered.map((m) => (
+              <div key={m.id} className="glass-card rounded-2xl p-4 border"
+                style={{ borderColor: m.status === "pending" ? "#FBBF2440" : "rgba(255,255,255,0.06)" }}>
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-foreground">{m.name}</p>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold"
+                        style={{ background: `${STATUS_COLORS[m.status]}20`, color: STATUS_COLORS[m.status] }}>
+                        {STATUS_LABELS[m.status]}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{m.phone}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">{m.phone}</p>
+                  <div className="text-right">
+                    <p className="text-sm font-bold" style={{ color: TYPE_COLORS[m.type] }}>{TYPE_LABELS[m.type]}</p>
+                    <p className="text-xs text-muted-foreground">{formatRupiah(m.balance)}</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold" style={{ color: TYPE_COLORS[m.type] }}>{TYPE_LABELS[m.type]}</p>
-                  <p className="text-xs text-muted-foreground">{formatRupiah(m.balance)}</p>
-                </div>
-              </div>
 
-              {/* Type selector */}
-              {m.status === "approved" && (
-                <div className="flex gap-1.5 mb-3">
-                  {(["retail", "member", "reseller"] as MemberType[]).map((t) => (
-                    <button key={t} onClick={() => handleTypeChange(m.id, t)}
-                      className="flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all border"
-                      style={m.type === t
-                        ? { background: `${TYPE_COLORS[t]}20`, borderColor: `${TYPE_COLORS[t]}50`, color: TYPE_COLORS[t] }
-                        : { borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.35)" }
-                      }>
-                      {TYPE_LABELS[t]}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-2">
-                {m.status === "pending" && (
-                  <>
-                    <button onClick={() => handleApprove(m.id)} className="flex-1 py-2 rounded-lg text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 transition-all hover:bg-emerald-500/25">✓ Setujui</button>
-                    <button onClick={() => handleReject(m.id)} className="flex-1 py-2 rounded-lg text-xs font-bold bg-red-500/15 text-red-400 border border-red-500/25 transition-all hover:bg-red-500/25">✕ Tolak</button>
-                  </>
-                )}
                 {m.status === "approved" && (
-                  <button onClick={() => { setTransferTarget(m); setView("transfer"); }}
-                    className="flex-1 py-2 rounded-lg text-xs font-bold bg-blue-500/15 text-blue-400 border border-blue-500/25 transition-all hover:bg-blue-500/25">
-                    💸 Transfer Saldo
-                  </button>
+                  <div className="flex gap-1.5 mb-3">
+                    {(["retail", "member", "reseller"] as MemberType[]).map((t) => (
+                      <button key={t} onClick={() => handleTypeChange(m.id, t)}
+                        className="flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all border"
+                        style={m.type === t
+                          ? { background: `${TYPE_COLORS[t]}20`, borderColor: `${TYPE_COLORS[t]}50`, color: TYPE_COLORS[t] }
+                          : { borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.35)" }
+                        }>
+                        {TYPE_LABELS[t]}
+                      </button>
+                    ))}
+                  </div>
                 )}
-                <button onClick={() => handleDelete(m.id)} className="w-9 h-9 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 flex items-center justify-center text-xs transition-all hover:bg-red-500/20">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
+
+                <div className="flex gap-2">
+                  {m.status === "pending" && (
+                    <>
+                      <button onClick={() => handleApprove(m.id)} className="flex-1 py-2 rounded-lg text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 transition-all hover:bg-emerald-500/25">✓ Setujui</button>
+                      <button onClick={() => handleReject(m.id)} className="flex-1 py-2 rounded-lg text-xs font-bold bg-red-500/15 text-red-400 border border-red-500/25 transition-all hover:bg-red-500/25">✕ Tolak</button>
+                    </>
+                  )}
+                  {m.status === "approved" && (
+                    <button onClick={() => { setTransferTarget(m); setView("transfer"); }}
+                      className="flex-1 py-2 rounded-lg text-xs font-bold bg-blue-500/15 text-blue-400 border border-blue-500/25 transition-all hover:bg-blue-500/25">
+                      💸 Transfer Saldo
+                    </button>
+                  )}
+                  <button onClick={() => handleDelete(m.id)} className="w-9 h-9 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 flex items-center justify-center text-xs transition-all hover:bg-red-500/20">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

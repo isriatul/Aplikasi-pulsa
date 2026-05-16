@@ -63,6 +63,13 @@ export default function App() {
   }
 
   function handleLogin(m: Member) {
+    if (m.status === "pending") {
+      /* LoginPage already shows the error, but guard here too */
+      return;
+    }
+    if (m.status === "rejected") {
+      return;
+    }
     saveAppSession(m);
     setMember(m);
     setAppState("app");

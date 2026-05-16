@@ -90,6 +90,24 @@ async function api(params: Record<string, string>): Promise<ApiResponse> {
   }
 }
 
+/* ── User management (admin) ── */
+
+export async function getSheetUsers(): Promise<SheetUser[]> {
+  try {
+    const res = await api({ action: "getUsers" }) as ApiResponse & { users?: SheetUser[] };
+    return res.users ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function updateSheetUserStatus(
+  userId: string,
+  status: "active" | "rejected",
+): Promise<ApiResponse> {
+  return api({ action: "updateStatus", userId, status });
+}
+
 /* ── Auth ── */
 
 export async function loginWithPhone(phone: string, password: string): Promise<ApiResponse> {
@@ -133,6 +151,7 @@ export async function registerUser(data: {
     txPinHash,
     loginMethod: data.loginMethod,
     deviceId,
+    status: data.status ?? "pending",
   });
 }
 
