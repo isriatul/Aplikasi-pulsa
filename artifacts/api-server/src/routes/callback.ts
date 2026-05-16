@@ -8,6 +8,7 @@ import { appendTxLog } from "../lib/txLog.js";
 import { saveIdempotentResult } from "../lib/idempotency.js";
 import { cancelPendingRetry } from "../lib/pendingRetry.js";
 import { logger } from "../lib/logger.js";
+import { safeZodErrors } from "../lib/sanitize.js";
 
 const router: IRouter = Router();
 
@@ -43,8 +44,8 @@ function verifyCallbackSignature(sign: string, refId: string): boolean {
 router.post("/callback/digiflazz", (req, res) => {
   const parsed = CallbackSchema.safeParse(req.body);
   if (!parsed.success) {
-    logger.warn({ issues: parsed.error.issues }, "Callback: invalid payload");
-    res.status(400).json({ error: "Payload tidak valid" });
+    logger.warn({ count: parsed.error.issues.length }, "Callback: invalid payload");
+    res.status(400).json({ error: "Payload tidak valid", details: safeZodErrors(parsed.error.issues) });
     return;
   }
 
