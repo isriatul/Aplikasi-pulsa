@@ -6,6 +6,7 @@ import AdminPage from "@/pages/AdminPage";
 import MemberPortal from "@/pages/MemberPortal";
 import LoginPage from "@/pages/LoginPage";
 import SetupPage from "@/pages/SetupPage";
+import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { Member, clearSession } from "@/lib/members";
 import { loadConfig } from "@/lib/config";
 
@@ -113,6 +114,7 @@ export default function App() {
         member={member}
         pendingMemberCount={0}
       />
+      <PWAInstallBanner />
     </div>
   );
 }

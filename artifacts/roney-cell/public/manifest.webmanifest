@@ -1,0 +1,36 @@
+{
+  "name": "RoneyCell – Pulsa & Top Up",
+  "short_name": "RoneyCell",
+  "description": "Sistem Jualan Pulsa, Paket Data, Token PLN & Top Up Game Profesional",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#080d18",
+  "theme_color": "#3B82F6",
+  "orientation": "portrait-primary",
+  "lang": "id",
+  "categories": ["utilities", "finance"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Beli Pulsa",
+      "short_name": "Pulsa",
+      "description": "Langsung ke halaman pembelian pulsa",
+      "url": "/"
+    }
+  ]
+}

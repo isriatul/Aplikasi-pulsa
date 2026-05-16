@@ -416,6 +416,17 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             {error && <ErrorBox msg={error} />}
             <SubmitBtn loading={loading} disabled={!phone || !pin}
               label={mode === "login" ? "Masuk" : "Daftar Sekarang →"} />
+
+            {mode === "login" && (
+              <div className="text-center pt-1">
+                <a
+                  href={`https://wa.me/6281288080752?text=${encodeURIComponent("Halo Admin, saya lupa password akun RoneyCell saya.")}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors underline-offset-2 hover:underline">
+                  Lupa Password? Hubungi Admin
+                </a>
+              </div>
+            )}
           </form>
         )}
 
@@ -496,15 +507,43 @@ function FormInput({ label, type, value, onChange, placeholder, icon, numeric, m
   label: string; type: string; value: string; onChange: (v: string) => void;
   placeholder: string; icon: string; numeric?: boolean; maxLen?: number;
 }) {
+  const [showPw, setShowPw] = useState(false);
+  const isPassword = type === "password";
+  const inputType = isPassword ? (showPw ? "text" : "password") : type;
+
   return (
     <div>
       <label className="text-xs text-muted-foreground tracking-widest uppercase font-semibold block mb-1.5">{label}</label>
       <div className="relative">
         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base pointer-events-none">{icon}</span>
-        <input type={type} inputMode={numeric ? "numeric" : undefined} value={value} maxLength={maxLen}
+        <input
+          type={inputType}
+          inputMode={numeric ? "numeric" : undefined}
+          value={value}
+          maxLength={maxLen}
           onChange={(e) => onChange(numeric ? e.target.value.replace(/\D/g, "") : e.target.value)}
           placeholder={placeholder}
-          className="w-full pl-11 pr-4 py-3.5 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-all" />
+          className={`w-full pl-11 py-3.5 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-all ${isPassword ? "pr-11" : "pr-4"}`}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShowPw(!showPw)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+            tabIndex={-1}>
+            {showPw ? (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
