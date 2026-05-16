@@ -1,23 +1,28 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import BalanceCard from "@/components/BalanceCard";
 import PhoneInput from "@/components/PhoneInput";
 import TransactionModal from "@/components/TransactionModal";
+import TransactionPinModal from "@/components/TransactionPinModal";
 import {
   Product, ProductCategory, CATEGORY_META,
   getProductsByCategory, formatRupiah,
   getOperatorSku, MemberType,
 } from "@/lib/products";
 import { detectOperator, Operator } from "@/lib/operator";
-import { fetchBalance, deductBalance } from "@/lib/firebase";
 import { sendTransaction, generateRefId } from "@/lib/digiflazz";
 import { loadConfig } from "@/lib/config";
 import { saveTransaction } from "@/lib/transactions";
+import {
+  getMemberBalance, updateMemberBalance,
+  addTransactionToSheets, refundTransaction, verifyTxPin,
+} from "@/lib/sheetsApi";
 import { Member, TYPE_LABELS, TYPE_COLORS } from "@/lib/members";
 
-type ModalPhase = "confirm" | "loading" | "success" | "failed" | "insufficient" | null;
+type ModalPhase = "pin" | "confirm" | "loading" | "success" | "failed" | "insufficient" | null;
 
 interface HomeProps {
   member: Member;
+  onMemberUpdate: (updated: Member) => void;
 }
 
 const MENU_ITEMS: ProductCategory[] = [
@@ -25,7 +30,6 @@ const MENU_ITEMS: ProductCategory[] = [
   "game", "ewallet", "tv", "voucher",
 ];
 
-/* How many digits (or operator detection) needed before products appear */
 function isPhoneReady(phone: string, category: ProductCategory): boolean {
   const digits = phone.replace(/\D/g, "");
   const op = detectOperator(digits);
@@ -48,24 +52,21 @@ function isPhoneReady(phone: string, category: ProductCategory): boolean {
   }
 }
 
-/* Classify Digiflazz failure reason */
 function classifyFailure(msg: string): "number_invalid" | "other" {
-  const lower = msg.toLowerCase();
-  if (
-    lower.includes("nomor") || lower.includes("number") ||
-    lower.includes("tidak aktif") || lower.includes("not active") ||
-    lower.includes("salah") || lower.includes("invalid") ||
-    lower.includes("wrong") || lower.includes("gagal") ||
-    lower.includes("tujuan") || lower.includes("destination")
-  ) return "number_invalid";
+  const l = msg.toLowerCase();
+  if (l.includes("nomor") || l.includes("tidak aktif") || l.includes("salah") ||
+      l.includes("invalid") || l.includes("wrong") || l.includes("tujuan") ||
+      l.includes("number") || l.includes("destination"))
+    return "number_invalid";
   return "other";
 }
 
-export default function Home({ member }: HomeProps) {
+export default function Home({ member, onMemberUpdate }: HomeProps) {
   const [phone, setPhone] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [balance, setBalance] = useState(0);
+  const [storeBalance, setStoreBalance] = useState(0);
+  const [memberBalance, setMemberBalance] = useState(member.balance ?? 0);
   const [modalPhase, setModalPhase] = useState<ModalPhase>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [failureType, setFailureType] = useState<"number_invalid" | "other">("other");
@@ -73,37 +74,64 @@ export default function Home({ member }: HomeProps) {
 
   const memberType: MemberType = member.type;
   const operator: Operator | null = detectOperator(phone);
-  const handleBalanceChange = useCallback((val: number) => setBalance(val), []);
+
+  const handleStoreBalanceChange = useCallback((val: number) => setStoreBalance(val), []);
+
+  /* Refresh member balance from Sheets */
+  useEffect(() => {
+    if (member.id) {
+      getMemberBalance(member.id)
+        .then((b) => {
+          setMemberBalance(b);
+          onMemberUpdate({ ...member, balance: b });
+        })
+        .catch(() => {});
+    }
+  }, [member.id]);
 
   const products = selectedCategory ? getProductsByCategory(selectedCategory, memberType) : [];
   const meta = selectedCategory ? CATEGORY_META[selectedCategory] : null;
   const phoneReady = selectedCategory ? isPhoneReady(phone, selectedCategory) : false;
+  const isFormValid = phoneReady && selectedProduct !== null;
 
   function handleSelectCategory(cat: ProductCategory) {
-    if (selectedCategory === cat) {
-      setSelectedCategory(null);
-      setSelectedProduct(null);
-    } else {
-      setSelectedCategory(cat);
-      setSelectedProduct(null);
-      setPhone("");
-    }
+    if (selectedCategory === cat) { setSelectedCategory(null); setSelectedProduct(null); }
+    else { setSelectedCategory(cat); setSelectedProduct(null); setPhone(""); }
   }
 
   function handleSubmit() {
-    if (!phone || !isPhoneReady(phone, selectedCategory!) || !selectedProduct) return;
+    if (!isFormValid || !selectedProduct) return;
     const cfg = loadConfig();
     if (!cfg.username || !cfg.apiKey) {
       alert("Sila pergi ke tab Owner → Tetapan untuk mengisi username & API key Digiflazz.");
       return;
     }
+    setModalPhase("pin");
+  }
+
+  async function handlePinVerified() {
     setModalPhase("confirm");
+  }
+
+  async function handlePinEntered(pin: string) {
+    try {
+      const res = await verifyTxPin(member.id, pin);
+      return { ok: res.ok, message: res.message };
+    } catch (err: unknown) {
+      return { ok: false, message: err instanceof Error ? err.message : "Gagal verifikasi PIN." };
+    }
   }
 
   async function handleConfirmTransaction() {
     if (!selectedProduct) return;
-    const current = await fetchBalance().catch(() => balance);
-    if (current < selectedProduct.price) { setModalPhase("insufficient"); return; }
+
+    /* Check member's Sheets balance */
+    const latestBalance = await getMemberBalance(member.id).catch(() => memberBalance);
+    if (latestBalance < selectedProduct.price) {
+      setMemberBalance(latestBalance);
+      setModalPhase("insufficient");
+      return;
+    }
 
     setModalPhase("loading");
     const cfg = loadConfig();
@@ -111,27 +139,50 @@ export default function Home({ member }: HomeProps) {
     const refId = generateRefId();
     setLastRefId(refId);
 
+    /* Deduct member balance BEFORE sending to Digiflazz */
+    await updateMemberBalance(member.id, -selectedProduct.price).catch(() => {});
+    const newBalance = latestBalance - selectedProduct.price;
+    setMemberBalance(newBalance);
+    onMemberUpdate({ ...member, balance: newBalance });
+
     try {
       const result = await sendTransaction(cfg, phone, sku, refId);
+
+      await addTransactionToSheets({
+        refId, phone, product: selectedProduct.name, category: selectedProduct.category,
+        amount: selectedProduct.price, basePrice: selectedProduct.basePrice,
+        profit: selectedProduct.price - selectedProduct.basePrice,
+        status: result.success ? "success" : "failed",
+        date: new Date().toISOString(),
+      }).catch(() => {});
 
       saveTransaction({
         id: refId, date: new Date().toISOString(), phone,
         product: selectedProduct.name, category: selectedProduct.category,
         sellPrice: selectedProduct.price, basePrice: selectedProduct.basePrice,
-        profit: selectedProduct.price - selectedProduct.basePrice,
+        profit: result.success ? selectedProduct.price - selectedProduct.basePrice : 0,
         status: result.success ? "success" : "failed",
       });
 
       if (result.success) {
-        await deductBalance(selectedProduct.price);
         setModalPhase("success");
       } else {
+        /* Auto-refund: add balance back */
+        await refundTransaction(member.id, phone, refId, selectedProduct.price).catch(() => {});
+        const refundedBal = newBalance + selectedProduct.price;
+        setMemberBalance(refundedBal);
+        onMemberUpdate({ ...member, balance: refundedBal });
         setFailureType(classifyFailure(result.message));
         setErrorMessage(result.message);
         setModalPhase("failed");
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Ralat tidak diketahui";
+      /* Auto-refund on exception */
+      await refundTransaction(member.id, phone, refId, selectedProduct.price).catch(() => {});
+      const refundedBal = newBalance + selectedProduct.price;
+      setMemberBalance(refundedBal);
+      onMemberUpdate({ ...member, balance: refundedBal });
       saveTransaction({
         id: refId, date: new Date().toISOString(), phone,
         product: selectedProduct.name, category: selectedProduct.category,
@@ -146,14 +197,12 @@ export default function Home({ member }: HomeProps) {
 
   function handleCloseModal() { setModalPhase(null); setErrorMessage(""); }
 
-  const isFormValid = phoneReady && selectedProduct !== null;
-
   return (
     <div className="min-h-dvh flex flex-col max-w-md mx-auto px-4 pb-28">
       {/* ── Header ── */}
       <header className="sticky top-0 z-40 pt-safe">
         <div className="flex items-center justify-between py-4"
-          style={{ background: "linear-gradient(to bottom, hsl(220 40% 5%) 80%, transparent)" }}>
+          style={{ background: "linear-gradient(to bottom,hsl(220 40% 5%) 80%,transparent)" }}>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center"
               style={{ background: "linear-gradient(135deg,hsl(210 90% 55%) 0%,hsl(230 80% 40%) 100%)", boxShadow: "0 0 16px rgba(59,130,246,0.4)" }}>
@@ -172,33 +221,30 @@ export default function Home({ member }: HomeProps) {
               </p>
             </div>
           </div>
-
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border"
-            style={{ background: `${TYPE_COLORS[member.type]}15`, borderColor: `${TYPE_COLORS[member.type]}30` }}>
-            <div className="w-1.5 h-1.5 rounded-full" style={{ background: TYPE_COLORS[member.type] }} />
-            <span className="text-xs font-bold" style={{ color: TYPE_COLORS[member.type] }}>
-              {TYPE_LABELS[member.type]}
-            </span>
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border"
+              style={{ background: `${TYPE_COLORS[member.type]}15`, borderColor: `${TYPE_COLORS[member.type]}30` }}>
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: TYPE_COLORS[member.type] }} />
+              <span className="text-xs font-bold" style={{ color: TYPE_COLORS[member.type] }}>
+                {TYPE_LABELS[member.type]}
+              </span>
+            </div>
+            {/* Member personal balance */}
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/5 border border-white/8">
+              <span className="text-[9px] text-muted-foreground">Saldo:</span>
+              <span className="text-[11px] font-black"
+                style={{ background: "linear-gradient(135deg,#FBBF24 0%,#F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                {formatRupiah(memberBalance)}
+              </span>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* ── Balance ── */}
+      {/* ── Store Balance (Firebase) ── */}
       <div className="mb-5">
-        <BalanceCard onBalanceChange={handleBalanceChange} />
+        <BalanceCard onBalanceChange={handleStoreBalanceChange} />
       </div>
-
-      {/* ── Member tier banner ── */}
-      {member.type !== "retail" && (
-        <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl border"
-          style={{ background: `${TYPE_COLORS[member.type]}10`, borderColor: `${TYPE_COLORS[member.type]}25` }}>
-          <span className="text-lg">🎯</span>
-          <div>
-            <p className="text-xs font-bold" style={{ color: TYPE_COLORS[member.type] }}>Harga {TYPE_LABELS[member.type]} Aktif</p>
-            <p className="text-[10px] text-muted-foreground">Anda menikmati harga lebih murah dari retail</p>
-          </div>
-        </div>
-      )}
 
       {/* ── Icon Menu Grid 4×2 ── */}
       <div className="glass-card rounded-2xl p-4 mb-5">
@@ -208,24 +254,16 @@ export default function Home({ member }: HomeProps) {
             const m = CATEGORY_META[id];
             const isActive = selectedCategory === id;
             return (
-              <button
-                key={id}
-                onClick={() => handleSelectCategory(id)}
-                className="relative flex flex-col items-center gap-2"
-              >
-                <div
-                  className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl transition-all duration-200"
+              <button key={id} onClick={() => handleSelectCategory(id)} className="relative flex flex-col items-center gap-2">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl transition-all duration-200"
                   style={isActive
                     ? { background: `${m.color}30`, border: `2px solid ${m.color}`, boxShadow: `0 0 16px ${m.color}40` }
                     : { background: `${m.color}12`, border: `1.5px solid ${m.color}20` }
-                  }
-                >
+                  }>
                   {m.icon}
                 </div>
-                <span
-                  className="text-[10px] font-bold text-center leading-tight transition-colors"
-                  style={{ color: isActive ? m.color : "rgba(255,255,255,0.55)" }}
-                >
+                <span className="text-[10px] font-bold text-center leading-tight transition-colors"
+                  style={{ color: isActive ? m.color : "rgba(255,255,255,0.55)" }}>
                   {m.label}
                 </span>
                 {isActive && (
@@ -241,21 +279,18 @@ export default function Home({ member }: HomeProps) {
       {/* ── Smart Product Panel ── */}
       {selectedCategory && meta && (
         <div className="mb-4 space-y-3">
-          {/* Panel header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-lg">{meta.icon}</span>
               <p className="text-sm font-black" style={{ color: meta.color }}>{meta.label}</p>
             </div>
-            <button
-              onClick={() => { setSelectedCategory(null); setSelectedProduct(null); setPhone(""); }}
-              className="text-xs text-muted-foreground px-2 py-1 rounded-lg border border-white/8 hover:bg-white/5 transition-all"
-            >
+            <button onClick={() => { setSelectedCategory(null); setSelectedProduct(null); setPhone(""); }}
+              className="text-xs text-muted-foreground px-2 py-1 rounded-lg border border-white/8 hover:bg-white/5 transition-all">
               Tutup ✕
             </button>
           </div>
 
-          {/* ── STEP 1: Phone / ID input ── */}
+          {/* STEP 1: Phone Input */}
           <PhoneInput
             value={phone}
             onChange={(v) => { setPhone(v); setSelectedProduct(null); }}
@@ -271,7 +306,6 @@ export default function Home({ member }: HomeProps) {
             }
           />
 
-          {/* Prompt to enter number if not ready */}
           {!phoneReady && phone.length > 0 && (
             <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-yellow-500/20 bg-yellow-500/8">
               <svg className="w-4 h-4 text-yellow-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -285,19 +319,13 @@ export default function Home({ member }: HomeProps) {
             </div>
           )}
 
-          {/* ── STEP 2: Products (only shown after phone is ready) ── */}
+          {/* STEP 2: Products (after phone ready) */}
           {phoneReady && (
-            <div
-              className="glass-card rounded-2xl p-4 transition-all"
-              style={{ animation: "fadeSlideIn 0.3s ease" }}
-            >
+            <div className="glass-card rounded-2xl p-4" style={{ animation: "fadeSlideIn 0.3s ease" }}>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs text-muted-foreground tracking-widest uppercase font-semibold">
-                  Pilih Nominal / Paket
-                </p>
+                <p className="text-xs text-muted-foreground tracking-widest uppercase font-semibold">Pilih Nominal / Paket</p>
                 <span className="text-xs text-muted-foreground">{products.length} produk</span>
               </div>
-
               {selectedCategory === "pulsa" || selectedCategory === "pln" ? (
                 <div className="grid grid-cols-2 gap-2.5">
                   {products.map((p) => (
@@ -314,7 +342,7 @@ export default function Home({ member }: HomeProps) {
             </div>
           )}
 
-          {/* ── Order summary ── */}
+          {/* Order summary */}
           {selectedProduct && phoneReady && (
             <div className="glass-card rounded-2xl p-4 border border-cyan-500/15" style={{ animation: "fadeSlideIn 0.2s ease" }}>
               <p className="text-xs text-muted-foreground tracking-widest uppercase font-semibold mb-3">Ringkasan Pesanan</p>
@@ -336,51 +364,57 @@ export default function Home({ member }: HomeProps) {
                     style={{ background: "linear-gradient(135deg,#FBBF24 0%,#F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                     {formatRupiah(selectedProduct.price)}
                   </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Harga jual</p>
+                  <p className="text-[10px] mt-0.5"
+                    style={{ color: memberBalance >= selectedProduct.price ? "#34D399" : "#F87171" }}>
+                    Saldo: {formatRupiah(memberBalance)}
+                  </p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ── Submit ── */}
-          <button
-            onClick={handleSubmit}
-            disabled={!isFormValid}
+          {/* Submit */}
+          <button onClick={handleSubmit} disabled={!isFormValid}
             className="w-full py-4 rounded-2xl text-base font-black tracking-wide transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed"
             style={isFormValid ? {
               background: "linear-gradient(135deg,hsl(210 90% 55%) 0%,hsl(230 75% 45%) 100%)",
               color: "white",
               boxShadow: "0 6px 24px rgba(59,130,246,0.4),0 2px 8px rgba(0,0,0,0.3)",
-            } : undefined}
-          >
-            {!phoneReady
-              ? `Masukkan ${selectedCategory === "game" ? "ID Game" : "Nomor Tujuan"} Dahulu`
-              : !selectedProduct
-              ? "Pilih Produk Dahulu"
-              : "Proses Transaksi →"}
+            } : undefined}>
+            {!phoneReady ? `Masukkan ${selectedCategory === "game" ? "ID Game" : "Nomor Tujuan"} Dahulu`
+              : !selectedProduct ? "Pilih Produk Dahulu"
+              : "🔐 Masukkan PIN & Proses →"}
           </button>
         </div>
       )}
 
-      {/* Footer */}
       {!selectedCategory && (
         <div className="text-center mt-2">
           <p className="text-xs text-muted-foreground">
             Dikuasakan oleh{" "}
             <span style={{ background: "linear-gradient(135deg,#FBBF24 0%,#F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 }}>Digiflazz</span>
             {" "}&amp;{" "}
-            <span style={{ background: "linear-gradient(135deg,#34D399 0%,#10B981 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 }}>Firebase</span>
+            <span style={{ background: "linear-gradient(135deg,#34D399 0%,#10B981 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 }}>Google Sheets</span>
           </p>
         </div>
       )}
 
-      {modalPhase && (
+      {/* Modals */}
+      {modalPhase === "pin" && (
+        <TransactionPinModal
+          onPinEntered={handlePinEntered}
+          onVerified={handlePinVerified}
+          onCancel={handleCloseModal}
+        />
+      )}
+
+      {modalPhase && modalPhase !== "pin" && (
         <TransactionModal
           phase={modalPhase}
           product={selectedProduct}
           phone={phone}
           operator={operator}
-          balance={balance}
+          balance={memberBalance}
           errorMessage={errorMessage}
           failureType={failureType}
           refId={lastRefId}
@@ -399,14 +433,12 @@ function ProductCompactCard({ product, selected, onSelect, color }: {
   product: Product; selected: boolean; onSelect: (p: Product) => void; color: string;
 }) {
   return (
-    <button
-      onClick={() => onSelect(product)}
+    <button onClick={() => onSelect(product)}
       className="relative rounded-2xl p-4 text-left transition-all duration-200 border"
       style={selected
         ? { borderColor: color, boxShadow: `0 0 0 1px ${color},0 0 20px ${color}30`, background: `${color}10` }
         : { borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }
-      }
-    >
+      }>
       {product.badge && (
         <div className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full text-[9px] font-black text-gray-900"
           style={{ background: "linear-gradient(135deg,#FBBF24 0%,#F59E0B 100%)" }}>
@@ -423,9 +455,7 @@ function ProductCompactCard({ product, selected, onSelect, color }: {
           </div>
         )}
       </div>
-      <p className="text-sm font-black text-foreground leading-tight">
-        {formatRupiah(product.nominal)}
-      </p>
+      <p className="text-sm font-black text-foreground leading-tight">{formatRupiah(product.nominal)}</p>
       <p className="text-[10px] text-muted-foreground mt-0.5 mb-2">{product.description}</p>
       <div className="pt-2 border-t border-white/5">
         <p className="text-[10px] text-muted-foreground">Harga Jual</p>
@@ -442,14 +472,12 @@ function ProductRowCard({ product, selected, onSelect, color }: {
   product: Product; selected: boolean; onSelect: (p: Product) => void; color: string;
 }) {
   return (
-    <button
-      onClick={() => onSelect(product)}
+    <button onClick={() => onSelect(product)}
       className="w-full flex items-center gap-3 p-4 rounded-2xl text-left transition-all duration-200 border"
       style={selected
         ? { borderColor: color, boxShadow: `0 0 0 1px ${color},0 0 15px ${color}20`, background: `${color}10` }
         : { borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }
-      }
-    >
+      }>
       <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
         style={{ background: `${color}18`, border: `1.5px solid ${color}30` }}>
         {product.icon}

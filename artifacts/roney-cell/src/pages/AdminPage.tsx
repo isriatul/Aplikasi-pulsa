@@ -395,6 +395,7 @@ function AddMemberForm({ onDone, onBack }: { onDone: () => void; onBack: () => v
       status: "approved",
       balance: Number(form.balance),
       notes: form.notes,
+      loginMethod: "phone",
       approvedAt: new Date().toISOString(),
     });
     onDone();

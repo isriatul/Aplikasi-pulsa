@@ -12,6 +12,7 @@ export interface AppConfig {
   bcaAccountName: string;
   qrisImage: string;
   adminPin: string;
+  scriptsUrl: string;
 }
 
 const CONFIG_KEY = "roneycell_config";
@@ -30,6 +31,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   bcaAccountName: "Isriatul Bahroni",
   qrisImage: "",
   adminPin: "1234",
+  scriptsUrl: "",
 };
 
 export function loadConfig(): AppConfig {
@@ -64,19 +66,24 @@ export function buildOrderMessage(
     `🧾 *BUKTI TRANSAKSI RoneyCell*`,
     ``,
     `📱 No. Pelanggan : ${phone}`,
-    `📶 Operator      : ${operator ?? "Tidak dikesan"}`,
+    `📶 Operator      : ${operator ?? "Tidak terdeteksi"}`,
     `🛒 Produk        : ${productName}`,
     `💰 Harga         : Rp ${price.toLocaleString("id-ID")}`,
     `🔖 Ref ID        : ${refId}`,
     `⏰ Waktu         : ${now}`,
-    `✅ Status        : BERJAYA`,
+    `✅ Status        : BERHASIL`,
   ];
   if (memberName) lines.push(`👤 Member         : ${memberName}`);
-  lines.push(``, `Terima kasih kerana menggunakan RoneyCell!`);
+  lines.push(``, `Terima kasih telah menggunakan RoneyCell! 🙏`);
   return lines.join("\n");
 }
 
-export function buildDepositMessage(amount: number, method: string, accountInfo: string, memberName?: string): string {
+export function buildDepositMessage(
+  amount: number,
+  method: string,
+  accountInfo: string,
+  memberName?: string
+): string {
   const now = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
   const lines = [
     `💳 *KONFIRMASI DEPOSIT RoneyCell*`,
@@ -87,6 +94,10 @@ export function buildDepositMessage(amount: number, method: string, accountInfo:
     `⏰ Waktu           : ${now}`,
   ];
   if (memberName) lines.push(`👤 Nama Member     : ${memberName}`);
-  lines.push(``, `Sila hantar bukti transfer ini.`, `Saldo akan dikreditkan selepas pengesahan.`);
+  lines.push(
+    ``,
+    `Silakan kirim bukti transfer ini.`,
+    `Saldo akan dikreditkan setelah konfirmasi.`
+  );
   return lines.join("\n");
 }

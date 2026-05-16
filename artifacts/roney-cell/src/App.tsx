@@ -5,51 +5,82 @@ import DepositPage from "@/pages/DepositPage";
 import AdminPage from "@/pages/AdminPage";
 import MemberPortal from "@/pages/MemberPortal";
 import LoginPage from "@/pages/LoginPage";
-import { Member, loadSession, clearSession, loadMembers } from "@/lib/members";
+import SetupPage from "@/pages/SetupPage";
+import { Member, clearSession } from "@/lib/members";
+import { loadConfig } from "@/lib/config";
 
 type Tab = "home" | "deposit" | "member" | "admin";
+type AppState = "checking" | "setup" | "login" | "app";
+
+const SESSION_KEY = "roneycell_member_session_v2";
+
+function saveAppSession(member: Member) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(member));
+}
+
+function loadAppSession(): Member | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (raw) return JSON.parse(raw) as Member;
+  } catch {}
+  return null;
+}
+
+function clearAppSession() {
+  localStorage.removeItem(SESSION_KEY);
+  clearSession();
+}
 
 export default function App() {
+  const [appState, setAppState] = useState<AppState>("checking");
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [member, setMember] = useState<Member | null>(null);
-  const [pendingCount, setPendingCount] = useState(0);
-  const [sessionChecked, setSessionChecked] = useState(false);
 
   useEffect(() => {
-    const session = loadSession();
-    if (session) setMember(session);
-    refreshPendingCount();
-    setSessionChecked(true);
+    const cfg = loadConfig();
+    if (!cfg.scriptsUrl?.trim()) {
+      setAppState("setup");
+      return;
+    }
+    const session = loadAppSession();
+    if (session) {
+      setMember(session);
+      setAppState("app");
+    } else {
+      setAppState("login");
+    }
   }, []);
 
-  function refreshPendingCount() {
-    const count = loadMembers().filter((m) => m.status === "pending").length;
-    setPendingCount(count);
+  function handleSetupDone() {
+    setAppState("login");
   }
 
   function handleLogin(m: Member) {
+    saveAppSession(m);
     setMember(m);
+    setAppState("app");
     setActiveTab("home");
-    refreshPendingCount();
   }
 
   function handleLogout() {
-    clearSession();
+    clearAppSession();
     setMember(null);
+    setAppState("login");
   }
 
-  /* Don't render anything until we know the session state */
-  if (!sessionChecked) return null;
-
-  /* Show login gate if no active session */
-  if (!member) {
-    return <LoginPage onLogin={handleLogin} />;
+  function handleMemberUpdate(updated: Member) {
+    saveAppSession(updated);
+    setMember(updated);
   }
+
+  if (appState === "checking") return null;
+  if (appState === "setup")   return <SetupPage onDone={handleSetupDone} />;
+  if (appState === "login")   return <LoginPage onLogin={handleLogin} />;
 
   return (
     <div className="min-h-dvh">
       <div style={{ display: activeTab === "home" ? "block" : "none" }}>
-        <Home member={member} />
+        <Home member={member!} onMemberUpdate={handleMemberUpdate} />
       </div>
       <div style={{ display: activeTab === "deposit" ? "block" : "none" }}>
         <DepositPage member={member} />
@@ -58,13 +89,13 @@ export default function App() {
         <MemberPortal member={member} onLogin={handleLogin} onLogout={handleLogout} />
       </div>
       <div style={{ display: activeTab === "admin" ? "block" : "none" }}>
-        <AdminPage onMemberChange={refreshPendingCount} />
+        <AdminPage onMemberChange={() => {}} />
       </div>
       <BottomNav
         active={activeTab}
-        onChange={(tab) => { setActiveTab(tab); refreshPendingCount(); }}
+        onChange={setActiveTab}
         member={member}
-        pendingMemberCount={pendingCount}
+        pendingMemberCount={0}
       />
     </div>
   );

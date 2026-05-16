@@ -1,10 +1,6 @@
 import { useState } from "react";
-import {
-  Member,
-  loginMember, registerMember,
-  loginByEmail, registerByEmail,
-  loginByFacebook,
-} from "@/lib/members";
+import { SheetUser, loginWithPhone, loginByEmail, registerUser, registerFacebook } from "@/lib/sheetsApi";
+import { Member } from "@/lib/members";
 
 type LoginMethod = "phone" | "email" | "facebook";
 type Mode = "login" | "register";
@@ -13,22 +9,41 @@ interface LoginPageProps {
   onLogin: (member: Member) => void;
 }
 
+/* Convert SheetUser to Member (for backward compat with app state) */
+function sheetToMember(u: SheetUser): Member {
+  return {
+    id: u.id,
+    name: u.name,
+    phone: u.phone,
+    email: u.email,
+    whatsapp: u.phone,
+    pin: "",
+    type: (u.type as Member["type"]) ?? "member",
+    status: u.status === "active" ? "approved" : u.status === "pending" ? "pending" : "rejected",
+    balance: u.balance,
+    loginMethod: u.loginMethod as Member["loginMethod"],
+    createdAt: u.createdAt,
+    approvedAt: u.status === "active" ? u.createdAt : undefined,
+  };
+}
+
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [method, setMethod] = useState<LoginMethod>("phone");
   const [mode, setMode] = useState<Mode>("login");
 
-  /* phone fields */
+  /* phone */
   const [phone, setPhone] = useState("");
   const [pin, setPin] = useState("");
+  const [txPin, setTxPin] = useState("");
   const [name, setName] = useState("");
-  const [whatsapp, setWhatsapp] = useState("");
 
-  /* email fields */
+  /* email */
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [emailTxPin, setEmailTxPin] = useState("");
   const [emailName, setEmailName] = useState("");
 
-  /* facebook fields */
+  /* facebook */
   const [fbName, setFbName] = useState("");
   const [fbStep, setFbStep] = useState<"button" | "name">("button");
 
@@ -36,55 +51,67 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
 
-  function clearError() { setError(""); setSuccess(""); }
+  function clearMsg() { setError(""); setSuccess(""); }
 
-  /* ── phone submit ── */
+  /* ── Phone submit ── */
   async function handlePhoneSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true); clearError();
-    await new Promise((r) => setTimeout(r, 400));
-
-    if (mode === "login") {
-      const res = loginMember(phone.replace(/\D/g, ""), pin);
-      if (res.success && res.member) onLogin(res.member);
-      else setError(res.message);
-    } else {
-      if (!name.trim()) { setError("Nama tidak boleh kosong."); setLoading(false); return; }
-      const res = registerMember({ name, phone: phone.replace(/\D/g, ""), whatsapp: whatsapp || phone, pin });
-      if (res.success) {
-        setSuccess("Pendaftaran berhasil! Menunggu persetujuan admin. Hubungi owner untuk konfirmasi.");
-        setMode("login");
-      } else setError(res.message);
+    if (!phone || !pin) { setError("Isi nomor HP dan password."); return; }
+    setLoading(true); clearMsg();
+    try {
+      if (mode === "login") {
+        const res = await loginWithPhone(phone, pin);
+        if (res.ok && res.user) onLogin(sheetToMember(res.user));
+        else setError(res.message ?? "Login gagal.");
+      } else {
+        if (!name.trim()) { setError("Nama tidak boleh kosong."); setLoading(false); return; }
+        if (txPin.length !== 6) { setError("PIN Transaksi harus 6 digit."); setLoading(false); return; }
+        const res = await registerUser({ name, phone: phone.replace(/\D/g,""), password: pin, txPin, loginMethod: "phone" });
+        if (res.ok) {
+          setSuccess(res.message ?? "Pendaftaran berhasil!");
+          setMode("login");
+        } else setError(res.message ?? "Gagal mendaftar.");
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Terjadi kesalahan.");
     }
     setLoading(false);
   }
 
-  /* ── email submit ── */
+  /* ── Email submit ── */
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true); clearError();
-    await new Promise((r) => setTimeout(r, 400));
-
-    if (mode === "login") {
-      const res = loginByEmail(email, password);
-      if (res.success && res.member) onLogin(res.member);
-      else setError(res.message);
-    } else {
-      if (!emailName.trim()) { setError("Nama tidak boleh kosong."); setLoading(false); return; }
-      const res = registerByEmail({ name: emailName, email, password });
-      if (res.success && res.member) onLogin(res.member);
-      else setError(res.message);
+    if (!email || !password) { setError("Isi email dan password."); return; }
+    setLoading(true); clearMsg();
+    try {
+      if (mode === "login") {
+        const res = await loginByEmail(email, password);
+        if (res.ok && res.user) onLogin(sheetToMember(res.user));
+        else setError(res.message ?? "Login gagal.");
+      } else {
+        if (!emailName.trim()) { setError("Nama tidak boleh kosong."); setLoading(false); return; }
+        if (emailTxPin.length !== 6) { setError("PIN Transaksi harus 6 digit."); setLoading(false); return; }
+        const res = await registerUser({ name: emailName, email, password, txPin: emailTxPin, loginMethod: "email" });
+        if (res.ok && res.user) onLogin(sheetToMember(res.user));
+        else setError(res.message ?? "Gagal mendaftar.");
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Terjadi kesalahan.");
     }
     setLoading(false);
   }
 
-  /* ── facebook submit ── */
+  /* ── Facebook submit ── */
   async function handleFacebookLogin() {
     if (!fbName.trim()) { setError("Masukkan nama Anda."); return; }
-    setLoading(true); clearError();
-    await new Promise((r) => setTimeout(r, 600));
-    const res = loginByFacebook(fbName.trim());
-    if (res.success) onLogin(res.member);
+    setLoading(true); clearMsg();
+    try {
+      const res = await registerFacebook(fbName.trim());
+      if (res.ok && res.user) onLogin(sheetToMember(res.user));
+      else setError(res.message ?? "Gagal masuk dengan Facebook.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Terjadi kesalahan.");
+    }
     setLoading(false);
   }
 
@@ -100,21 +127,15 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
       {/* Logo */}
       <div className="flex flex-col items-center mb-8">
-        <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
-          style={{
-            background: "linear-gradient(135deg, hsl(210 90% 55%) 0%, hsl(230 80% 40%) 100%)",
-            boxShadow: "0 0 40px rgba(59,130,246,0.5), 0 8px 24px rgba(0,0,0,0.4)",
-          }}
-        >
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+          style={{ background: "linear-gradient(135deg,hsl(210 90% 55%) 0%,hsl(230 80% 40%) 100%)", boxShadow: "0 0 40px rgba(59,130,246,0.5),0 8px 24px rgba(0,0,0,0.4)" }}>
           <svg className="w-9 h-9 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 7V5z"
-            />
+              d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 7V5z" />
           </svg>
         </div>
         <h1 className="font-black text-3xl leading-none tracking-tight mb-1"
-          style={{ background: "linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+          style={{ background: "linear-gradient(135deg,#60A5FA 0%,#A78BFA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
           RoneyCell
         </h1>
         <p className="text-xs text-muted-foreground tracking-widest">SISTEM JUALAN PULSA PROFESIONAL</p>
@@ -123,12 +144,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       {/* Method tabs */}
       <div className="w-full flex gap-2 mb-6 p-1 rounded-2xl bg-white/4 border border-white/6">
         {METHODS.map((m) => (
-          <button
-            key={m.id}
-            onClick={() => { setMethod(m.id); clearError(); }}
+          <button key={m.id}
+            onClick={() => { setMethod(m.id); clearMsg(); }}
             className="flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl text-[11px] font-bold transition-all"
             style={method === m.id
-              ? { background: "linear-gradient(135deg, #3B82F6 0%, #6366F1 100%)", color: "white", boxShadow: "0 4px 12px rgba(59,130,246,0.3)" }
+              ? { background: "linear-gradient(135deg,#3B82F6 0%,#6366F1 100%)", color: "white", boxShadow: "0 4px 12px rgba(59,130,246,0.3)" }
               : { color: "rgba(255,255,255,0.45)" }
             }
           >
@@ -142,32 +162,17 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       {method === "phone" && (
         <form onSubmit={handlePhoneSubmit} className="w-full space-y-3">
           {mode === "register" && (
-            <>
-              <FormInput label="Nama Lengkap" type="text" value={name} onChange={setName} placeholder="Nama Anda" icon="👤" />
-              <FormInput label="No. WhatsApp" type="tel" value={whatsapp} onChange={setWhatsapp} placeholder="08xxxxxxxxxx" icon="💬" numeric />
-            </>
+            <FormInput label="Nama Lengkap" type="text" value={name} onChange={setName} placeholder="Nama Anda" icon="👤" />
           )}
           <FormInput label="Nomor HP" type="tel" value={phone} onChange={setPhone} placeholder="08xxxxxxxxxx" icon="📱" numeric />
-          <FormInput label="PIN (4–8 digit)" type="password" value={pin} onChange={setPin} placeholder="••••••" icon="🔒" numeric />
-
+          <FormInput label={mode === "register" ? "Password (min 6 karakter)" : "Password"} type="password" value={pin} onChange={setPin} placeholder="••••••" icon="🔒" />
+          {mode === "register" && (
+            <FormInput label="PIN Transaksi (6 digit)" type="password" value={txPin} onChange={setTxPin} placeholder="6 digit PIN rahasia" icon="🔐" numeric maxLen={6} />
+          )}
           {error && <ErrorBox msg={error} />}
           {success && <SuccessBox msg={success} />}
-
-          <button
-            type="submit"
-            disabled={loading || !phone || !pin}
-            className="w-full py-4 rounded-2xl font-black text-base text-white transition-all disabled:opacity-40"
-            style={{ background: "linear-gradient(135deg, #3B82F6 0%, #6366F1 100%)", boxShadow: "0 6px 20px rgba(59,130,246,0.35)" }}
-          >
-            {loading ? "⏳ Memproses..." : mode === "login" ? "Masuk" : "Daftar Sekarang"}
-          </button>
-
-          <div className="text-center">
-            <button type="button" onClick={() => { setMode(mode === "login" ? "register" : "login"); clearError(); }}
-              className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
-              {mode === "login" ? "Belum punya akun? Daftar di sini" : "Sudah punya akun? Masuk"}
-            </button>
-          </div>
+          <SubmitBtn loading={loading} disabled={!phone || !pin} label={mode === "login" ? "Masuk" : "Daftar Sekarang"} />
+          <ToggleMode mode={mode} onToggle={() => { setMode(mode === "login" ? "register" : "login"); clearMsg(); }} />
         </form>
       )}
 
@@ -179,24 +184,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           )}
           <FormInput label="Email" type="email" value={email} onChange={setEmail} placeholder="nama@email.com" icon="✉️" />
           <FormInput label={mode === "register" ? "Buat Password" : "Password"} type="password" value={password} onChange={setPassword} placeholder="Min. 6 karakter" icon="🔒" />
-
+          {mode === "register" && (
+            <FormInput label="PIN Transaksi (6 digit)" type="password" value={emailTxPin} onChange={setEmailTxPin} placeholder="6 digit PIN rahasia" icon="🔐" numeric maxLen={6} />
+          )}
           {error && <ErrorBox msg={error} />}
-
-          <button
-            type="submit"
-            disabled={loading || !email || !password}
-            className="w-full py-4 rounded-2xl font-black text-base text-white transition-all disabled:opacity-40"
-            style={{ background: "linear-gradient(135deg, #3B82F6 0%, #6366F1 100%)", boxShadow: "0 6px 20px rgba(59,130,246,0.35)" }}
-          >
-            {loading ? "⏳ Memproses..." : mode === "login" ? "Masuk dengan Email" : "Buat Akun"}
-          </button>
-
-          <div className="text-center">
-            <button type="button" onClick={() => { setMode(mode === "login" ? "register" : "login"); clearError(); }}
-              className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
-              {mode === "login" ? "Belum punya akun? Daftar" : "Sudah punya akun? Masuk"}
-            </button>
-          </div>
+          <SubmitBtn loading={loading} disabled={!email || !password} label={mode === "login" ? "Masuk dengan Email" : "Buat Akun"} />
+          <ToggleMode mode={mode} onToggle={() => { setMode(mode === "login" ? "register" : "login"); clearMsg(); }} />
         </form>
       )}
 
@@ -205,14 +198,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         <div className="w-full space-y-4">
           {fbStep === "button" ? (
             <>
-              <p className="text-sm text-muted-foreground text-center mb-4">
-                Masuk dengan akun Facebook Anda. Akun akan dibuat otomatis dan langsung aktif.
+              <p className="text-sm text-muted-foreground text-center">
+                Masuk dengan Facebook. Akun dibuat otomatis dan langsung aktif. PIN Transaksi default: <span className="font-bold text-yellow-400">123456</span> (ubah setelah masuk).
               </p>
-              <button
-                onClick={() => setFbStep("name")}
-                className="w-full py-4 rounded-2xl font-black text-base text-white transition-all flex items-center justify-center gap-3"
-                style={{ background: "linear-gradient(135deg, #1877F2 0%, #0B5ED7 100%)", boxShadow: "0 6px 20px rgba(24,119,242,0.4)" }}
-              >
+              <button onClick={() => setFbStep("name")}
+                className="w-full py-4 rounded-2xl font-black text-base text-white flex items-center justify-center gap-3"
+                style={{ background: "linear-gradient(135deg,#1877F2 0%,#0B5ED7 100%)", boxShadow: "0 6px 20px rgba(24,119,242,0.4)" }}>
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                 </svg>
@@ -221,20 +212,14 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             </>
           ) : (
             <>
-              <p className="text-sm text-muted-foreground text-center mb-2">
-                Masukkan nama Anda untuk melanjutkan:
-              </p>
               <FormInput label="Nama Facebook Anda" type="text" value={fbName} onChange={setFbName} placeholder="Contoh: Budi Santoso" icon="👤" />
               {error && <ErrorBox msg={error} />}
-              <button
-                onClick={handleFacebookLogin}
-                disabled={loading || !fbName.trim()}
-                className="w-full py-4 rounded-2xl font-black text-base text-white transition-all disabled:opacity-40 flex items-center justify-center gap-3"
-                style={{ background: "linear-gradient(135deg, #1877F2 0%, #0B5ED7 100%)", boxShadow: "0 6px 20px rgba(24,119,242,0.4)" }}
-              >
+              <button onClick={handleFacebookLogin} disabled={loading || !fbName.trim()}
+                className="w-full py-4 rounded-2xl font-black text-base text-white disabled:opacity-40 flex items-center justify-center gap-3"
+                style={{ background: "linear-gradient(135deg,#1877F2 0%,#0B5ED7 100%)", boxShadow: "0 6px 20px rgba(24,119,242,0.4)" }}>
                 {loading ? "⏳ Memproses..." : "Masuk Sekarang"}
               </button>
-              <button type="button" onClick={() => { setFbStep("button"); clearError(); }}
+              <button type="button" onClick={() => { setFbStep("button"); clearMsg(); }}
                 className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-1">
                 ← Kembali
               </button>
@@ -243,20 +228,18 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         </div>
       )}
 
-      {/* Terms note */}
       <p className="text-[10px] text-muted-foreground text-center mt-6 px-4 leading-relaxed">
-        Dengan mendaftar, Anda menyetujui syarat penggunaan RoneyCell.
-        Data disimpan di perangkat Anda.
+        Dengan mendaftar, Anda menyetujui syarat penggunaan RoneyCell. Data disimpan di Google Sheets Anda.
       </p>
     </div>
   );
 }
 
-/* ── Shared form components ── */
+/* ── Shared sub-components ── */
 
-function FormInput({ label, type, value, onChange, placeholder, icon, numeric }: {
-  label: string; type: string; value: string;
-  onChange: (v: string) => void; placeholder: string; icon: string; numeric?: boolean;
+function FormInput({ label, type, value, onChange, placeholder, icon, numeric, maxLen }: {
+  label: string; type: string; value: string; onChange: (v: string) => void;
+  placeholder: string; icon: string; numeric?: boolean; maxLen?: number;
 }) {
   return (
     <div>
@@ -267,11 +250,33 @@ function FormInput({ label, type, value, onChange, placeholder, icon, numeric }:
           type={type}
           inputMode={numeric ? "numeric" : undefined}
           value={value}
-          onChange={(e) => onChange(numeric ? e.target.value.replace(/\D/g, "") : e.target.value)}
+          maxLength={maxLen}
+          onChange={(e) => onChange(numeric ? e.target.value.replace(/\D/g,"") : e.target.value)}
           placeholder={placeholder}
           className="w-full pl-11 pr-4 py-3.5 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-all"
         />
       </div>
+    </div>
+  );
+}
+
+function SubmitBtn({ loading, disabled, label }: { loading: boolean; disabled: boolean; label: string }) {
+  return (
+    <button type="submit" disabled={loading || disabled}
+      className="w-full py-4 rounded-2xl font-black text-base text-white transition-all disabled:opacity-40"
+      style={{ background: "linear-gradient(135deg,#3B82F6 0%,#6366F1 100%)", boxShadow: "0 6px 20px rgba(59,130,246,0.35)" }}>
+      {loading ? "⏳ Memproses..." : label}
+    </button>
+  );
+}
+
+function ToggleMode({ mode, onToggle }: { mode: Mode; onToggle: () => void }) {
+  return (
+    <div className="text-center">
+      <button type="button" onClick={onToggle}
+        className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
+        {mode === "login" ? "Belum punya akun? Daftar di sini" : "Sudah punya akun? Masuk"}
+      </button>
     </div>
   );
 }

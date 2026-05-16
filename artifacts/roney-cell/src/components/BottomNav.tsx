@@ -15,7 +15,7 @@ export default function BottomNav({ active, onChange, member, pendingMemberCount
     label: string;
     activeColor: string;
     activeBg: string;
-    icon: (active: boolean) => JSX.Element;
+    icon: (active: boolean) => React.ReactElement;
     badge?: number | string;
   }[] = [
     {
