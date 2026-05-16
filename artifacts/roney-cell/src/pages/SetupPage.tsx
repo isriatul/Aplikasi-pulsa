@@ -2,23 +2,32 @@ import { useState } from "react";
 import { saveConfig } from "@/lib/config";
 import { pingScript } from "@/lib/sheetsApi";
 
+/* ─────────────────────────────────────────────────────────
+   CATATAN PENTING:
+   Semua request dari app ke Apps Script menggunakan GET
+   (bukan POST), karena Apps Script melakukan redirect 302
+   yang menyebabkan body POST hilang di browser.
+   Kode di bawah menangani SEMUA aksi lewat doGet().
+───────────────────────────────────────────────────────── */
 const APPS_SCRIPT_CODE = `// ╔══════════════════════════════════════════════════════════════╗
-// ║          RoneyCell — Google Apps Script API                  ║
+// ║          RoneyCell — Google Apps Script API v2               ║
+// ╠══════════════════════════════════════════════════════════════╣
+// ║  SEMUA request melalui doGet (GET) untuk menghindari         ║
+// ║  masalah CORS redirect pada doPost.                          ║
 // ╠══════════════════════════════════════════════════════════════╣
 // ║  Cara deploy:                                                ║
-// ║  1. Buka spreadsheet → Extensions > Apps Script              ║
-// ║  2. Hapus semua kode, tempel kode ini                        ║
-// ║  3. Klik Deploy > New deployment > Web app                   ║
-// ║  4. Execute as: Me  |  Who has access: Anyone                ║
-// ║  5. Authorize → Copy URL → Paste di RoneyCell Setup          ║
+// ║  1. Extensions > Apps Script > Tempel kode ini               ║
+// ║  2. Deploy > New deployment > Web app                        ║
+// ║  3. Execute as: Me  |  Who has access: Anyone                ║
+// ║  4. Authorize > Copy URL > Paste di RoneyCell Setup          ║
 // ╚══════════════════════════════════════════════════════════════╝
 
 const SS_ID    = "1WiFiPeRn7luGimAC53WTC4zgR4Oc4_0gZ-mVi0J0-J8";
 const U_SHEET  = "Users";
 const T_SHEET  = "Transactions";
-const ADMIN_HP = "081288080752";  // << HARDCODED ADMIN
+const ADMIN_HP = "081288080752";
 
-/* ── Utilities ─────────────────────────────────── */
+/* ── Utilities ──────────────────────────────────── */
 
 function sha256(str) {
   const raw = Utilities.computeDigest(
@@ -29,10 +38,11 @@ function sha256(str) {
   return raw.map(b => ("0" + (b & 0xFF).toString(16)).slice(-2)).join("");
 }
 
-function ok(obj) {
-  return ContentService
+function respond(obj) {
+  const output = ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+  return output;
 }
 
 function getSheet(name) {
@@ -43,109 +53,139 @@ function ensureSheets() {
   const ss = SpreadsheetApp.openById(SS_ID);
   if (!ss.getSheetByName(U_SHEET)) {
     const s = ss.insertSheet(U_SHEET);
-    s.appendRow(["ID","Nama","Phone","Email","Password","TxPIN","Role",
-                 "Status","Saldo","Type","LoginMethod","DaftarPada"]);
+    s.appendRow(["ID","Nama","Phone","Email","Password","TxPIN",
+                 "Role","Status","Saldo","Type","LoginMethod","DaftarPada"]);
     s.setFrozenRows(1);
   }
   if (!ss.getSheetByName(T_SHEET)) {
     const s = ss.insertSheet(T_SHEET);
-    s.appendRow(["RefID","Phone","Produk","Kategori","Harga","HargaDasar",
-                 "Profit","Status","Tanggal","Catatan"]);
+    s.appendRow(["RefID","Phone","Produk","Kategori","Harga",
+                 "HargaDasar","Profit","Status","Tanggal","Catatan"]);
     s.setFrozenRows(1);
   }
 }
 
-/* ── Row finders ───────────────────────────────── */
+/* ── Row finders ────────────────────────────────── */
 
 function findByPhone(phone) {
   const c = String(phone).replace(/\\D/g, "");
   const rows = getSheet(U_SHEET).getDataRange().getValues();
-  for (let i = 1; i < rows.length; i++)
-    if (String(rows[i][2]).replace(/\\D/g, "") === c) return { row: i + 1, data: rows[i] };
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][2]).replace(/\\D/g, "") === c)
+      return { row: i + 1, data: rows[i] };
+  }
   return null;
 }
 
 function findByEmail(email) {
   const rows = getSheet(U_SHEET).getDataRange().getValues();
-  for (let i = 1; i < rows.length; i++)
-    if (String(rows[i][3]).toLowerCase() === String(email).toLowerCase()) return { row: i + 1, data: rows[i] };
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][3]).toLowerCase() === String(email).toLowerCase())
+      return { row: i + 1, data: rows[i] };
+  }
   return null;
 }
 
 function findById(id) {
   const rows = getSheet(U_SHEET).getDataRange().getValues();
-  for (let i = 1; i < rows.length; i++)
-    if (rows[i][0] === id) return { row: i + 1, data: rows[i] };
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(id))
+      return { row: i + 1, data: rows[i] };
+  }
   return null;
 }
 
 function toUser(d) {
-  return { id: d[0], name: d[1], phone: d[2], email: d[3],
-           role: d[6], status: d[7], balance: Number(d[8]),
-           type: d[9], loginMethod: d[10], createdAt: d[11] };
+  return {
+    id: String(d[0]), name: String(d[1]), phone: String(d[2]),
+    email: String(d[3]), role: String(d[6]), status: String(d[7]),
+    balance: Number(d[8]), type: String(d[9]),
+    loginMethod: String(d[10]), createdAt: String(d[11])
+  };
 }
 
-/* ── doGet ─────────────────────────────────────── */
+/* ── Main entry point (ALL requests come here) ─── */
 
 function doGet(e) {
   try {
     ensureSheets();
     const p = e.parameter;
-    switch (p.action) {
+    const action = p.action || "";
+
+    switch (action) {
+      // ── Auth ──
       case "login":           return handleLogin(p);
+      case "register":        return handleRegister(p);
+
+      // ── Balance ──
       case "getBalance":      return handleGetBalance(p);
+      case "updateBalance":   return handleUpdateBalance(p);
+
+      // ── Transactions ──
+      case "addTransaction":  return handleAddTxn(p);
+      case "refund":          return handleRefund(p);
       case "getTransactions": return handleGetTxns(p);
-      case "ping":            return ok({ ok: true, ts: new Date().toISOString() });
-      default:                return ok({ ok: false, message: "Unknown: " + p.action });
+
+      // ── PIN ──
+      case "verifyTxPin":     return handleVerifyPin(p);
+
+      // ── Util ──
+      case "ping":
+        return respond({ ok: true, ts: new Date().toISOString() });
+
+      default:
+        return respond({ ok: false, message: "Unknown action: " + action });
     }
-  } catch (err) { return ok({ ok: false, message: err.message }); }
+  } catch (err) {
+    return respond({ ok: false, message: String(err.message || err) });
+  }
 }
 
-/* ── doPost ────────────────────────────────────── */
-
+/* doPost tetap ada sebagai fallback */
 function doPost(e) {
   try {
     ensureSheets();
-    const b = JSON.parse(e.postData.contents);
-    switch (b.action) {
-      case "register":       return handleRegister(b);
-      case "updateBalance":  return handleUpdateBalance(b);
-      case "addTransaction": return handleAddTxn(b);
-      case "refund":         return handleRefund(b);
-      case "verifyTxPin":    return handleVerifyPin(b);
-      default:               return ok({ ok: false, message: "Unknown: " + b.action });
+    let p = Object.assign({}, e.parameter);
+    if (e.postData && e.postData.contents) {
+      try { Object.assign(p, JSON.parse(e.postData.contents)); } catch(x) {}
     }
-  } catch (err) { return ok({ ok: false, message: err.message }); }
+    return doGet({ parameter: p });
+  } catch (err) {
+    return respond({ ok: false, message: String(err.message || err) });
+  }
 }
 
-/* ── Handler: Login ────────────────────────────── */
+/* ── Handler: Login ─────────────────────────────── */
 
 function handleLogin(p) {
   let found;
+
   if (p.method === "email") {
-    if (!p.email) return ok({ ok: false, message: "Email diperlukan." });
+    if (!p.email) return respond({ ok: false, message: "Email diperlukan." });
     found = findByEmail(p.email);
+    if (!found) return respond({ ok: false, message: "Email tidak terdaftar." });
   } else {
     const cp = String(p.phone || "").replace(/\\D/g, "");
+    if (!cp) return respond({ ok: false, message: "Nomor HP diperlukan." });
     const isAdmin = cp === ADMIN_HP.replace(/\\D/g, "");
     found = findByPhone(cp);
+
+    // Auto-buat akun admin saat login pertama
     if (!found && isAdmin) {
-      // Auto-create admin saat login pertama kali
-      const sh = getSheet(U_SHEET);
-      const id = "USR" + Date.now();
-      sh.appendRow([id, "Admin RoneyCell", ADMIN_HP, "", p.passwordHash,
-                    sha256("123456"), "admin", "active", 0,
-                    "member", "phone", new Date().toISOString()]);
+      getSheet(U_SHEET).appendRow([
+        "USR" + Date.now(), "Admin RoneyCell", ADMIN_HP, "",
+        p.passwordHash, sha256("123456"),
+        "admin", "active", 0, "member", "phone",
+        new Date().toISOString()
+      ]);
       found = findByPhone(ADMIN_HP);
     }
-    if (!found) return ok({ ok: false, message: "Nomor HP tidak terdaftar." });
+    if (!found) return respond({ ok: false, message: "Nomor HP tidak terdaftar." });
   }
 
-  if (!found) return ok({ ok: false, message: "Akun tidak ditemukan." });
-
-  // Bandingkan hash password
+  // Bandingkan hash (React sudah hash sebelum kirim)
   if (String(found.data[4]) !== String(p.passwordHash))
-    return ok({ ok: false, message: "Password salah." });
+    return respond({ ok: false, message: "Password salah." });
 
   const user = toUser(found.data);
 
@@ -159,42 +199,45 @@ function handleLogin(p) {
 
   if (user.status !== "active") {
     if (user.status === "pending")
-      return ok({ ok: false, message: "Akun menunggu persetujuan admin." });
-    return ok({ ok: false, message: "Akun ditolak. Hubungi admin." });
+      return respond({ ok: false, message: "Akun menunggu persetujuan admin." });
+    return respond({ ok: false, message: "Akun ditolak. Hubungi admin." });
   }
 
-  return ok({ ok: true, user });
+  return respond({ ok: true, user });
 }
 
-/* ── Handler: Register ─────────────────────────── */
+/* ── Handler: Register ──────────────────────────── */
 
-function handleRegister(b) {
-  const method = b.loginMethod || "phone";
-  const phone  = b.phone ? String(b.phone).replace(/\\D/g,"") : "";
-  const email  = b.email || "";
+function handleRegister(p) {
+  const method = p.loginMethod || "phone";
+  const phone  = p.phone ? String(p.phone).replace(/\\D/g,"") : "";
+  const email  = p.email || "";
+  const name   = p.name  || "Pengguna";
 
   if (phone && findByPhone(phone))
-    return ok({ ok: false, message: "Nomor HP sudah terdaftar." });
+    return respond({ ok: false, message: "Nomor HP sudah terdaftar." });
   if (email && email !== "" && findByEmail(email))
-    return ok({ ok: false, message: "Email sudah terdaftar." });
+    return respond({ ok: false, message: "Email sudah terdaftar." });
 
   const isAdmin = phone === ADMIN_HP.replace(/\\D/g,"");
   const status  = (isAdmin || method === "email" || method === "facebook")
                   ? "active" : "pending";
   const role    = isAdmin ? "admin" : "member";
-  const txPin   = b.txPinHash || sha256("123456");
+  const txPin   = p.txPinHash || sha256("123456");
 
-  const sh = getSheet(U_SHEET);
   const id = "USR" + Date.now();
-  sh.appendRow([id, b.name || "Pengguna", phone, email,
-                b.passwordHash || "", txPin, role, status,
-                0, "member", method, new Date().toISOString()]);
+  getSheet(U_SHEET).appendRow([
+    id, name, phone, email,
+    p.passwordHash || "", txPin,
+    role, status, 0, "member", method,
+    new Date().toISOString()
+  ]);
 
   const newRow = phone ? findByPhone(phone) : findByEmail(email);
   const user   = toUser(newRow.data);
   if (isAdmin) { user.role = "admin"; user.status = "active"; }
 
-  return ok({
+  return respond({
     ok: true, user,
     message: status === "pending"
       ? "Pendaftaran berhasil! Menunggu persetujuan admin."
@@ -202,61 +245,54 @@ function handleRegister(b) {
   });
 }
 
-/* ── Handler: Balance ──────────────────────────── */
+/* ── Handler: Balance ───────────────────────────── */
 
 function handleGetBalance(p) {
   const row = (p.userId ? findById(p.userId) : null)
            || (p.phone  ? findByPhone(p.phone) : null);
-  if (!row) return ok({ ok: false, message: "User tidak ditemukan." });
-  return ok({ ok: true, balance: Number(row.data[8]) });
+  if (!row) return respond({ ok: false, message: "User tidak ditemukan." });
+  return respond({ ok: true, balance: Number(row.data[8]) });
 }
 
-function handleUpdateBalance(b) {
-  const row = (b.userId ? findById(b.userId) : null)
-           || (b.phone  ? findByPhone(b.phone)  : null);
-  if (!row) return ok({ ok: false, message: "User tidak ditemukan." });
+function handleUpdateBalance(p) {
+  const row = (p.userId ? findById(p.userId) : null)
+           || (p.phone  ? findByPhone(p.phone) : null);
+  if (!row) return respond({ ok: false, message: "User tidak ditemukan." });
   const sh      = getSheet(U_SHEET);
   const current = Number(row.data[8]);
-  const newBal  = current + Number(b.delta);
+  const newBal  = current + Number(p.delta);
   sh.getRange(row.row, 9).setValue(newBal);
-  return ok({ ok: true, balance: newBal });
+  return respond({ ok: true, balance: newBal });
 }
 
-/* ── Handler: Transactions ─────────────────────── */
+/* ── Handler: Transactions ──────────────────────── */
 
-function handleAddTxn(b) {
+function handleAddTxn(p) {
   getSheet(T_SHEET).appendRow([
-    b.refId, b.phone, b.product, b.category,
-    Number(b.amount), Number(b.basePrice), Number(b.profit),
-    b.status, b.date, b.note || ""
+    p.refId, p.phone, p.product, p.category,
+    Number(p.amount), Number(p.basePrice), Number(p.profit),
+    p.status, p.date, p.note || ""
   ]);
-  return ok({ ok: true });
+  return respond({ ok: true });
 }
 
-function handleRefund(b) {
-  const row = (b.userId ? findById(b.userId) : null)
-           || (b.phone  ? findByPhone(b.phone)  : null);
+function handleRefund(p) {
+  // Kembalikan saldo
+  const row = (p.userId ? findById(p.userId) : null)
+           || (p.phone  ? findByPhone(p.phone) : null);
   if (row) {
     const sh = getSheet(U_SHEET);
-    sh.getRange(row.row, 9).setValue(Number(row.data[8]) + Number(b.amount));
+    sh.getRange(row.row, 9).setValue(Number(row.data[8]) + Number(p.amount));
   }
+  // Update status transaksi
   const tsh  = getSheet(T_SHEET);
   const rows = tsh.getDataRange().getValues();
   for (let i = 1; i < rows.length; i++) {
-    if (rows[i][0] === b.refId) {
+    if (String(rows[i][0]) === String(p.refId)) {
       tsh.getRange(i + 1, 8).setValue("refunded"); break;
     }
   }
-  return ok({ ok: true });
-}
-
-function handleVerifyPin(b) {
-  const row = (b.userId ? findById(b.userId) : null)
-           || (b.phone  ? findByPhone(b.phone)  : null);
-  if (!row) return ok({ ok: false, message: "User tidak ditemukan." });
-  if (String(row.data[5]) !== String(b.pinHash))
-    return ok({ ok: false, message: "PIN Transaksi salah." });
-  return ok({ ok: true });
+  return respond({ ok: true });
 }
 
 function handleGetTxns(p) {
@@ -266,14 +302,27 @@ function handleGetTxns(p) {
   const txns  = [];
   for (let i = rows.length - 1; i >= 1; i--) {
     if (String(rows[i][1]).replace(/\\D/g,"") === phone) {
-      txns.push({ refId: rows[i][0], phone: rows[i][1], product: rows[i][2],
-                  category: rows[i][3], amount: Number(rows[i][4]),
-                  basePrice: Number(rows[i][5]), profit: Number(rows[i][6]),
-                  status: rows[i][7], date: rows[i][8], note: rows[i][9] });
+      txns.push({
+        refId: rows[i][0], phone: rows[i][1], product: rows[i][2],
+        category: rows[i][3], amount: Number(rows[i][4]),
+        basePrice: Number(rows[i][5]), profit: Number(rows[i][6]),
+        status: rows[i][7], date: rows[i][8], note: rows[i][9]
+      });
       if (txns.length >= limit) break;
     }
   }
-  return ok({ ok: true, transactions: txns });
+  return respond({ ok: true, transactions: txns });
+}
+
+/* ── Handler: Verify PIN ────────────────────────── */
+
+function handleVerifyPin(p) {
+  const row = (p.userId ? findById(p.userId) : null)
+           || (p.phone  ? findByPhone(p.phone) : null);
+  if (!row) return respond({ ok: false, message: "User tidak ditemukan." });
+  if (String(row.data[5]) !== String(p.pinHash))
+    return respond({ ok: false, message: "PIN Transaksi salah." });
+  return respond({ ok: true });
 }`;
 
 interface SetupPageProps {
@@ -286,6 +335,7 @@ export default function SetupPage({ onDone }: SetupPageProps) {
   const [copied, setCopied] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<"ok" | "fail" | null>(null);
+  const [testMsg, setTestMsg] = useState("");
 
   async function handleCopy() {
     await navigator.clipboard.writeText(APPS_SCRIPT_CODE);
@@ -294,12 +344,20 @@ export default function SetupPage({ onDone }: SetupPageProps) {
   }
 
   async function handleTest() {
-    if (!url.trim()) return;
+    const trimmed = url.trim();
+    if (!trimmed) return;
     setTesting(true);
     setTestResult(null);
-    saveConfig({ scriptsUrl: url.trim() });
-    const ok = await pingScript();
-    setTestResult(ok ? "ok" : "fail");
+    setTestMsg("");
+    saveConfig({ scriptsUrl: trimmed });
+    try {
+      const ok = await pingScript();
+      setTestResult(ok ? "ok" : "fail");
+      setTestMsg(ok ? "" : "Respons tidak valid. Pastikan kode Apps Script sudah di-paste dan di-deploy ulang.");
+    } catch (err: unknown) {
+      setTestResult("fail");
+      setTestMsg(err instanceof Error ? err.message : "Tidak bisa terhubung.");
+    }
     setTesting(false);
   }
 
@@ -309,7 +367,9 @@ export default function SetupPage({ onDone }: SetupPageProps) {
   }
 
   return (
-    <div className="min-h-dvh max-w-md mx-auto px-4 py-8 flex flex-col">
+    <div className="min-h-dvh max-w-md mx-auto px-4 py-8 flex flex-col"
+      style={{ background: "linear-gradient(160deg, hsl(220 45% 5%) 0%, hsl(230 50% 8%) 100%)" }}>
+
       {/* Logo */}
       <div className="flex items-center gap-3 mb-8">
         <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
@@ -329,107 +389,109 @@ export default function SetupPage({ onDone }: SetupPageProps) {
       </div>
 
       {/* Step indicator */}
-      <div className="flex gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-6">
         {[1, 2].map((s) => (
           <div key={s} className="flex items-center gap-2">
-            <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black transition-all"
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black transition-all"
               style={step >= s
                 ? { background: "linear-gradient(135deg,#3B82F6 0%,#6366F1 100%)", color: "white" }
                 : { background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)" }
-              }
-            >
+              }>
               {s < step ? "✓" : s}
             </div>
-            <span className="text-xs font-semibold" style={{ color: step >= s ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)" }}>
+            <span className="text-xs font-semibold"
+              style={{ color: step >= s ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)" }}>
               {s === 1 ? "Pasang Script" : "Masukkan URL"}
             </span>
-            {s < 2 && <div className="w-8 h-px bg-white/10 ml-1" />}
+            {s < 2 && <div className="flex-1 h-px bg-white/10" />}
           </div>
         ))}
       </div>
 
-      {/* ── Step 1: Show code ── */}
+      {/* ── Step 1 ── */}
       {step === 1 && (
         <div className="flex flex-col gap-4 flex-1">
           <div className="glass-card rounded-2xl p-4 border border-blue-500/20">
-            <p className="text-sm font-black text-foreground mb-1">Langkah 1: Pasang kode ke Google Apps Script</p>
+            <p className="text-sm font-black text-foreground mb-1">Langkah 1: Pasang kode ke Apps Script</p>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Buka Google Spreadsheet Anda → klik <span className="font-bold text-foreground/80">Extensions</span> → <span className="font-bold text-foreground/80">Apps Script</span> → hapus kode lama → tempel kode di bawah ini.
+              Buka spreadsheet → klik <b className="text-foreground/80">Extensions</b> → <b className="text-foreground/80">Apps Script</b> → hapus kode lama → tempel kode ini.
             </p>
           </div>
 
-          {/* Steps detail */}
           <div className="space-y-2">
             {[
-              { n: "1", text: "Buka spreadsheet RoneyCell Anda" },
-              { n: "2", text: "Klik menu Extensions → Apps Script" },
-              { n: "3", text: "Hapus semua isi editor, tempel kode di bawah" },
-              { n: "4", text: "Klik tombol Simpan (ikon disk / Ctrl+S)" },
-              { n: "5", text: "Klik Deploy → New deployment → Web app" },
-              { n: "6", text: "Execute as: Me | Who has access: Anyone" },
-              { n: "7", text: "Klik Deploy → Authorize → Copy URL" },
-            ].map(({ n, text }) => (
-              <div key={n} className="flex items-start gap-3 px-3 py-2.5 rounded-xl bg-white/3 border border-white/6">
+              "Buka Google Spreadsheet RoneyCell Anda",
+              "Klik menu Extensions → Apps Script",
+              "Hapus semua isi editor (Ctrl+A, Delete)",
+              "Klik tombol 📋 Salin Kode di bawah, lalu tempel (Ctrl+V)",
+              "Klik ikon Simpan (💾) atau tekan Ctrl+S",
+              "Klik Deploy → New deployment",
+              "Type: Web app · Execute as: Me · Access: Anyone",
+              "Klik Deploy → Authorize → Copy the deployment URL",
+            ].map((text, i) => (
+              <div key={i} className="flex items-start gap-3 px-3 py-2.5 rounded-xl bg-white/3 border border-white/6">
                 <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0"
                   style={{ background: "rgba(99,102,241,0.3)", color: "#A78BFA" }}>
-                  {n}
+                  {i + 1}
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">{text}</p>
               </div>
             ))}
           </div>
 
-          {/* Code block */}
-          <div className="relative">
-            <div className="rounded-2xl border border-white/10 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/8"
-                style={{ background: "rgba(255,255,255,0.04)" }}>
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full bg-red-400/60" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-400/60" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-green-400/60" />
-                  <span className="text-xs text-muted-foreground ml-1 font-mono">Code.gs</span>
-                </div>
-                <button
-                  onClick={handleCopy}
-                  className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
-                  style={copied
-                    ? { background: "rgba(52,211,153,0.2)", color: "#34D399" }
-                    : { background: "rgba(99,102,241,0.2)", color: "#A78BFA" }
-                  }
-                >
-                  {copied ? "✓ Tersalin!" : "📋 Salin Kode"}
-                </button>
+          {/* Code preview + copy */}
+          <div className="rounded-2xl border border-white/10 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/8"
+              style={{ background: "rgba(255,255,255,0.04)" }}>
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-400/60" />
+                <div className="w-2.5 h-2.5 rounded-full bg-yellow-400/60" />
+                <div className="w-2.5 h-2.5 rounded-full bg-green-400/60" />
+                <span className="text-xs text-muted-foreground ml-1 font-mono">Code.gs — RoneyCell API v2</span>
               </div>
-              <div className="p-4 overflow-y-auto max-h-64 font-mono text-[10px] leading-relaxed text-green-300/80"
-                style={{ background: "rgba(0,0,0,0.4)" }}>
-                <pre className="whitespace-pre-wrap break-words">{APPS_SCRIPT_CODE.slice(0, 800)}...</pre>
-              </div>
+              <button onClick={handleCopy}
+                className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
+                style={copied
+                  ? { background: "rgba(52,211,153,0.2)", color: "#34D399" }
+                  : { background: "rgba(99,102,241,0.2)", color: "#A78BFA" }
+                }>
+                {copied ? "✓ Tersalin!" : "📋 Salin Kode"}
+              </button>
             </div>
-            <p className="text-[10px] text-muted-foreground text-center mt-1">
-              Kode terlalu panjang untuk ditampilkan penuh — klik "Salin Kode" untuk mendapatkan kode lengkap
+            <div className="p-4 font-mono text-[10px] leading-relaxed text-green-300/80 max-h-48 overflow-y-auto"
+              style={{ background: "rgba(0,0,0,0.5)" }}>
+              <pre className="whitespace-pre-wrap">{`// RoneyCell Apps Script API v2
+// Semua request melalui doGet()
+// ─────────────────────────────
+const SS_ID = "1WiFiPeRn7luGimAC53WTC4zgR4Oc4_0gZ-mVi0J0-J8";
+const ADMIN_HP = "081288080752";
+// ... (klik Salin Kode untuk kode lengkap)`}</pre>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2 px-3 py-3 rounded-xl bg-yellow-500/8 border border-yellow-500/20">
+            <span className="text-base flex-shrink-0">⚠️</span>
+            <p className="text-xs text-yellow-200/80 leading-relaxed">
+              <b>Penting:</b> Jika sebelumnya sudah pernah deploy, Anda harus membuat <b>New deployment</b> (bukan "Manage deployments"). URL lama tidak akan menggunakan kode terbaru.
             </p>
           </div>
 
-          <button
-            onClick={() => setStep(2)}
+          <button onClick={() => setStep(2)}
             className="w-full py-4 rounded-2xl font-black text-base text-white mt-auto"
-            style={{ background: "linear-gradient(135deg,#3B82F6 0%,#6366F1 100%)", boxShadow: "0 6px 20px rgba(59,130,246,0.35)" }}
-          >
+            style={{ background: "linear-gradient(135deg,#3B82F6 0%,#6366F1 100%)", boxShadow: "0 6px 20px rgba(59,130,246,0.35)" }}>
             Sudah Deploy → Lanjut ke Langkah 2 →
           </button>
         </div>
       )}
 
-      {/* ── Step 2: Enter URL ── */}
+      {/* ── Step 2 ── */}
       {step === 2 && (
         <div className="flex flex-col gap-4 flex-1">
           <div className="glass-card rounded-2xl p-4 border border-blue-500/20">
             <p className="text-sm font-black text-foreground mb-1">Langkah 2: Masukkan URL Deployment</p>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Setelah deploy berhasil, Google akan memberikan URL seperti:
-              <span className="font-mono block mt-1 text-blue-300/80 text-[9px] break-all">
+              Setelah deploy, Google memberikan URL seperti:
+              <span className="font-mono block mt-1.5 text-blue-300/80 text-[10px] break-all bg-black/30 px-2 py-1 rounded-lg">
                 https://script.google.com/macros/s/AKfy...xxx/exec
               </span>
             </p>
@@ -437,54 +499,59 @@ export default function SetupPage({ onDone }: SetupPageProps) {
 
           <div>
             <label className="text-xs text-muted-foreground tracking-widest uppercase font-semibold block mb-2">
-              URL Apps Script
+              URL Apps Script Deployment
             </label>
             <input
               type="url"
               value={url}
-              onChange={(e) => { setUrl(e.target.value); setTestResult(null); }}
+              onChange={(e) => { setUrl(e.target.value); setTestResult(null); setTestMsg(""); }}
               placeholder="https://script.google.com/macros/s/..."
-              className="w-full px-4 py-3.5 rounded-xl text-sm bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-all font-mono text-xs"
+              className="w-full px-4 py-3.5 rounded-xl text-xs bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-all font-mono"
             />
           </div>
 
-          {/* Test result */}
           {testResult === "ok" && (
-            <div className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
-              <p className="text-xs text-emerald-300 font-semibold">✅ Koneksi berhasil! URL valid.</p>
+            <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
+              <span className="text-base flex-shrink-0">✅</span>
+              <div>
+                <p className="text-xs text-emerald-300 font-bold">Koneksi berhasil!</p>
+                <p className="text-[11px] text-emerald-200/70">Apps Script merespons dengan benar.</p>
+              </div>
             </div>
           )}
           {testResult === "fail" && (
-            <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/25">
-              <p className="text-xs text-red-300 font-semibold">⚠️ Tidak bisa terhubung. Periksa URL atau pastikan deployment sudah diakses oleh Anyone.</p>
+            <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/25">
+              <span className="text-base flex-shrink-0">⚠️</span>
+              <div>
+                <p className="text-xs text-red-300 font-bold">Koneksi gagal</p>
+                <p className="text-[11px] text-red-200/70 mt-0.5 leading-relaxed">
+                  {testMsg || "Periksa: (1) URL sudah benar, (2) Who has access: Anyone, (3) Kode terbaru sudah di-deploy ulang."}
+                </p>
+              </div>
             </div>
           )}
 
-          <div className="flex gap-3 mt-auto">
-            <button
-              onClick={() => setStep(1)}
-              className="flex-1 py-3.5 rounded-2xl text-sm font-bold border border-white/10 text-muted-foreground hover:bg-white/5 transition-all"
-            >
+          <div className="flex gap-3">
+            <button onClick={() => setStep(1)}
+              className="flex-1 py-3.5 rounded-2xl text-sm font-bold border border-white/10 text-muted-foreground hover:bg-white/5 transition-all">
               ← Kembali
             </button>
-            <button
-              onClick={handleTest}
-              disabled={!url.trim() || testing}
+            <button onClick={handleTest} disabled={!url.trim() || testing}
               className="flex-1 py-3.5 rounded-2xl text-sm font-bold transition-all disabled:opacity-40"
-              style={{ background: "rgba(99,102,241,0.25)", color: "#A78BFA", border: "1px solid rgba(99,102,241,0.3)" }}
-            >
+              style={{ background: "rgba(99,102,241,0.25)", color: "#A78BFA", border: "1px solid rgba(99,102,241,0.3)" }}>
               {testing ? "⏳ Testing..." : "🔌 Test Koneksi"}
             </button>
           </div>
 
-          <button
-            onClick={handleSave}
-            disabled={!url.trim()}
+          <button onClick={handleSave} disabled={!url.trim()}
             className="w-full py-4 rounded-2xl font-black text-base text-white transition-all disabled:opacity-40"
-            style={{ background: "linear-gradient(135deg,#10B981 0%,#059669 100%)", boxShadow: "0 6px 20px rgba(16,185,129,0.35)" }}
-          >
+            style={{ background: "linear-gradient(135deg,#10B981 0%,#059669 100%)", boxShadow: "0 6px 20px rgba(16,185,129,0.35)" }}>
             ✅ Simpan & Mulai Aplikasi
           </button>
+
+          <p className="text-center text-[11px] text-muted-foreground leading-relaxed">
+            URL disimpan lokal di browser Anda. Tidak ada data yang dikirim ke server pihak ketiga.
+          </p>
         </div>
       )}
     </div>

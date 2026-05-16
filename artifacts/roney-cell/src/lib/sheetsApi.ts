@@ -36,69 +36,63 @@ export interface SheetTransaction {
   note: string;
 }
 
-interface ApiResponse<T = undefined> {
+interface ApiResponse {
   ok: boolean;
   message?: string;
   user?: SheetUser;
   balance?: number;
   transactions?: SheetTransaction[];
-  data?: T;
 }
 
 function getUrl(): string {
   return loadConfig().scriptsUrl?.trim() ?? "";
 }
 
-/* ── Core fetch helpers ── */
-
-async function apiGet<T = ApiResponse>(
-  action: string,
-  params: Record<string, string> = {}
-): Promise<T> {
+/* ─────────────────────────────────────────────────────────────
+   ALL requests use GET with URLSearchParams.
+   Reason: Apps Script exec URL redirects (302) which causes
+   POST bodies to be lost by browsers following CORS rules.
+   GET requests follow redirects correctly with no data loss.
+───────────────────────────────────────────────────────────── */
+async function api(params: Record<string, string>): Promise<ApiResponse> {
   const url = getUrl();
   if (!url) throw new Error("URL Apps Script belum dikonfigurasi.");
-  const qs = new URLSearchParams({ action, ...params }).toString();
-  const res = await fetch(`${url}?${qs}`, { redirect: "follow" });
-  if (!res.ok) throw new Error(`Server error: HTTP ${res.status}`);
-  return res.json() as Promise<T>;
-}
 
-async function apiPost<T = ApiResponse>(
-  action: string,
-  data: Record<string, unknown> = {}
-): Promise<T> {
-  const url = getUrl();
-  if (!url) throw new Error("URL Apps Script belum dikonfigurasi.");
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action, ...data }),
-    redirect: "follow",
-  });
-  if (!res.ok) throw new Error(`Server error: HTTP ${res.status}`);
-  return res.json() as Promise<T>;
+  const qs = new URLSearchParams(params).toString();
+  const fullUrl = `${url}?${qs}`;
+
+  try {
+    const res = await fetch(fullUrl, {
+      method: "GET",
+      redirect: "follow",
+    });
+    if (!res.ok) throw new Error(`Server error: HTTP ${res.status}`);
+    const data = await res.json() as ApiResponse;
+    return data;
+  } catch (err: unknown) {
+    if (err instanceof TypeError && String(err.message).includes("fetch")) {
+      throw new Error("Tidak bisa terhubung ke Apps Script. Periksa URL dan pastikan 'Who has access: Anyone'.");
+    }
+    throw err;
+  }
 }
 
 /* ── Auth ── */
 
-export async function loginWithPhone(
-  phone: string,
-  password: string
-): Promise<ApiResponse> {
+export async function loginWithPhone(phone: string, password: string): Promise<ApiResponse> {
   const passwordHash = await hashString(password);
-  return apiGet("login", {
+  return api({
+    action: "login",
     method: "phone",
     phone: phone.replace(/\D/g, ""),
     passwordHash,
   });
 }
 
-export async function loginByEmail(
-  email: string,
-  password: string
-): Promise<ApiResponse> {
+export async function loginByEmail(email: string, password: string): Promise<ApiResponse> {
   const passwordHash = await hashString(password);
-  return apiGet("login", {
+  return api({
+    action: "login",
     method: "email",
     email: email.toLowerCase().trim(),
     passwordHash,
@@ -115,7 +109,8 @@ export async function registerUser(data: {
 }): Promise<ApiResponse> {
   const passwordHash = await hashString(data.password);
   const txPinHash = await hashString(data.txPin);
-  return apiPost("register", {
+  return api({
+    action: "register",
     name: data.name,
     phone: data.phone ?? "",
     email: data.email ?? "",
@@ -126,13 +121,14 @@ export async function registerUser(data: {
 }
 
 export async function registerFacebook(name: string): Promise<ApiResponse> {
-  const fakePhone = "fb" + Date.now();
-  const passwordHash = await hashString(fakePhone);
+  const uid = "fb" + Date.now();
+  const passwordHash = await hashString(uid);
   const txPinHash = await hashString("123456");
-  return apiPost("register", {
+  return api({
+    action: "register",
     name,
     phone: "",
-    email: `${name.toLowerCase().replace(/\s+/g, ".")}@facebook.local`,
+    email: `${name.toLowerCase().replace(/\s+/g, ".")}${Date.now()}@fb.local`,
     passwordHash,
     txPinHash,
     loginMethod: "facebook",
@@ -140,31 +136,22 @@ export async function registerFacebook(name: string): Promise<ApiResponse> {
 }
 
 /* ── Transaction PIN ── */
-
-export async function verifyTxPin(
-  userId: string,
-  pin: string
-): Promise<ApiResponse> {
+export async function verifyTxPin(userId: string, pin: string): Promise<ApiResponse> {
   const pinHash = await hashString(pin);
-  return apiPost("verifyTxPin", { userId, pinHash });
+  return api({ action: "verifyTxPin", userId, pinHash });
 }
 
 /* ── Balance ── */
-
 export async function getMemberBalance(userId: string): Promise<number> {
-  const res = await apiGet<ApiResponse>("getBalance", { userId });
+  const res = await api({ action: "getBalance", userId });
   return res.balance ?? 0;
 }
 
-export async function updateMemberBalance(
-  userId: string,
-  delta: number
-): Promise<ApiResponse> {
-  return apiPost("updateBalance", { userId, delta });
+export async function updateMemberBalance(userId: string, delta: number): Promise<ApiResponse> {
+  return api({ action: "updateBalance", userId, delta: String(delta) });
 }
 
 /* ── Transactions ── */
-
 export async function addTransactionToSheets(txn: {
   refId: string;
   phone: string;
@@ -177,7 +164,19 @@ export async function addTransactionToSheets(txn: {
   date: string;
   note?: string;
 }): Promise<ApiResponse> {
-  return apiPost("addTransaction", txn);
+  return api({
+    action: "addTransaction",
+    refId: txn.refId,
+    phone: txn.phone,
+    product: txn.product,
+    category: txn.category,
+    amount: String(txn.amount),
+    basePrice: String(txn.basePrice),
+    profit: String(txn.profit),
+    status: txn.status,
+    date: txn.date,
+    note: txn.note ?? "",
+  });
 }
 
 export async function refundTransaction(
@@ -186,24 +185,22 @@ export async function refundTransaction(
   refId: string,
   amount: number
 ): Promise<ApiResponse> {
-  return apiPost("refund", { userId, phone, refId, amount });
+  return api({ action: "refund", userId, phone, refId, amount: String(amount) });
 }
 
-export async function getMemberTransactions(
-  phone: string,
-  limit = 20
-): Promise<SheetTransaction[]> {
-  const res = await apiGet<ApiResponse>("getTransactions", {
+export async function getMemberTransactions(phone: string, limit = 20): Promise<SheetTransaction[]> {
+  const res = await api({
+    action: "getTransactions",
     phone: phone.replace(/\D/g, ""),
     limit: String(limit),
   });
   return res.transactions ?? [];
 }
 
-/* ── Ping (check if URL is valid) ── */
+/* ── Ping ── */
 export async function pingScript(): Promise<boolean> {
   try {
-    const res = await apiGet<ApiResponse>("ping");
+    const res = await api({ action: "ping" });
     return res.ok === true;
   } catch {
     return false;
