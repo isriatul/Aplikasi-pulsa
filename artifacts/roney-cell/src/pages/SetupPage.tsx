@@ -171,14 +171,26 @@ function handleLogin(p) {
     found = findByPhone(cp);
 
     // Auto-buat akun admin saat login pertama
+    // FIX: setelah appendRow, gunakan SpreadsheetApp.flush() agar data
+    // langsung tersimpan sebelum dibaca kembali (menghindari cache issue)
     if (!found && isAdmin) {
+      const adminId = "USR" + Date.now();
+      const adminCreated = new Date().toISOString();
       getSheet(U_SHEET).appendRow([
-        "USR" + Date.now(), "Admin RoneyCell", ADMIN_HP, "",
+        adminId, "Admin RoneyCell", ADMIN_HP, "",
         p.passwordHash, sha256("123456"),
-        "admin", "active", 0, "member", "phone",
-        new Date().toISOString()
+        "admin", "active", 0, "member", "phone", adminCreated
       ]);
+      SpreadsheetApp.flush();
       found = findByPhone(ADMIN_HP);
+      // Fallback: bangun objek langsung jika masih tidak ditemukan
+      if (!found) {
+        return respond({ ok: true, user: {
+          id: adminId, name: "Admin RoneyCell", phone: ADMIN_HP, email: "",
+          role: "admin", status: "active", balance: 0,
+          type: "member", loginMethod: "phone", createdAt: adminCreated
+        }});
+      }
     }
     if (!found) return respond({ ok: false, message: "Nomor HP tidak terdaftar." });
   }
@@ -224,18 +236,22 @@ function handleRegister(p) {
                   ? "active" : "pending";
   const role    = isAdmin ? "admin" : "member";
   const txPin   = p.txPinHash || sha256("123456");
+  const id      = "USR" + Date.now();
+  const created = new Date().toISOString();
 
-  const id = "USR" + Date.now();
   getSheet(U_SHEET).appendRow([
     id, name, phone, email,
     p.passwordHash || "", txPin,
-    role, status, 0, "member", method,
-    new Date().toISOString()
+    role, status, 0, "member", method, created
   ]);
-
-  const newRow = phone ? findByPhone(phone) : findByEmail(email);
-  const user   = toUser(newRow.data);
-  if (isAdmin) { user.role = "admin"; user.status = "active"; }
+  // FIX: jangan re-read dari sheet setelah appendRow (Apps Script cache bug).
+  // Bangun objek user langsung dari data yang sudah diketahui.
+  const user = {
+    id: id, name: name, phone: phone, email: email,
+    role: isAdmin ? "admin" : role,
+    status: isAdmin ? "active" : status,
+    balance: 0, type: "member", loginMethod: method, createdAt: created
+  };
 
   return respond({
     ok: true, user,

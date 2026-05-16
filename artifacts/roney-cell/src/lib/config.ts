@@ -31,13 +31,20 @@ export const DEFAULT_CONFIG: AppConfig = {
   bcaAccountName: "Isriatul Bahroni",
   qrisImage: "",
   adminPin: "1234",
-  scriptsUrl: "",
+  scriptsUrl: "https://script.google.com/macros/s/AKfycbykF7A4bEbhmjtoREXiytKNJfgyDKD86tqy8X0U2tFwvCCxFwCd14jFEp0Ss4JRr-vy/exec",
 };
 
 export function loadConfig(): AppConfig {
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
-    if (raw) return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+    if (raw) {
+      const stored = JSON.parse(raw) as Partial<AppConfig>;
+      // If stored URL is empty, fall back to the hardcoded default
+      if (!stored.scriptsUrl?.trim()) {
+        stored.scriptsUrl = DEFAULT_CONFIG.scriptsUrl;
+      }
+      return { ...DEFAULT_CONFIG, ...stored };
+    }
   } catch {}
   return { ...DEFAULT_CONFIG };
 }
