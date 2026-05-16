@@ -1,14 +1,5 @@
 import { loadConfig } from "./config";
 
-/* ── SHA-256 via Web Crypto API (matches Apps Script output) ── */
-export async function hashString(str: string): Promise<string> {
-  const enc = new TextEncoder();
-  const buf = await crypto.subtle.digest("SHA-256", enc.encode(str));
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
 /* ── Device ID (persisten per browser) ── */
 function getDeviceId(): string {
   const KEY = "roneycell_device_id";
@@ -75,10 +66,7 @@ async function api(params: Record<string, string>): Promise<ApiResponse> {
   const fullUrl = `${url}?${qs}`;
 
   try {
-    const res = await fetch(fullUrl, {
-      method: "GET",
-      redirect: "follow",
-    });
+    const res = await fetch(fullUrl, { method: "GET", redirect: "follow" });
     if (!res.ok) throw new Error(`Server error: HTTP ${res.status}`);
     const data = await res.json() as ApiResponse;
     return data;
@@ -111,22 +99,20 @@ export async function updateSheetUserStatus(
 /* ── Auth ── */
 
 export async function loginWithPhone(phone: string, password: string): Promise<ApiResponse> {
-  const passwordHash = await hashString(password);
   return api({
     action: "login",
     method: "phone",
     phone: phone.replace(/\D/g, ""),
-    passwordHash,
+    password,
   });
 }
 
 export async function loginByEmail(email: string, password: string): Promise<ApiResponse> {
-  const passwordHash = await hashString(password);
   return api({
     action: "login",
     method: "email",
     email: email.toLowerCase().trim(),
-    passwordHash,
+    password,
   });
 }
 
@@ -139,16 +125,14 @@ export async function registerUser(data: {
   loginMethod: "phone" | "email" | "facebook";
   status?: string;
 }): Promise<ApiResponse> {
-  const passwordHash = await hashString(data.password);
-  const txPinHash    = await hashString(data.txPin);
-  const deviceId     = getDeviceId();
+  const deviceId = getDeviceId();
   return api({
     action: "register",
     name: data.name,
     phone: data.phone ?? "",
     email: data.email ?? "",
-    passwordHash,
-    txPinHash,
+    password: data.password,
+    txPin: data.txPin,
     loginMethod: data.loginMethod,
     deviceId,
     status: data.status ?? "pending",
@@ -156,26 +140,23 @@ export async function registerUser(data: {
 }
 
 export async function registerFacebook(name: string): Promise<ApiResponse> {
-  const uid          = "fb" + Date.now();
-  const passwordHash = await hashString(uid);
-  const txPinHash    = await hashString("123456");
-  const deviceId     = getDeviceId();
+  const deviceId = getDeviceId();
   return api({
     action: "register",
     name,
     phone: "",
     email: `${name.toLowerCase().replace(/\s+/g, ".")}${Date.now()}@fb.local`,
-    passwordHash,
-    txPinHash,
+    password: "fb" + Date.now(),
+    txPin: "123456",
     loginMethod: "facebook",
     deviceId,
+    status: "active",
   });
 }
 
 /* ── Transaction PIN ── */
 export async function verifyTxPin(userId: string, pin: string): Promise<ApiResponse> {
-  const pinHash = await hashString(pin);
-  return api({ action: "verifyTxPin", userId, pinHash });
+  return api({ action: "verifyTxPin", userId, pin });
 }
 
 /* ── Balance ── */
@@ -220,7 +201,7 @@ export async function refundTransaction(
   userId: string,
   phone: string,
   refId: string,
-  amount: number
+  amount: number,
 ): Promise<ApiResponse> {
   return api({ action: "refund", userId, phone, refId, amount: String(amount) });
 }
