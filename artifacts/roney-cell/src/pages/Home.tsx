@@ -218,7 +218,7 @@ export default function Home({ member, onMemberUpdate }: HomeProps) {
     setMemberBalance(newBalance);
     onMemberUpdate({ ...member, balance: newBalance });
     try {
-      const result = await sendTransaction(cfg, txPhone, sku, refId);
+      const result = await sendTransaction(txPhone, sku, refId);
       await addTransactionToSheets({
         refId, phone: txPhone, product: selectedProduct.name, category: selectedProduct.category,
         amount: selectedProduct.price, basePrice: selectedProduct.basePrice,

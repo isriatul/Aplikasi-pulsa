@@ -30,6 +30,7 @@ import {
   updateSheetUserStatus,
   SheetUser,
 } from "@/lib/sheetsApi";
+import { getServerIp, checkDigiflazzBalance } from "@/lib/digiflazz";
 
 type AdminTab = "report" | "prices" | "members" | "settings";
 
@@ -735,15 +736,113 @@ function TransferBalanceForm({ member, onDone, onBack }: { member: Member; onDon
   );
 }
 
+/* ─── DIGIFLAZZ STATUS CARD ─── */
+function DigiflazzStatusCard() {
+  const [ip, setIp]           = useState<string | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [error, setError]     = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied]   = useState(false);
+
+  const fetchStatus = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const [ipResult, balResult] = await Promise.all([
+        getServerIp(),
+        checkDigiflazzBalance(),
+      ]);
+      setIp(ipResult);
+      if (balResult.error) setError(balResult.error);
+      else setBalance(balResult.balance);
+    } catch {
+      setError("Tidak dapat menghubungi server");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchStatus(); }, [fetchStatus]);
+
+  function copyIp() {
+    if (!ip) return;
+    navigator.clipboard.writeText(ip).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  const connected = !error && balance !== null;
+
+  return (
+    <div className="glass-card rounded-2xl p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-base font-bold text-foreground">Koneksi Digiflazz</span>
+          <span className={`w-2 h-2 rounded-full ${loading ? "bg-yellow-400 animate-pulse" : connected ? "bg-emerald-400" : "bg-red-400"}`} />
+        </div>
+        <button onClick={fetchStatus} disabled={loading}
+          className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-muted-foreground hover:bg-white/10 transition-all disabled:opacity-50">
+          {loading ? "Memeriksa…" : "Refresh"}
+        </button>
+      </div>
+
+      {/* IP Server */}
+      <div>
+        <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold mb-1.5">
+          IP Server (untuk Whitelist Digiflazz)
+        </p>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 font-mono text-sm text-foreground">
+            {ip ?? (loading ? "Memuat…" : "—")}
+          </div>
+          {ip && (
+            <button onClick={copyIp}
+              className="px-3 py-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-sm"
+              title="Salin IP">
+              {copied ? "✓" : "📋"}
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground mt-1.5">
+          Masukkan IP ini ke kolom <span className="text-purple-400 font-semibold">Development IP</span> dan{" "}
+          <span className="text-purple-400 font-semibold">Production IP</span> di Pengaturan Koneksi Digiflazz.
+        </p>
+      </div>
+
+      {/* Saldo Deposit */}
+      <div>
+        <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold mb-1.5">
+          Saldo Deposit Digiflazz
+        </p>
+        {error ? (
+          <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+            ⚠ {error}
+          </div>
+        ) : (
+          <div className="px-4 py-3 rounded-xl bg-emerald-500/8 border border-emerald-500/20">
+            <p className="text-lg font-black text-emerald-400">
+              {balance === null ? "Memuat…" : `Rp ${balance.toLocaleString("id-ID")}`}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-blue-500/8 border border-blue-500/20">
+        <span className="text-blue-400 text-xs mt-0.5">ℹ</span>
+        <p className="text-xs text-blue-300">
+          Kredensial Digiflazz disimpan aman di Secrets server, bukan di perangkat.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /* ─── SETTINGS ─── */
 function SettingsSection({ onLogout }: { onLogout: () => void }) {
   const [cfg, setCfg] = useState(loadConfig());
   const [saved, setSaved] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(false);
 
   const fields: { key: keyof typeof cfg; label: string; placeholder: string; type?: string }[] = [
-    { key: "username", label: "Username Digiflazz", placeholder: "username digiflazz" },
-    { key: "apiKey", label: "API Key Digiflazz", placeholder: "api key digiflazz", type: "password" },
     { key: "whatsappNumber", label: "WhatsApp Owner", placeholder: "081288080752" },
     { key: "gopayNumber", label: "Nomor GoPay", placeholder: "08xxxxxxxxxx" },
     { key: "gopayName", label: "Nama GoPay", placeholder: "Nama Anda" },
@@ -758,30 +857,19 @@ function SettingsSection({ onLogout }: { onLogout: () => void }) {
 
   return (
     <div className="space-y-4">
+      <DigiflazzStatusCard />
+
       <div className="glass-card rounded-2xl p-5 space-y-4">
         {fields.map((field) => (
           <div key={field.key}>
             <label className="text-xs text-muted-foreground tracking-widest uppercase font-semibold block mb-2">{field.label}</label>
-            <div className="relative">
-              <input
-                type={field.type === "password" && !showApiKey ? "password" : "text"}
-                value={cfg[field.key] as string}
-                onChange={(e) => setCfg({ ...cfg, [field.key]: e.target.value })}
-                placeholder={field.placeholder}
-                className="w-full px-4 py-3 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-purple-500/60 focus:ring-1 focus:ring-purple-500/40 transition-all"
-              />
-              {field.type === "password" && (
-                <button type="button" onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d={showApiKey ? "M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
-                        : "M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                      } />
-                  </svg>
-                </button>
-              )}
-            </div>
+            <input
+              type="text"
+              value={cfg[field.key] as string}
+              onChange={(e) => setCfg({ ...cfg, [field.key]: e.target.value })}
+              placeholder={field.placeholder}
+              className="w-full px-4 py-3 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-purple-500/60 focus:ring-1 focus:ring-purple-500/40 transition-all"
+            />
           </div>
         ))}
       </div>
