@@ -22,13 +22,15 @@ export default function TransactionModal({
   errorMessage, failureType = "other", refId, memberName,
   onBuyNow, onConfirm, onClose,
 }: TransactionModalProps) {
+  const isQuick = phase === "quick";
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center p-4 modal-backdrop"
-      style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }}
+      className={`fixed inset-0 z-[70] flex justify-center p-4 modal-backdrop ${isQuick ? "items-center" : "items-end"}`}
+      style={{ background: "rgba(0,0,0,0.80)", backdropFilter: "blur(10px)" }}
       onClick={(e) => { if (e.target === e.currentTarget && phase !== "loading") onClose(); }}
     >
-      <div className="w-full max-w-md modal-content">
+      <div className={`w-full max-w-md ${isQuick ? "" : "modal-content"}`}>
         {phase === "quick" && (
           <QuickConfirmSheet product={product!} phone={phone} operator={operator} balance={balance} memberName={memberName} onBuyNow={onBuyNow!} onClose={onClose} />
         )}
@@ -56,7 +58,7 @@ function QuickConfirmSheet({ product, phone, operator, balance, memberName, onBu
 }) {
   const canAfford = balance >= product.price;
   return (
-    <div className="glass-card rounded-2xl p-5 border border-blue-500/25" style={{ animation: "slide-up 0.22s ease" }}>
+    <div className="glass-card rounded-2xl p-5 border border-blue-500/25" style={{ animation: "fade-in 0.2s ease" }}>
       {/* Handle bar */}
       <div className="w-10 h-1 rounded-full bg-white/15 mx-auto mb-4" />
 

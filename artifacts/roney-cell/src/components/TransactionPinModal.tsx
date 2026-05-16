@@ -60,7 +60,7 @@ export default function TransactionPinModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center p-4"
+      className="fixed inset-0 z-[70] flex items-end justify-center p-4"
       style={{ background: "rgba(0,0,0,0.80)", backdropFilter: "blur(10px)" }}
       onClick={(e) => { if (e.target === e.currentTarget && !loading) onCancel(); }}
     >
