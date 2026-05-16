@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { subscribeBalance } from "@/lib/firebase";
 import { formatRupiah } from "@/lib/products";
+import { t, getLang } from "@/lib/i18n";
 
 interface BalanceCardProps {
   onBalanceChange?: (balance: number) => void;
@@ -10,6 +11,7 @@ export default function BalanceCard({ onBalanceChange }: BalanceCardProps) {
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const lang = getLang();
 
   useEffect(() => {
     const unsub = subscribeBalance(
@@ -41,11 +43,12 @@ export default function BalanceCard({ onBalanceChange }: BalanceCardProps) {
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-400 pulse-dot" />
             <span className="text-xs text-muted-foreground tracking-widest uppercase font-semibold">
-              Saldo Aktif
+              {t("active_balance", lang)}
             </span>
           </div>
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-            <span className="text-xs text-emerald-400 font-medium">Firebase Live</span>
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span className="text-xs text-emerald-400 font-medium">{t("synced", lang)}</span>
           </div>
         </div>
 
@@ -70,7 +73,7 @@ export default function BalanceCard({ onBalanceChange }: BalanceCardProps) {
 
         <div className="mt-3 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <p className="text-xs text-muted-foreground mt-2">
-          Dikemas kini secara automatik dari Firebase
+          {t("sync_info", lang)}
         </p>
       </div>
     </div>
