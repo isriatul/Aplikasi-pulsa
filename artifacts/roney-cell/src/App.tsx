@@ -4,6 +4,7 @@ import Home from "@/pages/Home";
 import DepositPage from "@/pages/DepositPage";
 import AdminPage from "@/pages/AdminPage";
 import MemberPortal from "@/pages/MemberPortal";
+import LoginPage from "@/pages/LoginPage";
 import { Member, loadSession, clearSession, loadMembers } from "@/lib/members";
 
 type Tab = "home" | "deposit" | "member" | "admin";
@@ -12,11 +13,13 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [member, setMember] = useState<Member | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   useEffect(() => {
     const session = loadSession();
     if (session) setMember(session);
     refreshPendingCount();
+    setSessionChecked(true);
   }, []);
 
   function refreshPendingCount() {
@@ -27,11 +30,20 @@ export default function App() {
   function handleLogin(m: Member) {
     setMember(m);
     setActiveTab("home");
+    refreshPendingCount();
   }
 
   function handleLogout() {
     clearSession();
     setMember(null);
+  }
+
+  /* Don't render anything until we know the session state */
+  if (!sessionChecked) return null;
+
+  /* Show login gate if no active session */
+  if (!member) {
+    return <LoginPage onLogin={handleLogin} />;
   }
 
   return (

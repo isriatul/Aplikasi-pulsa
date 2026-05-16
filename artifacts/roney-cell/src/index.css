@@ -167,6 +167,12 @@ input[type="number"] { -moz-appearance: textfield; }
 
 /* No scrollbar */
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Smart menu product panel reveal */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 /* Safe area */
