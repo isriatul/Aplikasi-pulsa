@@ -2,6 +2,8 @@ import { useState } from "react";
 import { SheetUser, loginWithPhone, loginByEmail, registerUser, registerFacebook } from "@/lib/sheetsApi";
 import { Member } from "@/lib/members";
 import OtpScreen from "@/components/OtpScreen";
+import { sendOtpViaFonnte, toFonnteNumber, isValidPhoneLength, generateOtp } from "@/lib/otp";
+import { getCountryInfo } from "@/lib/operator";
 
 type LoginMethod = "phone" | "email" | "facebook";
 type Mode = "login" | "register" | "otp";
@@ -28,33 +30,33 @@ function sheetToMember(u: SheetUser): Member {
   };
 }
 
-function generateOtp(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
-}
-
 export default function LoginPage({ onLogin }: LoginPageProps) {
-  const [method, setMethod]   = useState<LoginMethod>("phone");
-  const [mode, setMode]       = useState<Mode>("login");
+  const [method, setMethod] = useState<LoginMethod>("phone");
+  const [mode, setMode]     = useState<Mode>("login");
 
   /* phone */
-  const [phone, setPhone]     = useState("");
-  const [pin, setPin]         = useState("");
-  const [txPin, setTxPin]     = useState("");
-  const [name, setName]       = useState("");
+  const [phone, setPhone]   = useState("");
+  const [dialCode, setDialCode] = useState("+62");
+  const [pin, setPin]       = useState("");
+  const [txPin, setTxPin]   = useState("");
+  const [name, setName]     = useState("");
 
   /* email */
-  const [email, setEmail]         = useState("");
-  const [password, setPassword]   = useState("");
+  const [email, setEmail]           = useState("");
+  const [emailPhone, setEmailPhone] = useState("");   /* WA number for email OTP */
+  const [password, setPassword]     = useState("");
   const [emailTxPin, setEmailTxPin] = useState("");
-  const [emailName, setEmailName] = useState("");
+  const [emailName, setEmailName]   = useState("");
 
   /* facebook */
-  const [fbName, setFbName]   = useState("");
-  const [fbStep, setFbStep]   = useState<"button" | "name">("button");
+  const [fbName, setFbName] = useState("");
+  const [fbStep, setFbStep] = useState<"button" | "name">("button");
 
-  /* OTP */
-  const [otpCode, setOtpCode]       = useState("");
-  const [otpContact, setOtpContact] = useState("");
+  /* OTP — plaintext stored in state but NEVER rendered to DOM */
+  const [otpSecret, setOtpSecret]         = useState("");
+  const [otpContact, setOtpContact]       = useState("");
+  const [otpSending, setOtpSending]       = useState(false);
+  const [otpSendError, setOtpSendError]   = useState("");
   const [pendingRegData, setPendingRegData] = useState<Parameters<typeof registerUser>[0] | null>(null);
 
   const [error, setError]     = useState("");
@@ -63,16 +65,50 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
   function clearMsg() { setError(""); setSuccess(""); }
 
-  /* ── Generate and start OTP flow ── */
-  function startOtp(contact: string, regData: Parameters<typeof registerUser>[0]) {
-    const code = generateOtp();
-    setOtpCode(code);
-    setOtpContact(contact);
-    setPendingRegData(regData);
-    setMode("otp");
+  /* ── Format phone to international for display ── */
+  function formatDisplay(dc: string, p: string) {
+    const local = p.replace(/^0+/, "");
+    return `${dc} ${local}`;
   }
 
-  /* ── OTP verified → complete registration ── */
+  /* ── Send OTP and enter OTP screen ── */
+  async function sendAndStartOtp(
+    dc: string,
+    rawPhone: string,
+    displayContact: string,
+    regData: Parameters<typeof registerUser>[0],
+  ) {
+    /* Validate phone length */
+    if (!isValidPhoneLength(dc, rawPhone)) {
+      const info = getCountryInfo(dc);
+      setError(`Nomor HP tidak valid. Panjang nomor untuk ${info.name} harus ${info.minLen}–${info.maxLen} digit.`);
+      return;
+    }
+
+    const otp    = generateOtp();
+    const target = toFonnteNumber(dc, rawPhone);
+
+    setOtpSecret(otp);
+    setOtpContact(displayContact);
+    setPendingRegData(regData);
+    setOtpSendError("");
+    setOtpSending(true);
+    setMode("otp");
+
+    const result = await sendOtpViaFonnte(target, otp);
+    setOtpSending(false);
+
+    if (!result.ok) {
+      setOtpSendError(result.message);
+    }
+  }
+
+  /* ── Called by OtpScreen to verify user input ── */
+  function verifyOtpInput(input: string): boolean {
+    return input === otpSecret;
+  }
+
+  /* ── OTP verified → complete registration with pending status ── */
   async function handleOtpVerified() {
     if (!pendingRegData) return;
     setLoading(true);
@@ -80,22 +116,38 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       const res = await registerUser({ ...pendingRegData, status: "pending" });
       if (res.ok) {
         setMode("login");
-        setSuccess("✅ Verifikasi berhasil! Akun menunggu persetujuan admin. Anda akan dihubungi via WhatsApp.");
+        setSuccess(
+          "✅ Verifikasi berhasil! Akun Anda sedang menunggu persetujuan admin. " +
+          "Anda akan dihubungi via WhatsApp setelah disetujui.",
+        );
         clearAllForms();
       } else {
         setError(res.message ?? "Gagal mendaftar.");
-        setMode("login");
+        setMode("register");
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Terjadi kesalahan.");
-      setMode("login");
+      setMode("register");
     }
     setLoading(false);
   }
 
+  /* ── Resend OTP ── */
+  async function handleResend() {
+    if (!pendingRegData) return;
+    const newOtp = generateOtp();
+    setOtpSecret(newOtp);
+    setOtpSendError("");
+    setOtpSending(true);
+    const target = toFonnteNumber(dialCode, pendingRegData.phone ?? emailPhone);
+    const result = await sendOtpViaFonnte(target, newOtp);
+    setOtpSending(false);
+    if (!result.ok) setOtpSendError(result.message);
+  }
+
   function clearAllForms() {
     setPhone(""); setPin(""); setTxPin(""); setName("");
-    setEmail(""); setPassword(""); setEmailTxPin(""); setEmailName("");
+    setEmail(""); setPassword(""); setEmailTxPin(""); setEmailName(""); setEmailPhone("");
     setFbName(""); setFbStep("button");
   }
 
@@ -109,18 +161,23 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         const res = await loginWithPhone(phone, pin);
         if (res.ok && res.user) onLogin(sheetToMember(res.user));
         else setError(res.message ?? "Login gagal.");
+        setLoading(false);
       } else {
         if (!name.trim())       { setError("Nama tidak boleh kosong."); setLoading(false); return; }
         if (txPin.length !== 6) { setError("PIN Transaksi harus 6 digit."); setLoading(false); return; }
         if (pin.length < 6)     { setError("Password minimal 6 karakter."); setLoading(false); return; }
         setLoading(false);
-        startOtp(`+62 ${phone}`, { name, phone: phone.replace(/\D/g,""), password: pin, txPin, loginMethod: "phone" });
-        return;
+        await sendAndStartOtp(
+          dialCode,
+          phone,
+          formatDisplay(dialCode, phone),
+          { name, phone: toFonnteNumber(dialCode, phone), password: pin, txPin, loginMethod: "phone" },
+        );
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Terjadi kesalahan.");
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   /* ── Email submit ── */
@@ -133,18 +190,24 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         const res = await loginByEmail(email, password);
         if (res.ok && res.user) onLogin(sheetToMember(res.user));
         else setError(res.message ?? "Login gagal.");
+        setLoading(false);
       } else {
         if (!emailName.trim())       { setError("Nama tidak boleh kosong."); setLoading(false); return; }
         if (emailTxPin.length !== 6) { setError("PIN Transaksi harus 6 digit."); setLoading(false); return; }
         if (password.length < 6)     { setError("Password minimal 6 karakter."); setLoading(false); return; }
+        if (!emailPhone.trim())      { setError("Nomor WhatsApp wajib diisi untuk menerima OTP."); setLoading(false); return; }
         setLoading(false);
-        startOtp(email, { name: emailName, email, password, txPin: emailTxPin, loginMethod: "email" });
-        return;
+        await sendAndStartOtp(
+          "+62",
+          emailPhone,
+          email,
+          { name: emailName, email, password, txPin: emailTxPin, loginMethod: "email" },
+        );
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Terjadi kesalahan.");
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   /* ── Facebook submit ── */
@@ -162,15 +225,17 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   }
 
   /* ── OTP screen ── */
-  if (mode === "otp" && otpCode) {
+  if (mode === "otp") {
     return (
       <OtpScreen
         contact={otpContact}
         method={method}
-        otp={otpCode}
+        sending={otpSending}
+        sendError={otpSendError}
+        onVerify={verifyOtpInput}
         onVerified={handleOtpVerified}
-        onBack={() => { setMode("register"); setOtpCode(""); }}
-        onResend={() => setOtpCode(generateOtp())}
+        onBack={() => { setMode("register"); setOtpSecret(""); setOtpSendError(""); }}
+        onResend={handleResend}
       />
     );
   }
@@ -179,6 +244,17 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     { id: "phone",    icon: "📱", label: "No. HP" },
     { id: "email",    icon: "✉️", label: "Email" },
     { id: "facebook", icon: "👤", label: "Facebook" },
+  ];
+
+  /* Country code options for phone */
+  const DIAL_CODES = [
+    { code: "+62", flag: "🇮🇩", label: "ID" },
+    { code: "+60", flag: "🇲🇾", label: "MY" },
+    { code: "+65", flag: "🇸🇬", label: "SG" },
+    { code: "+966", flag: "🇸🇦", label: "SA" },
+    { code: "+63", flag: "🇵🇭", label: "PH" },
+    { code: "+84", flag: "🇻🇳", label: "VN" },
+    { code: "+91", flag: "🇮🇳", label: "IN" },
   ];
 
   return (
@@ -203,10 +279,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         </div>
 
         {/* Method tabs */}
-        <div className="w-full flex gap-2 mb-6 p-1 rounded-2xl bg-white/4 border border-white/6">
+        <div className="w-full flex gap-2 mb-5 p-1 rounded-2xl bg-white/4 border border-white/6">
           {METHODS.map((m) => (
-            <button key={m.id}
-              onClick={() => { setMethod(m.id); clearMsg(); }}
+            <button key={m.id} onClick={() => { setMethod(m.id); clearMsg(); }}
               className="flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl text-[11px] font-bold transition-all"
               style={method === m.id
                 ? { background: "linear-gradient(135deg,#3B82F6 0%,#6366F1 100%)", color: "white", boxShadow: "0 4px 12px rgba(59,130,246,0.3)" }
@@ -218,7 +293,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           ))}
         </div>
 
-        {/* Mode toggle pills */}
+        {/* Login / Register pills */}
         <div className="w-full flex gap-2 mb-5">
           {(["login", "register"] as const).map((m) => (
             <button key={m} onClick={() => { setMode(m); clearMsg(); }}
@@ -232,14 +307,14 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           ))}
         </div>
 
-        {/* OTP registration notice */}
+        {/* OTP notice banner (register only) */}
         {mode === "register" && method !== "facebook" && (
           <div className="w-full flex items-start gap-2.5 px-4 py-3 rounded-xl border border-blue-500/20 bg-blue-500/8 mb-4">
             <span className="flex-shrink-0 text-blue-400 mt-0.5">🔐</span>
             <div>
-              <p className="text-xs font-bold text-blue-300">Verifikasi OTP Wajib</p>
+              <p className="text-xs font-bold text-blue-300">Verifikasi OTP via WhatsApp</p>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Setelah mendaftar, Anda akan menerima kode OTP 6 digit via {method === "email" ? "email" : "WhatsApp"}. Masukkan kode untuk melanjutkan.
+                Kode 6 digit akan dikirim ke WhatsApp Anda oleh Fonnte API. Masukkan kode tersebut untuk melanjutkan.
               </p>
             </div>
           </div>
@@ -251,14 +326,52 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             {mode === "register" && (
               <FormInput label="Nama Lengkap" type="text" value={name} onChange={setName} placeholder="Nama Anda" icon="👤" />
             )}
-            <FormInput label="Nomor HP" type="tel" value={phone} onChange={setPhone} placeholder="08xxxxxxxxxx" icon="📱" numeric />
+
+            {/* Phone with dial-code selector */}
+            <div>
+              <label className="text-xs text-muted-foreground tracking-widest uppercase font-semibold block mb-1.5">
+                Nomor HP
+              </label>
+              <div className="flex gap-2">
+                <select
+                  value={dialCode}
+                  onChange={(e) => setDialCode(e.target.value)}
+                  className="w-24 px-2 py-3.5 rounded-xl text-sm font-bold bg-white/5 border border-white/10 text-foreground focus:outline-none focus:border-blue-500/60"
+                >
+                  {DIAL_CODES.map((d) => (
+                    <option key={d.code} value={d.code}>{d.flag} {d.code}</option>
+                  ))}
+                </select>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                  placeholder={dialCode === "+62" ? "08xxxxxxxxxx" : "Nomor lokal"}
+                  className="flex-1 px-4 py-3.5 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-all"
+                />
+              </div>
+              {/* Real-time country indicator */}
+              {phone.length >= 3 && (
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <span className="text-base">{getCountryInfo(dialCode).flag}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {getCountryInfo(dialCode).name}
+                    {isValidPhoneLength(dialCode, phone)
+                      ? <span className="text-emerald-400 ml-1">✓ Format valid</span>
+                      : <span className="text-yellow-400 ml-1">Min {getCountryInfo(dialCode).minLen} digit</span>}
+                  </span>
+                </div>
+              )}
+            </div>
+
             <FormInput label={mode === "register" ? "Password (min 6 karakter)" : "Password"} type="password" value={pin} onChange={setPin} placeholder="••••••" icon="🔒" />
             {mode === "register" && (
               <FormInput label="PIN Transaksi (6 digit)" type="password" value={txPin} onChange={setTxPin} placeholder="6 digit PIN rahasia" icon="🔐" numeric maxLen={6} />
             )}
             {error && <ErrorBox msg={error} />}
             {success && <SuccessBox msg={success} />}
-            <SubmitBtn loading={loading} disabled={!phone || !pin} label={mode === "login" ? "Masuk" : "Kirim Kode OTP →"} />
+            <SubmitBtn loading={loading} disabled={!phone || !pin} label={mode === "login" ? "Masuk" : "Kirim Kode OTP via WA →"} />
           </form>
         )}
 
@@ -271,11 +384,17 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             <FormInput label="Email" type="email" value={email} onChange={setEmail} placeholder="nama@email.com" icon="✉️" />
             <FormInput label={mode === "register" ? "Buat Password" : "Password"} type="password" value={password} onChange={setPassword} placeholder="Min. 6 karakter" icon="🔒" />
             {mode === "register" && (
-              <FormInput label="PIN Transaksi (6 digit)" type="password" value={emailTxPin} onChange={setEmailTxPin} placeholder="6 digit PIN rahasia" icon="🔐" numeric maxLen={6} />
+              <>
+                <FormInput label="PIN Transaksi (6 digit)" type="password" value={emailTxPin} onChange={setEmailTxPin} placeholder="6 digit PIN rahasia" icon="🔐" numeric maxLen={6} />
+                <div>
+                  <FormInput label="Nomor WhatsApp (untuk OTP)" type="tel" value={emailPhone} onChange={(v) => setEmailPhone(v.replace(/\D/g, ""))} placeholder="08xxxxxxxxxx" icon="💬" numeric />
+                  <p className="text-[10px] text-muted-foreground mt-1 ml-1">Kode OTP akan dikirim ke nomor WhatsApp ini.</p>
+                </div>
+              </>
             )}
             {error && <ErrorBox msg={error} />}
             {success && <SuccessBox msg={success} />}
-            <SubmitBtn loading={loading} disabled={!email || !password} label={mode === "login" ? "Masuk dengan Email" : "Kirim Kode OTP →"} />
+            <SubmitBtn loading={loading} disabled={!email || !password} label={mode === "login" ? "Masuk dengan Email" : "Kirim Kode OTP via WA →"} />
           </form>
         )}
 
@@ -285,7 +404,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             {fbStep === "button" ? (
               <>
                 <p className="text-sm text-muted-foreground text-center">
-                  Masuk dengan Facebook. Akun dibuat otomatis dan langsung aktif. PIN Transaksi default: <span className="font-bold text-yellow-400">123456</span> (ubah setelah masuk).
+                  Masuk dengan Facebook. Akun dibuat otomatis dan langsung aktif. PIN Transaksi default:{" "}
+                  <span className="font-bold text-yellow-400">123456</span> (ubah setelah masuk).
                 </p>
                 <button onClick={() => setFbStep("name")}
                   className="w-full py-4 rounded-2xl font-black text-base text-white flex items-center justify-center gap-3"
@@ -348,7 +468,7 @@ function FormInput({ label, type, value, onChange, placeholder, icon, numeric, m
           inputMode={numeric ? "numeric" : undefined}
           value={value}
           maxLength={maxLen}
-          onChange={(e) => onChange(numeric ? e.target.value.replace(/\D/g,"") : e.target.value)}
+          onChange={(e) => onChange(numeric ? e.target.value.replace(/\D/g, "") : e.target.value)}
           placeholder={placeholder}
           className="w-full pl-11 pr-4 py-3.5 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-all"
         />
