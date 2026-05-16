@@ -119,6 +119,7 @@ export async function registerUser(data: {
   password: string;
   txPin: string;
   loginMethod: "phone" | "email" | "facebook";
+  status?: string;
 }): Promise<ApiResponse> {
   const passwordHash = await hashString(data.password);
   const txPinHash    = await hashString(data.txPin);
