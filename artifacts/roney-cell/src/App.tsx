@@ -37,6 +37,13 @@ export default function App() {
   const [member, setMember] = useState<Member | null>(null);
 
   useEffect(() => {
+    // Allow accessing setup page via ?setup=1 or #setup in URL
+    const params = new URLSearchParams(window.location.search);
+    const hash = window.location.hash;
+    if (params.get("setup") === "1" || hash === "#setup") {
+      setAppState("setup");
+      return;
+    }
     const cfg = loadConfig();
     if (!cfg.scriptsUrl?.trim()) {
       setAppState("setup");
