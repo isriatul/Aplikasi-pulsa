@@ -27,8 +27,9 @@ const T_SHEET  = "Transactions";
 const ADMIN_HP = "081288080752";
 
 function sha256(str) {
-  const raw = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, str, Utilities.Charset.UTF_8);
-  return raw.map(b => ("0" + (b & 0xFF).toString(16)).slice(-2)).join("");
+  var s = (str == null) ? "" : String(str);
+  var raw = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, s, Utilities.Charset.UTF_8);
+  return raw.map(function(b) { return ("0" + (b & 0xFF).toString(16)).slice(-2); }).join("");
 }
 function respond(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
@@ -135,7 +136,7 @@ function toUser(d) {
 function doGet(e) {
   try {
     ensureSheets();
-    const p = e.parameter, a = p.action || "";
+    const p = (e && e.parameter) ? e.parameter : {}, a = p.action || "";
     if (a === "ping")           return respond({ ok:true, ts:new Date().toISOString() });
     if (a === "debug")          return handleDebug();
     if (a === "login")          return handleLogin(p);
