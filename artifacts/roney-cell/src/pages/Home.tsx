@@ -2,7 +2,11 @@ import { useState, useCallback } from "react";
 import BalanceCard from "@/components/BalanceCard";
 import PhoneInput from "@/components/PhoneInput";
 import TransactionModal from "@/components/TransactionModal";
-import { Product, ProductCategory, CATEGORY_META, getProductsByCategory, formatRupiah, getOperatorSku, MemberType } from "@/lib/products";
+import {
+  Product, ProductCategory, CATEGORY_META,
+  getProductsByCategory, formatRupiah,
+  getOperatorSku, MemberType,
+} from "@/lib/products";
 import { detectOperator, Operator } from "@/lib/operator";
 import { fetchBalance, deductBalance } from "@/lib/firebase";
 import { sendTransaction, generateRefId } from "@/lib/digiflazz";
@@ -16,40 +20,29 @@ interface HomeProps {
   member?: Member | null;
 }
 
-const CATEGORY_CARDS: { id: ProductCategory; label: string; desc: string; icon: string; color: string; gradient: string }[] = [
-  {
-    id: "pulsa",
-    label: "Pulsa",
-    desc: "Isi pulsa semua operator",
-    icon: "📱",
-    color: "#60A5FA",
-    gradient: "linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(37,99,235,0.1) 100%)",
-  },
-  {
-    id: "data",
-    label: "Paket Data",
-    desc: "Internet semua operator",
-    icon: "📶",
-    color: "#34D399",
-    gradient: "linear-gradient(135deg, rgba(52,211,153,0.2) 0%, rgba(16,185,129,0.1) 100%)",
-  },
-  {
-    id: "pln",
-    label: "Token PLN",
-    desc: "Token listrik prabayar",
-    icon: "⚡",
-    color: "#FBBF24",
-    gradient: "linear-gradient(135deg, rgba(251,191,36,0.2) 0%, rgba(245,158,11,0.1) 100%)",
-  },
-  {
-    id: "game",
-    label: "Top Up Game",
-    desc: "Diamond, UC, Voucher",
-    icon: "🎮",
-    color: "#F472B6",
-    gradient: "linear-gradient(135deg, rgba(244,114,182,0.2) 0%, rgba(236,72,153,0.1) 100%)",
-  },
+/* All 8 categories in display order */
+const MENU_ITEMS: { id: ProductCategory; group?: string }[] = [
+  { id: "pulsa",      group: "Pulsa & Data" },
+  { id: "data",       group: "Pulsa & Data" },
+  { id: "pln",        group: "Tagihan & Utiliti" },
+  { id: "pascabayar", group: "Tagihan & Utiliti" },
+  { id: "game",       group: "Hiburan" },
+  { id: "ewallet",    group: "Hiburan" },
+  { id: "tv",         group: "Internet & TV" },
+  { id: "voucher",    group: "Internet & TV" },
 ];
+
+/* Small pill badge shown under each icon when it's active */
+function CategoryPill({ color, label }: { color: string; label: string }) {
+  return (
+    <div
+      className="absolute -bottom-5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[8px] font-black whitespace-nowrap"
+      style={{ background: `${color}25`, color }}
+    >
+      {label}
+    </div>
+  );
+}
 
 export default function Home({ member }: HomeProps) {
   const [phone, setPhone] = useState("");
@@ -62,25 +55,23 @@ export default function Home({ member }: HomeProps) {
 
   const memberType: MemberType = member?.type ?? "retail";
   const operator: Operator | null = detectOperator(phone);
-
   const handleBalanceChange = useCallback((val: number) => setBalance(val), []);
 
   function handleSelectCategory(cat: ProductCategory) {
-    setSelectedCategory(cat);
-    setSelectedProduct(null);
-  }
-
-  function handleBack() {
-    setSelectedCategory(null);
-    setSelectedProduct(null);
+    if (selectedCategory === cat) {
+      setSelectedCategory(null);
+      setSelectedProduct(null);
+    } else {
+      setSelectedCategory(cat);
+      setSelectedProduct(null);
+    }
   }
 
   function handleSubmit() {
-    if (!phone || phone.length < 9) return;
-    if (!selectedProduct) return;
+    if (!phone || phone.length < 9 || !selectedProduct) return;
     const cfg = loadConfig();
     if (!cfg.username || !cfg.apiKey) {
-      alert("Sila pergi ke tab Owner → Tetapan untuk mengisi username & API key Digiflazz terlebih dahulu.");
+      alert("Sila pergi ke tab Owner → Tetapan untuk mengisi username & API key Digiflazz.");
       return;
     }
     setModalPhase("confirm");
@@ -88,15 +79,10 @@ export default function Home({ member }: HomeProps) {
 
   async function handleConfirmTransaction() {
     if (!selectedProduct) return;
-
     const current = await fetchBalance().catch(() => balance);
-    if (current < selectedProduct.price) {
-      setModalPhase("insufficient");
-      return;
-    }
+    if (current < selectedProduct.price) { setModalPhase("insufficient"); return; }
 
     setModalPhase("loading");
-
     const cfg = loadConfig();
     const sku = getOperatorSku(operator?.name, selectedProduct.sku);
     const refId = generateRefId();
@@ -104,19 +90,13 @@ export default function Home({ member }: HomeProps) {
 
     try {
       const result = await sendTransaction(cfg, phone, sku, refId);
-
       saveTransaction({
-        id: refId,
-        date: new Date().toISOString(),
-        phone,
-        product: selectedProduct.name,
-        category: selectedProduct.category,
-        sellPrice: selectedProduct.price,
-        basePrice: selectedProduct.basePrice,
+        id: refId, date: new Date().toISOString(), phone,
+        product: selectedProduct.name, category: selectedProduct.category,
+        sellPrice: selectedProduct.price, basePrice: selectedProduct.basePrice,
         profit: selectedProduct.price - selectedProduct.basePrice,
         status: result.success ? "success" : "failed",
       });
-
       if (result.success) {
         await deductBalance(selectedProduct.price);
         setModalPhase("success");
@@ -126,32 +106,25 @@ export default function Home({ member }: HomeProps) {
       }
     } catch (err: unknown) {
       saveTransaction({
-        id: refId,
-        date: new Date().toISOString(),
-        phone,
-        product: selectedProduct.name,
-        category: selectedProduct.category,
-        sellPrice: selectedProduct.price,
-        basePrice: selectedProduct.basePrice,
-        profit: 0,
-        status: "failed",
+        id: refId, date: new Date().toISOString(), phone,
+        product: selectedProduct.name, category: selectedProduct.category,
+        sellPrice: selectedProduct.price, basePrice: selectedProduct.basePrice,
+        profit: 0, status: "failed",
       });
       setErrorMessage(err instanceof Error ? err.message : "Ralat tidak diketahui");
       setModalPhase("failed");
     }
   }
 
-  function handleCloseModal() {
-    setModalPhase(null);
-    setErrorMessage("");
-  }
+  function handleCloseModal() { setModalPhase(null); setErrorMessage(""); }
 
   const isFormValid = phone.length >= 9 && selectedProduct !== null;
   const products = selectedCategory ? getProductsByCategory(selectedCategory, memberType) : [];
+  const meta = selectedCategory ? CATEGORY_META[selectedCategory] : null;
 
   return (
     <div className="min-h-dvh flex flex-col max-w-md mx-auto px-4 pb-28">
-      {/* Header */}
+      {/* ── Header ── */}
       <header className="sticky top-0 z-40 pt-safe">
         <div
           className="flex items-center justify-between py-4"
@@ -160,7 +133,7 @@ export default function Home({ member }: HomeProps) {
           <div className="flex items-center gap-3">
             <div
               className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ background: "linear-gradient(135deg, hsl(210 90% 55%) 0%, hsl(230 80% 40%) 100%)", boxShadow: "0 0 16px rgba(59,130,246,0.4)" }}
+              style={{ background: "linear-gradient(135deg,hsl(210 90% 55%) 0%,hsl(230 80% 40%) 100%)", boxShadow: "0 0 16px rgba(59,130,246,0.4)" }}
             >
               <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -170,7 +143,7 @@ export default function Home({ member }: HomeProps) {
             </div>
             <div>
               <h1 className="font-black text-lg leading-none tracking-tight"
-                style={{ background: "linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                style={{ background: "linear-gradient(135deg,#60A5FA 0%,#A78BFA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                 RoneyCell
               </h1>
               <p className="text-[10px] text-muted-foreground tracking-widest">SISTEM JUALAN PULSA</p>
@@ -189,127 +162,108 @@ export default function Home({ member }: HomeProps) {
         </div>
       </header>
 
-      {/* Balance */}
+      {/* ── Balance ── */}
       <div className="mb-5">
         <BalanceCard onBalanceChange={handleBalanceChange} />
       </div>
 
-      {/* Member price banner */}
+      {/* ── Member tier banner ── */}
       {member && member.type !== "retail" && (
         <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl border"
           style={{ background: `${TYPE_COLORS[member.type]}10`, borderColor: `${TYPE_COLORS[member.type]}25` }}>
           <span className="text-lg">🎯</span>
           <div>
-            <p className="text-xs font-bold" style={{ color: TYPE_COLORS[member.type] }}>
-              Harga {TYPE_LABELS[member.type]} Aktif
-            </p>
+            <p className="text-xs font-bold" style={{ color: TYPE_COLORS[member.type] }}>Harga {TYPE_LABELS[member.type]} Aktif</p>
             <p className="text-[10px] text-muted-foreground">Anda menikmati harga lebih murah dari retail</p>
           </div>
         </div>
       )}
 
-      {/* ── STEP 1: Category Cards ── */}
-      {!selectedCategory && (
-        <>
-          <p className="text-xs text-muted-foreground tracking-widest uppercase font-semibold mb-3">
-            Pilih Kategori Produk
-          </p>
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            {CATEGORY_CARDS.map((cat) => (
+      {/* ── Icon Menu Grid (4 cols × 2 rows) ── */}
+      <div className="glass-card rounded-2xl p-4 mb-5">
+        <p className="text-xs text-muted-foreground tracking-widest uppercase font-semibold mb-4">
+          Pilih Layanan
+        </p>
+        <div className="grid grid-cols-4 gap-x-2 gap-y-6">
+          {MENU_ITEMS.map(({ id }) => {
+            const m = CATEGORY_META[id];
+            const isActive = selectedCategory === id;
+            return (
               <button
-                key={cat.id}
-                onClick={() => handleSelectCategory(cat.id)}
-                className="relative rounded-2xl p-5 text-left transition-all duration-200 border hover:scale-[1.02] active:scale-[0.98]"
-                style={{ background: cat.gradient, borderColor: `${cat.color}30`, boxShadow: `0 4px 20px ${cat.color}10` }}
+                key={id}
+                onClick={() => handleSelectCategory(id)}
+                className="relative flex flex-col items-center gap-2 group"
               >
-                <div className="text-3xl mb-3">{cat.icon}</div>
-                <p className="font-black text-sm text-foreground leading-tight">{cat.label}</p>
-                <p className="text-[11px] text-muted-foreground mt-1 leading-tight">{cat.desc}</p>
-                <div className="absolute top-3 right-3">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                    style={{ color: cat.color, opacity: 0.6 }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                {/* Icon bubble */}
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl transition-all duration-200"
+                  style={isActive
+                    ? { background: `${m.color}30`, border: `2px solid ${m.color}`, boxShadow: `0 0 16px ${m.color}40` }
+                    : { background: `${m.color}12`, border: `1.5px solid ${m.color}20` }
+                  }
+                >
+                  {m.icon}
                 </div>
+                {/* Label */}
+                <span
+                  className="text-[10px] font-bold text-center leading-tight transition-colors"
+                  style={{ color: isActive ? m.color : "rgba(255,255,255,0.55)" }}
+                >
+                  {m.label}
+                </span>
+                {/* Active dot */}
+                {isActive && (
+                  <div
+                    className="absolute -top-1 -right-1 w-3 h-3 rounded-full border-2"
+                    style={{ background: m.color, borderColor: "hsl(220 40% 5%)" }}
+                  />
+                )}
               </button>
-            ))}
-          </div>
+            );
+          })}
+        </div>
+      </div>
 
-          <div className="text-center mt-4">
-            <p className="text-xs text-muted-foreground">
-              Dikuasakan oleh{" "}
-              <span style={{ background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 }}>Digiflazz</span>
-              {" "}&amp;{" "}
-              <span style={{ background: "linear-gradient(135deg, #34D399 0%, #10B981 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 }}>Firebase</span>
-            </p>
-          </div>
-        </>
-      )}
-
-      {/* ── STEP 2: Product Selection ── */}
-      {selectedCategory && (
-        <>
-          {/* Back button + category label */}
-          <div className="flex items-center gap-3 mb-4">
-            <button
-              onClick={handleBack}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold border transition-all hover:bg-white/5"
-              style={{ borderColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Kembali
-            </button>
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl border"
-              style={{
-                background: `${CATEGORY_META[selectedCategory].color}15`,
-                borderColor: `${CATEGORY_META[selectedCategory].color}35`,
-              }}>
-              <span>{CATEGORY_META[selectedCategory].icon}</span>
-              <span className="text-sm font-bold" style={{ color: CATEGORY_META[selectedCategory].color }}>
-                {CATEGORY_META[selectedCategory].label}
-              </span>
+      {/* ── Product panel (slides in when category selected) ── */}
+      {selectedCategory && meta && (
+        <div className="mb-4">
+          {/* Panel header */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{meta.icon}</span>
+              <p className="text-sm font-black" style={{ color: meta.color }}>{meta.label}</p>
+              <span className="text-xs text-muted-foreground">({products.length} produk)</span>
             </div>
+            <button
+              onClick={() => { setSelectedCategory(null); setSelectedProduct(null); }}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg border border-white/8 hover:bg-white/5"
+            >
+              Tutup ✕
+            </button>
           </div>
 
-          {/* Phone input */}
-          <div className="mb-4">
+          {/* Phone / ID input */}
+          <div className="mb-3">
             <PhoneInput
               value={phone}
               onChange={setPhone}
-              label={selectedCategory === "game" ? "ID Game / User ID" : undefined}
-              placeholder={selectedCategory === "game" ? "Contoh: 12345678 (1234)" : undefined}
+              label={selectedCategory === "game" ? "ID Game / User ID" : selectedCategory === "pascabayar" || selectedCategory === "tv" ? "No. ID Pelanggan" : "Nomor Telefon Pelanggan"}
+              placeholder={selectedCategory === "game" ? "Contoh: 12345678 (1234)" : selectedCategory === "pascabayar" || selectedCategory === "tv" ? "Contoh: 530000012345" : "Contoh: 08123456789"}
             />
           </div>
 
-          {/* Product list */}
-          <div className="glass-card rounded-2xl p-4 mb-4">
-            <p className="text-xs text-muted-foreground tracking-widest uppercase font-semibold mb-3">
-              Pilih Produk
-            </p>
+          {/* Product cards */}
+          <div className="glass-card rounded-2xl p-4">
             {selectedCategory === "pulsa" || selectedCategory === "pln" ? (
               <div className="grid grid-cols-2 gap-2.5">
-                {products.map((product) => (
-                  <ProductCompactCard
-                    key={product.id}
-                    product={product}
-                    selected={selectedProduct?.id === product.id}
-                    onSelect={setSelectedProduct}
-                    color={CATEGORY_META[selectedCategory].color}
-                  />
+                {products.map((p) => (
+                  <ProductCompactCard key={p.id} product={p} selected={selectedProduct?.id === p.id} onSelect={setSelectedProduct} color={meta.color} />
                 ))}
               </div>
             ) : (
               <div className="space-y-2">
-                {products.map((product) => (
-                  <ProductRowCard
-                    key={product.id}
-                    product={product}
-                    selected={selectedProduct?.id === product.id}
-                    onSelect={setSelectedProduct}
-                    color={CATEGORY_META[selectedCategory].color}
-                  />
+                {products.map((p) => (
+                  <ProductRowCard key={p.id} product={p} selected={selectedProduct?.id === p.id} onSelect={setSelectedProduct} color={meta.color} />
                 ))}
               </div>
             )}
@@ -317,7 +271,7 @@ export default function Home({ member }: HomeProps) {
 
           {/* Order summary */}
           {selectedProduct && phone.length >= 9 && (
-            <div className="mb-4 glass-card rounded-2xl p-4 border border-cyan-500/15">
+            <div className="mt-3 glass-card rounded-2xl p-4 border border-cyan-500/15">
               <p className="text-xs text-muted-foreground tracking-widest uppercase font-semibold mb-3">Ringkasan Pesanan</p>
               <div className="flex items-center justify-between">
                 <div>
@@ -330,27 +284,43 @@ export default function Home({ member }: HomeProps) {
                   )}
                 </div>
                 <p className="text-lg font-black"
-                  style={{ background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                  style={{ background: "linear-gradient(135deg,#FBBF24 0%,#F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                   {formatRupiah(selectedProduct.price)}
                 </p>
               </div>
             </div>
           )}
 
-          {/* Submit */}
+          {/* Submit button */}
           <button
             onClick={handleSubmit}
             disabled={!isFormValid}
-            className="w-full py-4 rounded-2xl text-base font-black tracking-wide transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="w-full py-4 rounded-2xl text-base font-black tracking-wide transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed mt-3"
             style={isFormValid ? {
-              background: "linear-gradient(135deg, hsl(210 90% 55%) 0%, hsl(230 75% 45%) 100%)",
+              background: "linear-gradient(135deg,hsl(210 90% 55%) 0%,hsl(230 75% 45%) 100%)",
               color: "white",
-              boxShadow: "0 6px 24px rgba(59,130,246,0.4), 0 2px 8px rgba(0,0,0,0.3)",
+              boxShadow: "0 6px 24px rgba(59,130,246,0.4),0 2px 8px rgba(0,0,0,0.3)",
             } : undefined}
           >
-            {isFormValid ? "Hantar Transaksi" : phone.length < 9 ? "Masukkan Nombor Dahulu" : "Pilih Produk Dahulu"}
+            {isFormValid
+              ? "Hantar Transaksi"
+              : phone.length < 9
+              ? "Masukkan Nombor / ID Dahulu"
+              : "Pilih Produk Dahulu"}
           </button>
-        </>
+        </div>
+      )}
+
+      {/* Footer */}
+      {!selectedCategory && (
+        <div className="text-center mt-2">
+          <p className="text-xs text-muted-foreground">
+            Dikuasakan oleh{" "}
+            <span style={{ background: "linear-gradient(135deg,#FBBF24 0%,#F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 }}>Digiflazz</span>
+            {" "}&amp;{" "}
+            <span style={{ background: "linear-gradient(135deg,#34D399 0%,#10B981 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 }}>Firebase</span>
+          </p>
+        </div>
       )}
 
       {modalPhase && (
@@ -371,6 +341,8 @@ export default function Home({ member }: HomeProps) {
   );
 }
 
+/* ── Product card components ── */
+
 function ProductCompactCard({ product, selected, onSelect, color }: {
   product: Product; selected: boolean; onSelect: (p: Product) => void; color: string;
 }) {
@@ -379,13 +351,13 @@ function ProductCompactCard({ product, selected, onSelect, color }: {
       onClick={() => onSelect(product)}
       className="relative rounded-xl p-4 text-left transition-all duration-200 border"
       style={selected
-        ? { borderColor: color, boxShadow: `0 0 0 1px ${color}, 0 0 20px ${color}30`, background: `${color}10` }
+        ? { borderColor: color, boxShadow: `0 0 0 1px ${color},0 0 20px ${color}30`, background: `${color}10` }
         : { borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }
       }
     >
       {product.badge && (
         <div className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full text-[10px] font-black tracking-wider text-gray-900"
-          style={{ background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)" }}>
+          style={{ background: "linear-gradient(135deg,#FBBF24 0%,#F59E0B 100%)" }}>
           {product.badge}
         </div>
       )}
@@ -404,10 +376,7 @@ function ProductCompactCard({ product, selected, onSelect, color }: {
       </p>
       <div className="mt-2.5 pt-2 border-t border-white/5">
         <p className="text-xs text-muted-foreground">Harga Jual</p>
-        <p className="text-sm font-bold mt-0.5" style={{
-          background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)",
-          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-        }}>
+        <p className="text-sm font-bold mt-0.5" style={{ background: "linear-gradient(135deg,#FBBF24 0%,#F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
           {formatRupiah(product.price)}
         </p>
       </div>
@@ -423,7 +392,7 @@ function ProductRowCard({ product, selected, onSelect, color }: {
       onClick={() => onSelect(product)}
       className="w-full flex items-center gap-3 p-3.5 rounded-xl text-left transition-all duration-200 border"
       style={selected
-        ? { borderColor: color, boxShadow: `0 0 0 1px ${color}, 0 0 15px ${color}20`, background: `${color}10` }
+        ? { borderColor: color, boxShadow: `0 0 0 1px ${color},0 0 15px ${color}20`, background: `${color}10` }
         : { borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }
       }
     >
@@ -436,7 +405,7 @@ function ProductRowCard({ product, selected, onSelect, color }: {
           <p className="text-sm font-bold text-foreground truncate">{product.name}</p>
           {product.badge && (
             <span className="px-1.5 py-0.5 rounded text-[9px] font-black text-gray-900 flex-shrink-0"
-              style={{ background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)" }}>
+              style={{ background: "linear-gradient(135deg,#FBBF24 0%,#F59E0B 100%)" }}>
               {product.badge}
             </span>
           )}
@@ -444,10 +413,7 @@ function ProductRowCard({ product, selected, onSelect, color }: {
         <p className="text-xs text-muted-foreground mt-0.5">{product.description}</p>
       </div>
       <div className="text-right flex-shrink-0">
-        <p className="text-sm font-bold" style={{
-          background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)",
-          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-        }}>
+        <p className="text-sm font-bold" style={{ background: "linear-gradient(135deg,#FBBF24 0%,#F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
           {formatRupiah(product.price)}
         </p>
         {selected && (
