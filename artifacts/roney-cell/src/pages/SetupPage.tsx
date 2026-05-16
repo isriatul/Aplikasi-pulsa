@@ -215,8 +215,8 @@ function handleRegister(p) {
     p.passwordHash || "", txPin,
     role, status, 0, "member", method, created
   ]);
-  // FIX: jangan re-read dari sheet setelah appendRow (Apps Script cache bug).
-  // Bangun objek user langsung dari data yang sudah diketahui.
+  SpreadsheetApp.flush(); // paksa data tersimpan sebelum lanjut
+  // Bangun objek user dari data yang diketahui (tidak perlu re-read dari sheet)
   const user = {
     id: id, name: name, phone: phone, email: email,
     role: isAdmin ? "admin" : role,
