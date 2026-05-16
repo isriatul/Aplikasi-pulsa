@@ -96,4 +96,36 @@ router.post("/digiflazz/topup", async (req, res) => {
   }
 });
 
+/* POST /api/digiflazz/test — Simulasi transaksi (mode testing Digiflazz, tidak memotong saldo nyata) */
+router.post("/digiflazz/test", async (req, res) => {
+  try {
+    const { username, apiKey } = getCredentials();
+    const { buyer_sku_code, customer_no } = req.body as {
+      buyer_sku_code?: string;
+      customer_no?: string;
+    };
+    if (!buyer_sku_code || !customer_no) {
+      res.status(400).json({ error: "buyer_sku_code dan customer_no wajib diisi" });
+      return;
+    }
+    const ref_id = `TEST-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const sign = md5(username + apiKey + ref_id);
+    const payload = {
+      username,
+      buyer_sku_code,
+      customer_no,
+      ref_id,
+      sign,
+      testing: true,
+    };
+    req.log.info({ buyer_sku_code, customer_no, ref_id }, "Digiflazz test transaction");
+    const data = await dgPost("/transaction", payload);
+    res.json({ ref_id, payload_sent: { buyer_sku_code, customer_no, ref_id, testing: true }, result: data });
+  } catch (err) {
+    req.log.error({ err }, "Digiflazz test transaction failed");
+    const msg = err instanceof Error ? err.message : "Test transaksi gagal";
+    res.status(500).json({ error: msg });
+  }
+});
+
 export default router;

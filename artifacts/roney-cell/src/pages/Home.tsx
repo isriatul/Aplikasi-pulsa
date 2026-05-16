@@ -182,11 +182,6 @@ export default function Home({ member, onMemberUpdate }: HomeProps) {
 
   function handleSubmit() {
     if (!isFormValid || !selectedProduct) return;
-    const cfg = loadConfig();
-    if (!cfg.username || !cfg.apiKey) {
-      alert("Sila pergi ke tab Owner → Tetapan untuk mengisi username & API key Digiflazz.");
-      return;
-    }
     setModalPhase("pin");
   }
 

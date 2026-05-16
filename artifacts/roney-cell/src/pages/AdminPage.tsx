@@ -30,9 +30,9 @@ import {
   updateSheetUserStatus,
   SheetUser,
 } from "@/lib/sheetsApi";
-import { getServerIp, checkDigiflazzBalance } from "@/lib/digiflazz";
+import { getServerIp, checkDigiflazzBalance, sendTestTransaction, TestTransactionResult } from "@/lib/digiflazz";
 
-type AdminTab = "report" | "prices" | "members" | "settings";
+type AdminTab = "report" | "prices" | "members" | "settings" | "uji";
 
 function PinGate({ onUnlock }: { onUnlock: () => void }) {
   const [pin, setPin] = useState("");
@@ -889,6 +889,166 @@ function SettingsSection({ onLogout }: { onLogout: () => void }) {
   );
 }
 
+/* ─── UJI TRANSAKSI (Simulation) ─── */
+function UjiSection() {
+  const [customerNo, setCustomerNo] = useState("08123456789");
+  const [skuCode, setSkuCode] = useState("XL5");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<TestTransactionResult | null>(null);
+
+  const commonSkus = [
+    { label: "XL 5rb", sku: "XL5" },
+    { label: "Telkomsel 5rb", sku: "TSEL5" },
+    { label: "Indosat 5rb", sku: "IST5" },
+    { label: "Tri 5rb", sku: "3P5" },
+    { label: "PLN 20rb", sku: "PLN20000" },
+  ];
+
+  async function runTest() {
+    if (!customerNo.trim() || !skuCode.trim()) return;
+    setLoading(true);
+    setResult(null);
+    try {
+      const r = await sendTestTransaction(customerNo.trim(), skuCode.trim());
+      setResult(r);
+    } catch (err) {
+      setResult({
+        ref_id: "-",
+        payload_sent: { buyer_sku_code: skuCode, customer_no: customerNo, ref_id: "-", testing: true },
+        result: {},
+        error: err instanceof Error ? err.message : "Gagal terhubung ke server",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const dgData = result?.result?.data;
+  const isSuccess = dgData?.status?.toLowerCase() === "sukses" || dgData?.status?.toLowerCase() === "success";
+  const isPending = dgData?.status?.toLowerCase() === "pending";
+  const isError = !!result?.error || (!!dgData && !isSuccess && !isPending);
+
+  return (
+    <div className="space-y-4">
+      {/* Info banner */}
+      <div className="glass-card rounded-2xl p-4 border border-blue-500/20 bg-blue-500/5">
+        <div className="flex items-start gap-3">
+          <span className="text-xl">🧪</span>
+          <div>
+            <p className="text-sm font-black text-blue-300 mb-1">Mode Simulasi (testing: true)</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Transaksi ini menggunakan flag <span className="font-mono text-blue-300">testing: true</span> dari Digiflazz.
+              Permintaan dikirim ke server Digiflazz nyata tetapi <span className="font-bold text-blue-200">tidak memotong saldo</span> akun Digiflazz Anda.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Form */}
+      <div className="glass-card rounded-2xl p-5 space-y-4">
+        <div>
+          <label className="text-xs text-muted-foreground tracking-widest uppercase font-semibold block mb-2">Nomor Tujuan</label>
+          <input
+            type="text"
+            value={customerNo}
+            onChange={(e) => setCustomerNo(e.target.value)}
+            placeholder="08123456789"
+            className="w-full px-4 py-3 rounded-xl text-sm font-mono bg-white/5 border border-white/10 text-foreground focus:outline-none focus:border-blue-500/60 transition-all"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground tracking-widest uppercase font-semibold block mb-2">Kode SKU Produk</label>
+          <input
+            type="text"
+            value={skuCode}
+            onChange={(e) => setSkuCode(e.target.value)}
+            placeholder="XL5"
+            className="w-full px-4 py-3 rounded-xl text-sm font-mono bg-white/5 border border-white/10 text-foreground focus:outline-none focus:border-blue-500/60 transition-all"
+          />
+          <div className="flex flex-wrap gap-2 mt-2">
+            {commonSkus.map((s) => (
+              <button key={s.sku} onClick={() => setSkuCode(s.sku)}
+                className="px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all"
+                style={skuCode === s.sku
+                  ? { background: "rgba(59,130,246,0.2)", borderColor: "rgba(59,130,246,0.5)", color: "#93C5FD" }
+                  : { background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.4)" }
+                }>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <button
+          onClick={runTest}
+          disabled={loading}
+          className="w-full py-4 rounded-2xl font-bold text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+          style={{ background: "linear-gradient(135deg, #1D4ED8 0%, #7C3AED 100%)", boxShadow: "0 4px 15px rgba(59,130,246,0.3)" }}>
+          {loading ? (
+            <>
+              <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white spinner" />
+              Mengirim ke Digiflazz...
+            </>
+          ) : "🚀 Jalankan Simulasi"}
+        </button>
+      </div>
+
+      {/* Result */}
+      {result && (
+        <div className={`glass-card rounded-2xl p-5 border ${isSuccess ? "border-emerald-500/25" : isPending ? "border-yellow-500/25" : "border-red-500/25"}`}>
+          <h3 className={`font-black text-base mb-4 ${isSuccess ? "text-emerald-400" : isPending ? "text-yellow-400" : "text-red-400"}`}>
+            {isSuccess ? "✅ Simulasi Berhasil" : isPending ? "⏳ Status Pending" : isError && !dgData ? "❌ Koneksi Gagal" : "❌ Simulasi Gagal"}
+          </h3>
+
+          {/* Payload sent */}
+          <div className="mb-3">
+            <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-semibold mb-2">Data Dikirim ke Digiflazz</p>
+            <div className="rounded-xl bg-white/3 border border-white/8 p-3 space-y-1.5">
+              <Row2 label="Nomor Tujuan" value={result.payload_sent.customer_no} ok />
+              <Row2 label="Kode SKU" value={result.payload_sent.buyer_sku_code} ok />
+              <Row2 label="Ref ID" value={result.payload_sent.ref_id} />
+              <Row2 label="Mode Testing" value="true ✓" ok />
+            </div>
+          </div>
+
+          {/* Digiflazz response */}
+          {dgData && (
+            <div className="mb-3">
+              <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-semibold mb-2">Respon dari Digiflazz</p>
+              <div className="rounded-xl bg-white/3 border border-white/8 p-3 space-y-1.5">
+                <Row2 label="Status" value={dgData.status ?? "-"} ok={isSuccess} warn={isPending} />
+                <Row2 label="Pesan" value={dgData.message ?? "-"} />
+                {dgData.sn && <Row2 label="Serial Number" value={dgData.sn} ok />}
+                {dgData.price !== undefined && <Row2 label="Harga Digiflazz" value={`Rp ${dgData.price?.toLocaleString("id-ID")}`} />}
+              </div>
+            </div>
+          )}
+
+          {result.error && (
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20">
+              <p className="text-xs text-red-400 font-mono">{result.error}</p>
+            </div>
+          )}
+
+          {isSuccess && (
+            <div className="mt-3 p-3 rounded-xl bg-emerald-500/8 border border-emerald-500/20">
+              <p className="text-xs text-emerald-300 font-semibold">✅ Sistem berjalan normal! Data nomor tujuan terkirim dengan benar dan respon dari Digiflazz berhasil dibaca.</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Row2({ label, value, ok, warn }: { label: string; value: string; ok?: boolean; warn?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-xs text-muted-foreground flex-shrink-0">{label}</span>
+      <span className={`text-xs font-mono font-semibold text-right truncate max-w-[55%] ${ok ? "text-emerald-400" : warn ? "text-yellow-400" : "text-foreground/80"}`}>{value}</span>
+    </div>
+  );
+}
+
 /* ─── MAIN ─── */
 export default function AdminPage({ onMemberChange }: { onMemberChange?: () => void }) {
   const [unlocked, setUnlocked] = useState(false);
@@ -900,6 +1060,7 @@ export default function AdminPage({ onMemberChange }: { onMemberChange?: () => v
     { id: "report", label: "Laporan", icon: "📊" },
     { id: "prices", label: "Harga", icon: "💲" },
     { id: "members", label: "Member", icon: "👥" },
+    { id: "uji", label: "Uji", icon: "🧪" },
     { id: "settings", label: "Tetapan", icon: "⚙️" },
   ];
 
@@ -921,7 +1082,7 @@ export default function AdminPage({ onMemberChange }: { onMemberChange?: () => v
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-1.5 mb-5 p-1 rounded-2xl bg-white/3 border border-white/6">
+      <div className="grid grid-cols-5 gap-1 mb-5 p-1 rounded-2xl bg-white/3 border border-white/6">
         {tabs.map((tab) => {
           const pendingCount = tab.id === "members" ? loadMembers().filter(m => m.status === "pending").length : 0;
           return (
@@ -946,6 +1107,7 @@ export default function AdminPage({ onMemberChange }: { onMemberChange?: () => v
       {activeTab === "report" && <ReportSection />}
       {activeTab === "prices" && <PriceSection />}
       {activeTab === "members" && <MembersSection onMemberChange={onMemberChange} />}
+      {activeTab === "uji" && <UjiSection />}
       {activeTab === "settings" && <SettingsSection onLogout={() => setUnlocked(false)} />}
     </div>
   );

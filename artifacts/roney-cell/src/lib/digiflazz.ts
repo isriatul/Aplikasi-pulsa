@@ -84,6 +84,52 @@ export async function checkDigiflazzBalance(): Promise<{
   }
 }
 
+export interface TestTransactionResult {
+  ref_id: string;
+  payload_sent: {
+    buyer_sku_code: string;
+    customer_no: string;
+    ref_id: string;
+    testing: boolean;
+  };
+  result: {
+    data?: {
+      ref_id?: string;
+      customer_no?: string;
+      buyer_sku_code?: string;
+      status?: string;
+      message?: string;
+      sn?: string;
+      price?: number;
+      tele?: string;
+    };
+    error?: string;
+  };
+  error?: string;
+}
+
+/* Simulasi transaksi (testing: true — tidak motong saldo Digiflazz) */
+export async function sendTestTransaction(
+  customerNo: string,
+  productCode: string,
+): Promise<TestTransactionResult> {
+  const res = await fetch("/api/digiflazz/test", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ buyer_sku_code: productCode, customer_no: customerNo }),
+  });
+  const data = (await res.json()) as TestTransactionResult & { error?: string };
+  if (!res.ok) {
+    return {
+      ref_id: "-",
+      payload_sent: { buyer_sku_code: productCode, customer_no: customerNo, ref_id: "-", testing: true },
+      result: {},
+      error: data.error ?? "Test gagal",
+    };
+  }
+  return data;
+}
+
 /* Generate Ref ID unik untuk setiap transaksi */
 export function generateRefId(): string {
   const ts = Date.now().toString(36).toUpperCase();
