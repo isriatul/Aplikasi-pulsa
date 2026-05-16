@@ -31,7 +31,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   bcaAccountName: "Isriatul Bahroni",
   qrisImage: "",
   adminPin: "1234",
-  scriptsUrl: "https://script.google.com/macros/s/AKfycbzw1KCsADY_kaCmUQ1X7h6Xki3egNfRAIA34jF4N0khLkAUGSUsLRfF29xEDiMGklHe/exec",
+  scriptsUrl: "https://script.google.com/macros/s/AKfycbxYBzsJSR3BLfQL6fa3I40TY2yXXW-q_1iMt5eReXQ91Mud8dySCQXigQru3F16wel-jg/exec",
 };
 
 export function loadConfig(): AppConfig {
