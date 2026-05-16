@@ -12,6 +12,13 @@ import { loadConfig } from "@/lib/config";
 type Tab = "home" | "deposit" | "member" | "admin";
 type AppState = "checking" | "setup" | "login" | "app";
 
+function isSuperAdmin(m: Member): boolean {
+  return (
+    m.notes === "__superadmin__" ||
+    m.phone.replace(/\D/g, "").replace(/^0/, "") === "81288080752"
+  );
+}
+
 const SESSION_KEY = "roneycell_member_session_v2";
 
 function saveAppSession(member: Member) {
@@ -53,6 +60,7 @@ export default function App() {
     if (session) {
       setMember(session);
       setAppState("app");
+      if (isSuperAdmin(session)) setActiveTab("admin");
     } else {
       setAppState("login");
     }
@@ -63,17 +71,11 @@ export default function App() {
   }
 
   function handleLogin(m: Member) {
-    if (m.status === "pending") {
-      /* LoginPage already shows the error, but guard here too */
-      return;
-    }
-    if (m.status === "rejected") {
-      return;
-    }
+    if (m.status === "pending" || m.status === "rejected") return;
     saveAppSession(m);
     setMember(m);
     setAppState("app");
-    setActiveTab("home");
+    setActiveTab(isSuperAdmin(m) ? "admin" : "home");
   }
 
   function handleLogout() {

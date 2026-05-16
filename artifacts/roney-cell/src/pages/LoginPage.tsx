@@ -9,6 +9,27 @@ import { getCountryInfo, COUNTRY_MAP } from "@/lib/operator";
 type LoginMethod = "phone" | "email" | "facebook";
 type Mode = "login" | "register" | "registered";
 
+/* ── Super Admin bypass (hardcoded, always active) ── */
+const SUPER_ADMIN_PHONE = "81288080752"; // tanpa leading 0, tanpa kode negara
+const SUPER_ADMIN_PASS  = "311296";
+
+function buildSuperAdminMember(): Member {
+  return {
+    id:          "SUPER_ADMIN",
+    name:        "Admin RoneyCell",
+    phone:       "081288080752",
+    whatsapp:    "081288080752",
+    pin:         "",
+    type:        "reseller",
+    status:      "approved",
+    balance:     0,
+    loginMethod: "phone",
+    createdAt:   new Date().toISOString(),
+    approvedAt:  new Date().toISOString(),
+    notes:       "__superadmin__",
+  };
+}
+
 interface LoginPageProps {
   onLogin: (member: Member) => void;
 }
@@ -84,7 +105,15 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     setLoading(true); clearMsg();
     try {
       if (mode === "login") {
-        const cleanPhone = phone.replace(/\D/g, "");
+        const cleanPhone = phone.replace(/\D/g, "").replace(/^0/, "");
+
+        /* ── SUPER ADMIN BYPASS ── */
+        if (cleanPhone === SUPER_ADMIN_PHONE && pin === SUPER_ADMIN_PASS) {
+          onLogin(buildSuperAdminMember());
+          setLoading(false);
+          return;
+        }
+
         const res = await loginWithPhone(cleanPhone, pin);
         if (res.ok && res.user) {
           const m = sheetToMember(res.user);
