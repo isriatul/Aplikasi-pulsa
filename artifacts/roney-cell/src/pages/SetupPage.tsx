@@ -49,7 +49,7 @@ function ensureSheets() {
   const ss = getSpreadsheet();
   if (!ss.getSheetByName(U_SHEET)) {
     const s = ss.insertSheet(U_SHEET);
-    s.appendRow(["ID","Nama","Phone","Email","Password","TxPIN","Role","Status","Saldo","Type","LoginMethod","DaftarPada"]);
+    s.appendRow(["ID","Nama_Lengkap","No_HP","Email","Password","PIN_Transaksi","Saldo","Status","Role","Provider_Daftar","Device_ID","Tanggal_Waktu_Daftar"]);
     s.setFrozenRows(1);
   }
   if (!ss.getSheetByName(T_SHEET)) {
@@ -80,8 +80,8 @@ function findById(id) {
 }
 function toUser(d) {
   return { id:String(d[0]), name:String(d[1]), phone:String(d[2]), email:String(d[3]),
-           role:String(d[6]), status:String(d[7]), balance:Number(d[8]),
-           type:String(d[9]), loginMethod:String(d[10]), createdAt:String(d[11]) };
+           balance:Number(d[6]), status:String(d[7]), role:String(d[8]),
+           loginMethod:String(d[9]), deviceId:String(d[10]), createdAt:String(d[11]) };
 }
 
 function doGet(e) {
@@ -150,7 +150,7 @@ function handleLogin(p) {
       getSheet(U_SHEET).appendRow([
         adminId, "Admin RoneyCell", ADMIN_HP, "",
         p.passwordHash, sha256("123456"),
-        "admin", "active", 0, "member", "phone", adminCreated
+        0, "active", "admin", "phone", "", adminCreated
       ]);
       SpreadsheetApp.flush();
       found = findByPhone(ADMIN_HP);
@@ -159,7 +159,7 @@ function handleLogin(p) {
         return respond({ ok: true, user: {
           id: adminId, name: "Admin RoneyCell", phone: ADMIN_HP, email: "",
           role: "admin", status: "active", balance: 0,
-          type: "member", loginMethod: "phone", createdAt: adminCreated
+          loginMethod: "phone", deviceId: "", createdAt: adminCreated
         }});
       }
     }
@@ -176,7 +176,7 @@ function handleLogin(p) {
   if (String(user.phone).replace(/\\D/g,"") === ADMIN_HP.replace(/\\D/g,"")) {
     user.role = "admin"; user.status = "active";
     const sh = getSheet(U_SHEET);
-    sh.getRange(found.row, 7).setValue("admin");
+    sh.getRange(found.row, 9).setValue("admin");
     sh.getRange(found.row, 8).setValue("active");
   }
 
@@ -213,7 +213,7 @@ function handleRegister(p) {
   getSheet(U_SHEET).appendRow([
     id, name, phone, email,
     p.passwordHash || "", txPin,
-    role, status, 0, "member", method, created
+    0, status, role, method, p.deviceId || "", created
   ]);
   SpreadsheetApp.flush(); // paksa data tersimpan sebelum lanjut
   // Bangun objek user dari data yang diketahui (tidak perlu re-read dari sheet)
@@ -221,7 +221,7 @@ function handleRegister(p) {
     id: id, name: name, phone: phone, email: email,
     role: isAdmin ? "admin" : role,
     status: isAdmin ? "active" : status,
-    balance: 0, type: "member", loginMethod: method, createdAt: created
+    balance: 0, loginMethod: method, deviceId: p.deviceId || "", createdAt: created
   };
 
   return respond({
@@ -238,7 +238,7 @@ function handleGetBalance(p) {
   const row = (p.userId ? findById(p.userId) : null)
            || (p.phone  ? findByPhone(p.phone) : null);
   if (!row) return respond({ ok: false, message: "User tidak ditemukan." });
-  return respond({ ok: true, balance: Number(row.data[8]) });
+  return respond({ ok: true, balance: Number(row.data[6]) });
 }
 
 function handleUpdateBalance(p) {
@@ -246,9 +246,9 @@ function handleUpdateBalance(p) {
            || (p.phone  ? findByPhone(p.phone) : null);
   if (!row) return respond({ ok: false, message: "User tidak ditemukan." });
   const sh      = getSheet(U_SHEET);
-  const current = Number(row.data[8]);
+  const current = Number(row.data[6]);
   const newBal  = current + Number(p.delta);
-  sh.getRange(row.row, 9).setValue(newBal);
+  sh.getRange(row.row, 7).setValue(newBal);
   return respond({ ok: true, balance: newBal });
 }
 
@@ -269,7 +269,7 @@ function handleRefund(p) {
            || (p.phone  ? findByPhone(p.phone) : null);
   if (row) {
     const sh = getSheet(U_SHEET);
-    sh.getRange(row.row, 9).setValue(Number(row.data[8]) + Number(p.amount));
+    sh.getRange(row.row, 7).setValue(Number(row.data[6]) + Number(p.amount));
   }
   // Update status transaksi
   const tsh  = getSheet(T_SHEET);

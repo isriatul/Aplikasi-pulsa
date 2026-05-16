@@ -18,10 +18,11 @@ function sheetToMember(u: SheetUser): Member {
     email: u.email,
     whatsapp: u.phone,
     pin: "",
-    type: (u.type as Member["type"]) ?? "member",
+    type: "member",
     status: u.status === "active" ? "approved" : u.status === "pending" ? "pending" : "rejected",
     balance: u.balance,
     loginMethod: u.loginMethod as Member["loginMethod"],
+    deviceId: u.deviceId,
     createdAt: u.createdAt,
     approvedAt: u.status === "active" ? u.createdAt : undefined,
   };

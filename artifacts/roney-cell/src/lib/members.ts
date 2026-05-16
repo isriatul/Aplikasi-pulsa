@@ -13,6 +13,7 @@ export interface Member {
   status: MemberStatus;
   balance: number;
   loginMethod: LoginMethod;
+  deviceId?: string;
   createdAt: string;
   approvedAt?: string;
   notes?: string;

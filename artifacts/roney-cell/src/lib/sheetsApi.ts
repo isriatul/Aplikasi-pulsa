@@ -9,17 +9,30 @@ export async function hashString(str: string): Promise<string> {
     .join("");
 }
 
+/* ── Device ID (persisten per browser) ── */
+function getDeviceId(): string {
+  const KEY = "roneycell_device_id";
+  let id = localStorage.getItem(KEY);
+  if (!id) {
+    const ts  = Date.now().toString(36).toUpperCase();
+    const rnd = Math.random().toString(36).slice(2, 8).toUpperCase();
+    id = `DEV-${ts}-${rnd}`;
+    localStorage.setItem(KEY, id);
+  }
+  return id;
+}
+
 /* ── Types ── */
 export interface SheetUser {
   id: string;
   name: string;
   phone: string;
   email: string;
-  role: "admin" | "member" | "reseller";
+  role: "admin" | "member";
   status: "pending" | "active" | "rejected";
   balance: number;
-  type: "member" | "reseller";
   loginMethod: "phone" | "email" | "facebook";
+  deviceId: string;
   createdAt: string;
 }
 
@@ -108,7 +121,8 @@ export async function registerUser(data: {
   loginMethod: "phone" | "email" | "facebook";
 }): Promise<ApiResponse> {
   const passwordHash = await hashString(data.password);
-  const txPinHash = await hashString(data.txPin);
+  const txPinHash    = await hashString(data.txPin);
+  const deviceId     = getDeviceId();
   return api({
     action: "register",
     name: data.name,
@@ -117,13 +131,15 @@ export async function registerUser(data: {
     passwordHash,
     txPinHash,
     loginMethod: data.loginMethod,
+    deviceId,
   });
 }
 
 export async function registerFacebook(name: string): Promise<ApiResponse> {
-  const uid = "fb" + Date.now();
+  const uid          = "fb" + Date.now();
   const passwordHash = await hashString(uid);
-  const txPinHash = await hashString("123456");
+  const txPinHash    = await hashString("123456");
+  const deviceId     = getDeviceId();
   return api({
     action: "register",
     name,
@@ -132,6 +148,7 @@ export async function registerFacebook(name: string): Promise<ApiResponse> {
     passwordHash,
     txPinHash,
     loginMethod: "facebook",
+    deviceId,
   });
 }
 
