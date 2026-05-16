@@ -39,8 +39,8 @@ export function loadConfig(): AppConfig {
     const raw = localStorage.getItem(CONFIG_KEY);
     if (raw) {
       const stored = JSON.parse(raw) as Partial<AppConfig>;
-      // If stored URL is empty, fall back to the hardcoded default
-      if (!stored.scriptsUrl?.trim()) {
+      // Always use the hardcoded URL — user should never override this manually
+      if (DEFAULT_CONFIG.scriptsUrl) {
         stored.scriptsUrl = DEFAULT_CONFIG.scriptsUrl;
       }
       return { ...DEFAULT_CONFIG, ...stored };
