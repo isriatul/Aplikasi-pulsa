@@ -6,13 +6,14 @@ import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { globalLimiter } from "./middlewares/rateLimiter.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
+import { requestTimeout } from "./middlewares/timeout.js";
 
 const app: Express = express();
 
-/* Percaya proxy Replit (untuk rate-limit by IP yang benar) */
+/* Percaya proxy Replit (untuk IP yang benar pada rate-limit & logging) */
 app.set("trust proxy", 1);
 
-/* Helmet: security headers */
+/* ── Helmet: security headers ── */
 app.use(
   helmet({
     contentSecurityPolicy: false,
@@ -20,7 +21,7 @@ app.use(
   }),
 );
 
-/* CORS: izinkan hanya domain Replit di production */
+/* ── CORS: izinkan hanya domain Replit di production ── */
 const allowedOrigins = process.env["REPLIT_DOMAINS"]
   ? process.env["REPLIT_DOMAINS"].split(",").map((d) => `https://${d.trim()}`)
   : ["*"];
@@ -40,13 +41,25 @@ app.use(
   }),
 );
 
-/* Logging */
+/* ── Request timeout: 30 detik ── */
+app.use(requestTimeout);
+
+/* ── Logging dengan IP dan User-Agent ── */
 app.use(
   pinoHttp({
     logger,
     serializers: {
       req(req) {
-        return { id: req.id, method: req.method, url: req.url?.split("?")[0] };
+        return {
+          id: req.id,
+          method: req.method,
+          url: req.url?.split("?")[0],
+          ip:
+            (req.headers?.["x-forwarded-for"] as string | undefined)
+              ?.split(",")[0]
+              ?.trim() ?? req.socket?.remoteAddress ?? "unknown",
+          ua: ((req.headers?.["user-agent"] as string | undefined) ?? "").slice(0, 150),
+        };
       },
       res(res) {
         return { statusCode: res.statusCode };
@@ -55,17 +68,17 @@ app.use(
   }),
 );
 
-/* Body parsing */
+/* ── Body parsing ── */
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 
-/* Global rate limiter */
+/* ── Global rate limiter ── */
 app.use(globalLimiter);
 
-/* Routes */
+/* ── Routes ── */
 app.use("/api", router);
 
-/* Safe error handler (harus paling akhir) */
+/* ── Safe error handler (paling akhir) ── */
 app.use(errorHandler);
 
 export default app;

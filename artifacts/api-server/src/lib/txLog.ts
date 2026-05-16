@@ -13,6 +13,7 @@ export interface TxLogEntry {
   status: "pending" | "success" | "failed" | "double_attempt";
   message?: string;
   ip: string;
+  userAgent?: string;
 }
 
 const MAX_ENTRIES = 1000;
@@ -39,4 +40,13 @@ export function getLogByRefId(refId: string): TxLogEntry | undefined {
     if (log[i]!.refId === refId) return log[i];
   }
   return undefined;
+}
+
+export function getTxLogStats(): { total: number; success: number; failed: number; pending: number } {
+  return {
+    total: log.length,
+    success: log.filter((e) => e.status === "success").length,
+    failed: log.filter((e) => e.status === "failed").length,
+    pending: log.filter((e) => e.status === "pending").length,
+  };
 }

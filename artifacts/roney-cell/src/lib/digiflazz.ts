@@ -11,11 +11,14 @@ export interface TransactionResult {
   status?: string;
 }
 
-/* Kirim transaksi pulsa/data/PLN melalui backend */
+/* Kirim transaksi pulsa/data/PLN melalui backend.
+   declared_price dan declared_balance dikirim untuk validasi anti-saldo-minus di server. */
 export async function sendTransaction(
   customerNo: string,
   productCode: string,
   refId: string,
+  declaredPrice?: number,
+  declaredBalance?: number,
 ): Promise<TransactionResult> {
   const res = await fetch("/api/digiflazz/topup", {
     method: "POST",
@@ -24,6 +27,8 @@ export async function sendTransaction(
       buyer_sku_code: productCode,
       customer_no: customerNo,
       ref_id: refId,
+      ...(declaredPrice !== undefined ? { declared_price: declaredPrice } : {}),
+      ...(declaredBalance !== undefined ? { declared_balance: declaredBalance } : {}),
     }),
   });
 
