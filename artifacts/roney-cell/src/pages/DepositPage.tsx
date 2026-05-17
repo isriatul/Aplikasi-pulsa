@@ -159,18 +159,44 @@ function UploadProofForm({ deposit, onSuccess }: { deposit: V2Deposit; onSuccess
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    if (!["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"].includes(file.type)) {
       setError("Format tidak didukung. Gunakan JPG, PNG, atau WebP.");
       return;
     }
-    if (file.size > 3 * 1024 * 1024) {
-      setError("Ukuran file terlalu besar (max 3MB).");
+    if (file.size > 15 * 1024 * 1024) {
+      setError("Ukuran file terlalu besar (max 15MB).");
       return;
     }
     setError("");
-    setMime(file.type as typeof mime);
+    /* Baca file lalu kompres otomatis menggunakan Canvas */
     const reader = new FileReader();
-    reader.onload = (ev) => setPreview(ev.target?.result as string);
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        /* Resize ke max 1200px sisi terpanjang, lalu encode JPEG 80% */
+        const MAX = 1200;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          if (width >= height) { height = Math.round(height * MAX / width); width = MAX; }
+          else { width = Math.round(width * MAX / height); height = MAX; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL("image/jpeg", 0.82);
+        setMime("image/jpeg");
+        setPreview(compressed);
+      };
+      img.onerror = () => {
+        /* Fallback: pakai data asli tanpa kompresi */
+        setMime(file.type as typeof mime);
+        setPreview(dataUrl);
+      };
+      img.src = dataUrl;
+    };
     reader.readAsDataURL(file);
   }
 

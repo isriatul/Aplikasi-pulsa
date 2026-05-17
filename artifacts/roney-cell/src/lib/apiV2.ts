@@ -10,10 +10,12 @@ const RT_KEY = "roneycell_refresh_token_v2";
 const AT_KEY = "roneycell_access_token_v2";
 
 export function getV2Token(): string | null {
-  return sessionStorage.getItem(AT_KEY);
+  /* Cek localStorage (persisten) dan sessionStorage (legacy fallback) */
+  return localStorage.getItem(AT_KEY) ?? sessionStorage.getItem(AT_KEY);
 }
 export function setV2Token(t: string) {
-  sessionStorage.setItem(AT_KEY, t);
+  localStorage.setItem(AT_KEY, t);
+  sessionStorage.removeItem(AT_KEY); /* Hapus key lama dari sessionStorage jika ada */
 }
 export function getV2RefreshToken(): string | null {
   return localStorage.getItem(RT_KEY);
@@ -23,6 +25,7 @@ export function setV2RefreshToken(t: string) {
 }
 export function clearV2Tokens() {
   sessionStorage.removeItem(AT_KEY);
+  localStorage.removeItem(AT_KEY);
   localStorage.removeItem(RT_KEY);
 }
 
@@ -35,7 +38,7 @@ function headers(extra?: Record<string, string>): Record<string, string> {
   };
 }
 
-async function tryRefresh(): Promise<boolean> {
+export async function tryV2Refresh(): Promise<boolean> {
   const rt = getV2RefreshToken();
   if (!rt) return false;
   try {
@@ -58,7 +61,7 @@ async function apiFetch<T>(path: string, init?: RequestInit, retry = true): Prom
     headers: { ...headers(), ...(init?.headers as Record<string, string> ?? {}) },
   });
   if (res.status === 401 && retry) {
-    const ok = await tryRefresh();
+    const ok = await tryV2Refresh();
     if (ok) return apiFetch<T>(path, init, false);
     clearV2Tokens();
     if (typeof window !== "undefined") {

@@ -8,7 +8,7 @@ import LoginPage from "@/pages/LoginPage";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { Member, clearSession } from "@/lib/members";
 import { clearApiToken } from "@/lib/apiAuth";
-import { clearV2Tokens } from "@/lib/apiV2";
+import { clearV2Tokens, getV2Token, getV2RefreshToken } from "@/lib/apiV2";
 
 type Tab = "home" | "deposit" | "member" | "admin";
 type AppState = "checking" | "login" | "app";
@@ -46,15 +46,7 @@ export default function App() {
 
   useEffect(() => {
     const session = loadAppSession();
-    if (session) {
-      setMember(session);
-      setAppState("app");
-      if (isSuperAdmin(session)) setActiveTab("admin");
-    } else {
-      setAppState("login");
-    }
 
-    /* Auto-logout saat sesi v2 habis (refresh token expired) */
     function onSessionExpired() {
       clearAppSession();
       clearApiToken();
@@ -63,6 +55,26 @@ export default function App() {
       setAppState("login");
     }
     window.addEventListener("v2-session-expired", onSessionExpired);
+
+    if (session) {
+      setMember(session);
+      setAppState("app");
+      if (isSuperAdmin(session)) setActiveTab("admin");
+
+      /* Jika ada refresh token tapi tidak ada access token (misal setelah buka tab baru
+         dari browser yang membersihkan sessionStorage), coba refresh diam-diam */
+      if (!getV2Token() && getV2RefreshToken()) {
+        import("@/lib/apiV2").then(({ tryV2Refresh }) => {
+          tryV2Refresh().catch(() => {
+            /* Refresh gagal (token expired) — paksa logout */
+            onSessionExpired();
+          });
+        });
+      }
+    } else {
+      setAppState("login");
+    }
+
     return () => window.removeEventListener("v2-session-expired", onSessionExpired);
   }, []);
 
