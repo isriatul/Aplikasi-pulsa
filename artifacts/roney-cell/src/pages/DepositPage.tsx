@@ -1,7 +1,7 @@
 /**
  * Halaman Isi Saldo — QRIS Statis + Kode Unik + Upload Bukti → Auto-Credit
  */
-import { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { formatRupiah } from "@/lib/products";
 import {
   v2CreateDeposit,
@@ -776,80 +776,83 @@ function NewDepositForm({
       </div>
 
       {/* Metode */}
-      <div className="rounded-2xl p-5 space-y-3" style={{ border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>
-        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Metode Bayar</p>
-        <div className="space-y-2">
-          {/* QRIS DANA */}
-          {([ 
-            {
-              v: "qris" as const,
-              label: "QRIS DANA Bisnis",
-              sub: "GoPay · OVO · DANA · ShopeePay",
-              color: "#108EE9",
-              logo: <LogoDANA size={36} />,
-            },
-            {
-              v: "transfer" as const,
-              label: "Transfer Bank BCA",
-              sub: "No. Rek 7255211277 · a.n. Isriatul Bahroni",
-              color: "#005DAA",
-              logo: <LogoBCA size={36} />,
-            },
-            {
-              v: "va_dana" as const,
-              label: "Virtual Account DANA",
-              sub: "VA 88810081288080752 · Bank Permata",
-              color: "#108EE9",
-              logo: (
-                <div className="flex gap-1">
-                  <LogoDANA size={28} />
-                  <LogoPermata size={28} />
-                </div>
-              ),
-            },
-            {
-              v: "alfamart" as const,
-              label: "Alfamart / Indomaret",
-              sub: "Bayar di kasir · Upload struk fisik",
-              color: "#E31E24",
-              logo: (
-                <div className="flex gap-1">
-                  <LogoAlfamart size={28} />
-                  <LogoIndomaret size={28} />
-                </div>
-              ),
-            },
-            {
-              v: "manual" as const,
-              label: "Konfirmasi via WhatsApp",
-              sub: "Hubungi admin langsung",
-              color: "#25D366",
-              logo: <LogoWA size={36} />,
-            },
-          ]).map((m) => (
+      <div className="space-y-2">
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1 pb-1">Pilih Metode Bayar</p>
+        {([
+          {
+            v: "qris" as const,
+            label: "QRIS DANA Bisnis",
+            sub: "GoPay · OVO · DANA · ShopeePay",
+            accent: "#108EE9",
+            logos: [<LogoDANA key="dana" size={40} />],
+          },
+          {
+            v: "transfer" as const,
+            label: "Transfer Bank BCA",
+            sub: "Rek 7255211277 · a.n. Isriatul Bahroni",
+            accent: "#005DAA",
+            logos: [<LogoBCA key="bca" size={40} />],
+          },
+          {
+            v: "va_dana" as const,
+            label: "Virtual Account DANA",
+            sub: "VA 88810081288080752 · Permata",
+            accent: "#108EE9",
+            logos: [<LogoDANA key="dana" size={40} />, <LogoPermata key="pmt" size={40} />],
+          },
+          {
+            v: "alfamart" as const,
+            label: "Alfamart / Indomaret",
+            sub: "Bayar di kasir · Upload struk fisik",
+            accent: "#E31E24",
+            logos: [<LogoAlfamart key="alfa" size={40} />, <LogoIndomaret key="indo" size={40} />],
+          },
+          {
+            v: "manual" as const,
+            label: "Konfirmasi via WhatsApp",
+            sub: "Hubungi admin langsung",
+            accent: "#25D366",
+            logos: [<LogoWA key="wa" size={40} />],
+          },
+        ]).map((m) => {
+          const active = method === m.v;
+          return (
             <button key={m.v} onClick={() => setMethod(m.v)}
-              className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all"
-              style={method === m.v
-                ? { background: `${m.color}15`, border: `1px solid ${m.color}50` }
-                : { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
-              <div className="shrink-0 flex items-center">{m.logo}</div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white leading-tight">{m.label}</p>
-                <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">{m.sub}</p>
+              className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-left transition-all"
+              style={{
+                background: active ? `${m.accent}12` : "rgba(255,255,255,0.025)",
+                border: active ? `2px solid ${m.accent}60` : "1.5px solid rgba(255,255,255,0.07)",
+                boxShadow: active ? `0 4px 20px ${m.accent}20` : "none",
+              }}>
+              {/* Logo container — ukuran seragam 40×40 tiap logo */}
+              <div className="shrink-0 flex items-center gap-1.5">
+                {m.logos.map((logo) => (
+                  <div key={(logo as React.ReactElement).key}
+                    className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center"
+                    style={{ background: "white", boxShadow: "0 1px 4px rgba(0,0,0,0.18)" }}>
+                    {logo}
+                  </div>
+                ))}
               </div>
+              {/* Label */}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-white leading-tight">{m.label}</p>
+                <p className="text-[11px] text-white/45 leading-tight mt-0.5 truncate">{m.sub}</p>
+              </div>
+              {/* Radio indicator */}
               <div className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center border-2 transition-all"
-                style={method === m.v
-                  ? { borderColor: m.color, background: m.color }
-                  : { borderColor: "rgba(255,255,255,0.2)", background: "transparent" }}>
-                {method === m.v && (
+                style={active
+                  ? { borderColor: m.accent, background: m.accent }
+                  : { borderColor: "rgba(255,255,255,0.18)", background: "transparent" }}>
+                {active && (
                   <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none">
                     <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 )}
               </div>
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
       {/* Info kode unik */}
@@ -886,6 +889,8 @@ function NewDepositForm({
 function DepositHistory({ refreshKey }: { refreshKey: number }) {
   const [deposits, setDeposits] = useState<V2Deposit[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmId, setConfirmId] = useState<number | null>(null);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -896,20 +901,74 @@ function DepositHistory({ refreshKey }: { refreshKey: number }) {
 
   useEffect(() => { void load(); }, [load, refreshKey]);
 
+  async function handleCancel(id: number) {
+    setCancellingId(id);
+    setConfirmId(null);
+    try {
+      await v2CancelDeposit(id);
+      setDeposits((prev) => prev.map((d) => d.id === id ? { ...d, status: "failed" } : d));
+    } catch { /* silent — status stays */ }
+    finally { setCancellingId(null); }
+  }
+
   if (loading) return <div className="flex justify-center py-5"><div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" /></div>;
   if (deposits.length === 0) return <p className="text-center text-xs text-muted-foreground py-4">Belum ada riwayat</p>;
 
   return (
     <div className="space-y-2">
       {deposits.map((d) => (
-        <div key={d.id} className="rounded-xl px-4 py-3 flex items-center justify-between gap-3"
-          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-          <div className="min-w-0">
-            <div className="text-sm font-bold text-white">{rp(d.totalAmount ?? d.amount)}</div>
-            <div className="text-xs text-muted-foreground font-mono truncate">{d.paymentRef}</div>
-            <div className="text-[10px] text-muted-foreground">{new Date(d.createdAt).toLocaleString("id-ID")}</div>
+        <div key={d.id}>
+          <div className="rounded-2xl px-4 py-3 flex items-center gap-3 transition-all"
+            style={{
+              background: d.status === "pending" ? "rgba(251,191,36,0.04)" : "rgba(255,255,255,0.025)",
+              border: d.status === "pending" ? "1px solid rgba(251,191,36,0.2)" : "1px solid rgba(255,255,255,0.06)",
+            }}>
+            {/* Info deposit */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-bold text-white">{rp(d.totalAmount ?? d.amount)}</span>
+                <StatusBadge status={d.status} />
+              </div>
+              <div className="text-[10px] text-muted-foreground font-mono truncate mt-0.5">{d.paymentRef}</div>
+              <div className="text-[10px] text-muted-foreground">{new Date(d.createdAt).toLocaleString("id-ID")}</div>
+            </div>
+
+            {/* Tombol batalkan — hanya untuk pending */}
+            {d.status === "pending" && (
+              cancellingId === d.id
+                ? <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                : <button
+                    onClick={() => setConfirmId(d.id)}
+                    className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:scale-105"
+                    style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)" }}
+                    title="Batalkan tiket">
+                    <svg className="w-3.5 h-3.5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+            )}
           </div>
-          <StatusBadge status={d.status} />
+
+          {/* Dialog konfirmasi inline */}
+          {confirmId === d.id && (
+            <div className="mx-1 mt-1 rounded-xl px-4 py-3 flex items-center justify-between gap-3"
+              style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)" }}>
+              <p className="text-xs text-red-300 font-semibold flex-1">Yakin ingin membatalkan tiket ini?</p>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={() => setConfirmId(null)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white/60 border border-white/10 hover:bg-white/5">
+                  Tidak
+                </button>
+                <button
+                  onClick={() => void handleCancel(d.id)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-white"
+                  style={{ background: "rgba(239,68,68,0.7)" }}>
+                  Ya, Batalkan
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </div>
