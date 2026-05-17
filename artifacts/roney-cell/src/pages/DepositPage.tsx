@@ -80,6 +80,24 @@ function LogoIndomaret({ size = 36 }: { size?: number }) {
   );
 }
 
+function LogoGopay({ size = 36 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 44 44" fill="none">
+      <rect width="44" height="44" rx="12" fill="#00AED6"/>
+      <text x="22" y="27" textAnchor="middle" fontSize="9" fontWeight="900" fill="white" fontFamily="Arial,sans-serif">GoPay</text>
+    </svg>
+  );
+}
+
+function LogoOVO({ size = 36 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 44 44" fill="none">
+      <rect width="44" height="44" rx="12" fill="#4C3494"/>
+      <text x="22" y="27" textAnchor="middle" fontSize="11" fontWeight="900" fill="white" fontFamily="Arial,sans-serif">OVO</text>
+    </svg>
+  );
+}
+
 function LogoWA({ size = 36 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 36 36" fill="none">
@@ -749,6 +767,85 @@ function ExistingTicketCard({
   );
 }
 
+/* ─── Komponen tile metode pembayaran ─── */
+function MethodTile({
+  label, logo, isBaru, active, onSelect, accent,
+}: {
+  label: string; logo: React.ReactNode; isBaru?: boolean;
+  active: boolean; onSelect: () => void; accent: string;
+}) {
+  return (
+    <button
+      onClick={onSelect}
+      className="relative flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-2xl transition-all active:scale-95"
+      style={{
+        background: active ? `${accent}18` : "rgba(255,255,255,0.06)",
+        border: active ? `2px solid ${accent}80` : "1.5px solid rgba(255,255,255,0.09)",
+        boxShadow: active ? `0 4px 16px ${accent}25` : "none",
+      }}
+    >
+      {isBaru && (
+        <span className="absolute -top-1.5 -left-1 px-1.5 py-0.5 rounded-md text-[8px] font-black tracking-wide text-white z-10"
+          style={{ background: "#1A56DB" }}>BARU</span>
+      )}
+      <div className="w-11 h-11 rounded-xl overflow-hidden flex items-center justify-center"
+        style={{ background: "white", boxShadow: "0 1px 6px rgba(0,0,0,0.25)" }}>
+        {logo}
+      </div>
+      <span className="text-[10px] font-semibold leading-tight text-center w-full px-0.5 truncate"
+        style={{ color: active ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.65)" }}>
+        {label}
+      </span>
+      {active && (
+        <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center"
+          style={{ background: accent }}>
+          <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none">
+            <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+      )}
+    </button>
+  );
+}
+
+function MethodTileDisabled({ label, logo }: { label: string; logo: React.ReactNode }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-2xl opacity-40"
+      style={{ background: "rgba(255,255,255,0.03)", border: "1.5px solid rgba(255,255,255,0.06)" }}>
+      <div className="w-11 h-11 rounded-xl overflow-hidden flex items-center justify-center"
+        style={{ background: "white", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>
+        {logo}
+      </div>
+      <span className="text-[10px] font-semibold text-center w-full px-0.5 truncate"
+        style={{ color: "rgba(255,255,255,0.40)" }}>
+        {label}
+      </span>
+      <span className="text-[8px] font-bold" style={{ color: "rgba(255,255,255,0.25)" }}>Segera</span>
+    </div>
+  );
+}
+
+function MethodSection({
+  title, accent, children,
+}: {
+  title: string; accent: string; children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl overflow-hidden"
+      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+      {/* Section header */}
+      <div className="flex items-center gap-2 px-4 pt-4 pb-3">
+        <div className="w-1 h-4 rounded-full shrink-0" style={{ background: accent }} />
+        <span className="font-black text-sm" style={{ color: "rgba(255,255,255,0.88)" }}>{title}</span>
+      </div>
+      {/* Logo grid */}
+      <div className="grid grid-cols-3 gap-2.5 px-4 pb-4">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 /* ─── Form pilih nominal & metode ─── */
 function NewDepositForm({
   onCreated,
@@ -812,84 +909,78 @@ function NewDepositForm({
         </div>
       </div>
 
-      {/* Metode */}
-      <div className="space-y-2">
-        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1 pb-1">Pilih Metode Bayar</p>
-        {([
-          {
-            v: "qris" as const,
-            label: "QRIS DANA Bisnis",
-            sub: "GoPay · OVO · DANA · ShopeePay",
-            accent: "#108EE9",
-            logos: [<LogoDANA key="dana" size={40} />],
-          },
-          {
-            v: "transfer" as const,
-            label: "Transfer Bank BCA",
-            sub: "Rek 7255211277 · a.n. Isriatul Bahroni",
-            accent: "#005DAA",
-            logos: [<LogoBCA key="bca" size={40} />],
-          },
-          {
-            v: "va_dana" as const,
-            label: "Virtual Account DANA",
-            sub: "VA 88810081288080752 · Permata",
-            accent: "#108EE9",
-            logos: [<LogoDANA key="dana" size={40} />, <LogoPermata key="pmt" size={40} />],
-          },
-          {
-            v: "alfamart" as const,
-            label: "Alfamart / Indomaret",
-            sub: "Bayar di kasir · Upload struk fisik",
-            accent: "#E31E24",
-            logos: [<LogoAlfamart key="alfa" size={40} />, <LogoIndomaret key="indo" size={40} />],
-          },
-          {
-            v: "manual" as const,
-            label: "Konfirmasi via WhatsApp",
-            sub: "Hubungi admin langsung",
-            accent: "#25D366",
-            logos: [<LogoWA key="wa" size={40} />],
-          },
-        ]).map((m) => {
-          const active = method === m.v;
-          return (
-            <button key={m.v} onClick={() => setMethod(m.v)}
-              className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-left transition-all"
-              style={{
-                background: active ? `${m.accent}12` : "rgba(255,255,255,0.025)",
-                border: active ? `2px solid ${m.accent}60` : "1.5px solid rgba(255,255,255,0.07)",
-                boxShadow: active ? `0 4px 20px ${m.accent}20` : "none",
-              }}>
-              {/* Logo container — ukuran seragam 40×40 tiap logo */}
-              <div className="shrink-0 flex items-center gap-1.5">
-                {m.logos.map((logo) => (
-                  <div key={(logo as React.ReactElement).key}
-                    className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center"
-                    style={{ background: "white", boxShadow: "0 1px 4px rgba(0,0,0,0.18)" }}>
-                    {logo}
-                  </div>
-                ))}
-              </div>
-              {/* Label */}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-white leading-tight">{m.label}</p>
-                <p className="text-[11px] text-white/45 leading-tight mt-0.5 truncate">{m.sub}</p>
-              </div>
-              {/* Radio indicator */}
-              <div className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center border-2 transition-all"
-                style={active
-                  ? { borderColor: m.accent, background: m.accent }
-                  : { borderColor: "rgba(255,255,255,0.18)", background: "transparent" }}>
-                {active && (
-                  <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none">
-                    <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                )}
-              </div>
-            </button>
-          );
-        })}
+      {/* Metode — Grouped logo grid */}
+      <div className="space-y-3">
+        <p className="text-[10px] font-black uppercase tracking-widest px-1"
+          style={{ color: "rgba(255,255,255,0.35)" }}>Pilih Metode Bayar</p>
+
+        {/* ─ Transfer Bank ─ */}
+        <MethodSection title="Transfer Bank" accent="#2563EB">
+          {[
+            { v: "transfer" as const, label: "Transfer BCA", isBaru: true,
+              logo: <LogoBCA size={44} /> },
+            { v: "va_dana" as const, label: "VA DANA", isBaru: false,
+              logo: <LogoPermata size={44} /> },
+          ].map((item) => (
+            <MethodTile
+              key={item.v}
+              label={item.label}
+              isBaru={item.isBaru}
+              active={method === item.v}
+              onSelect={() => setMethod(item.v)}
+              logo={item.logo}
+              accent="#2563EB"
+            />
+          ))}
+        </MethodSection>
+
+        {/* ─ QRIS & E-Wallet ─ */}
+        <MethodSection title="QRIS & E-Wallet" accent="#108EE9">
+          {[
+            { v: "qris" as const, label: "QRIS DANA", isBaru: true,
+              logo: <LogoDANA size={44} /> },
+          ].map((item) => (
+            <MethodTile
+              key={item.v}
+              label={item.label}
+              isBaru={item.isBaru}
+              active={method === item.v}
+              onSelect={() => setMethod(item.v)}
+              logo={item.logo}
+              accent="#108EE9"
+            />
+          ))}
+          <MethodTileDisabled label="GoPay" logo={<LogoGopay size={44} />} />
+          <MethodTileDisabled label="OVO" logo={<LogoOVO size={44} />} />
+        </MethodSection>
+
+        {/* ─ Uang Tunai ─ */}
+        <MethodSection title="Uang Tunai" accent="#E31E24">
+          {[
+            { v: "alfamart" as const, label: "Alfamart", isBaru: false,
+              logo: <LogoAlfamart size={44} /> },
+            { v: "alfamart" as const, label: "Indomaret", isBaru: false,
+              logo: <LogoIndomaret size={44} /> },
+          ].map((item, idx) => (
+            <MethodTile
+              key={`${item.v}-${idx}`}
+              label={item.label}
+              isBaru={item.isBaru}
+              active={method === item.v && item.label === "Alfamart" ? method === "alfamart" : false}
+              onSelect={() => setMethod(item.v)}
+              logo={item.logo}
+              accent="#E31E24"
+            />
+          ))}
+          <MethodTile
+            label="WhatsApp"
+            isBaru={false}
+            active={method === "manual"}
+            onSelect={() => setMethod("manual")}
+            logo={<LogoWA size={44} />}
+            accent="#25D366"
+          />
+        </MethodSection>
       </div>
 
       {/* Info kode unik */}
@@ -1065,36 +1156,35 @@ export default function DepositPage() {
 
   return (
     <div className="min-h-dvh flex flex-col max-w-md mx-auto pb-28">
-      {/* Header sticky */}
-      <header className="sticky top-0 z-40 pt-safe px-4"
-        style={{ background: "rgba(11,15,26,0.92)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-        <div className="flex items-center justify-between h-14">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: "linear-gradient(135deg,#F59E0B,#D97706)", boxShadow: "0 0 12px rgba(245,158,11,0.45)" }}>
-              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#111" strokeWidth="2.2">
-                <rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 10h20"/><circle cx="7" cy="15" r="1" fill="#111" stroke="none"/>
+      {/* Header sticky — style "Isi Saldo" */}
+      <header className="sticky top-0 z-40 pt-safe"
+        style={{ background: "linear-gradient(135deg,#1A56DB,#1e3a8a)", borderBottom: "1px solid rgba(255,255,255,0.10)" }}>
+        <div className="flex items-center h-14 px-4 gap-3">
+          {/* Tombol kembali / baru */}
+          {(step === "payment" || step === "existing") && !credited ? (
+            <button
+              onClick={step === "existing" ? () => setStep("form") : handleReset}
+              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-90"
+              style={{ background: "rgba(255,255,255,0.15)" }}>
+              <svg width="18" height="18" fill="none" stroke="white" strokeWidth="2.2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
+              </svg>
+            </button>
+          ) : (
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: "rgba(255,255,255,0.15)" }}>
+              <svg width="17" height="17" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
+                <rect x="2" y="6" width="20" height="14" rx="3" stroke="white"/><path d="M2 10h20" stroke="white"/>
               </svg>
             </div>
-            <div>
-              <h1 className="font-black text-base gradient-text-gold leading-none">Top Up Saldo</h1>
-              <p className="text-[9px] text-white/30 tracking-widest mt-0.5">QRIS · TRANSFER · AUTO-CREDIT</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {step === "payment" && !credited && (
-              <button onClick={handleReset}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/10 text-white/45 hover:bg-white/6 hover:text-white/70 transition-all">
-                ← Baru
-              </button>
-            )}
-            {step === "existing" && (
-              <button onClick={() => setStep("form")}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/10 text-white/45 hover:bg-white/6 hover:text-white/70 transition-all">
-                ← Kembali
-              </button>
-            )}
-          </div>
+          )}
+          <h1 className="flex-1 font-black text-base text-white">Isi Saldo</h1>
+          <button className="w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90"
+            style={{ background: "rgba(255,255,255,0.15)" }}>
+            <svg width="17" height="17" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 16v-4m0-4h.01"/>
+            </svg>
+          </button>
         </div>
       </header>
 
