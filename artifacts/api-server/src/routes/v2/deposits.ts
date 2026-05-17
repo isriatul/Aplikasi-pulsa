@@ -66,14 +66,19 @@ router.post("/v2/deposits", requireAuthV2, async (req, res) => {
     note: note ?? null,
   }).returning();
 
+  if (!deposit) {
+    res.status(500).json({ error: "Gagal membuat deposit. Coba lagi." });
+    return;
+  }
+
   const user = await findUserById(userId);
   if (user) notifyDeposit({ userName: user.name, amount, method, userId });
 
-  await audit({ userId, action: "deposit_request", entity: "deposit", entityId: deposit!.id, ip: getIp(req), data: { amount, method } });
+  await audit({ userId, action: "deposit_request", entity: "deposit", entityId: deposit.id, ip: getIp(req), data: { amount, method } });
 
   /* Kembalikan instruksi pembayaran sesuai metode */
   const instructions = buildInstructions(method, amount, paymentRef);
-  res.status(201).json({ deposit: deposit!, instructions });
+  res.status(201).json({ deposit, instructions });
 });
 
 /* ── GET /api/v2/deposits ── */

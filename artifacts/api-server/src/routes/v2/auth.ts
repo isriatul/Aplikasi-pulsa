@@ -229,7 +229,11 @@ router.put("/v2/auth/profile", requireAuthV2, async (req, res) => {
   await db.update(usersTable).set(updates).where(eq(usersTable.id, userId));
   await audit({ userId, action: "update_profile", ip: getIp(req), data: parsed.data });
   const updated = await findUserById(userId);
-  res.json(safeUser(updated!));
+  if (!updated) {
+    res.status(404).json({ error: "User tidak ditemukan setelah update" });
+    return;
+  }
+  res.json(safeUser(updated));
 });
 
 /* ── POST /api/v2/auth/change-password ── */

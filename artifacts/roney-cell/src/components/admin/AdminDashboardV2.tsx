@@ -666,6 +666,13 @@ export default function AdminDashboardV2() {
   const [tab, setTab] = useState<PanelTab>("dashboard");
   const [loggedIn, setLoggedIn] = useState(() => !!getV2Token());
 
+  /* Reset ke form login otomatis ketika sesi v2 habis di tengah pemakaian */
+  useEffect(() => {
+    const handler = () => setLoggedIn(false);
+    window.addEventListener("v2-session-expired", handler);
+    return () => window.removeEventListener("v2-session-expired", handler);
+  }, []);
+
   function handleLogout() {
     void v2Logout();
     setLoggedIn(false);

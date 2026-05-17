@@ -61,6 +61,9 @@ async function apiFetch<T>(path: string, init?: RequestInit, retry = true): Prom
     const ok = await tryRefresh();
     if (ok) return apiFetch<T>(path, init, false);
     clearV2Tokens();
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("v2-session-expired"));
+    }
     throw new Error("Sesi habis. Silakan login ulang.");
   }
   if (!res.ok) {
