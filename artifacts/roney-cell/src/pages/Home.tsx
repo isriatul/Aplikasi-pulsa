@@ -161,8 +161,8 @@ function GridIcon({ item, onPress }: { item: GridItem; onPress: (cat: ProductCat
 function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="px-4 pt-5 pb-3">
-      <h2 className="font-black text-base" style={{ color: "rgba(255,255,255,0.9)" }}>{title}</h2>
-      {subtitle && <p className="text-xs mt-0.5" style={{ color: "#E11D48" }}>{subtitle}</p>}
+      <h2 className="font-black text-base" style={{ color: "#0F172A" }}>{title}</h2>
+      {subtitle && <p className="text-xs mt-0.5" style={{ color: "#94A3B8" }}>{subtitle}</p>}
     </div>
   );
 }
@@ -301,53 +301,55 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
   const trendingProducts = getTrendingProducts(memberType);
   const shortId = member.phone ? member.phone.slice(-8) : member.id.slice(0, 8);
 
+  const isAdminMember = member.type === "admin" || member.notes === "__superadmin__";
+
   /* ─── Sidebar menu items ─── */
   const SIDEBAR_ITEMS = [
     { icon: "🎧", label: t("sidebar_cs", lang),      action: () => { window.open(`https://wa.me/${ADMIN_WA}`, "_blank"); setShowSidebar(false); } },
     { icon: "💳", label: t("sidebar_topup", lang),   action: () => { onNavigate("deposit"); setShowSidebar(false); } },
     { icon: "📋", label: t("sidebar_history", lang), action: () => { onNavigate("history"); setShowSidebar(false); } },
     { icon: "👤", label: t("sidebar_account", lang), action: () => { onNavigate("member"); setShowSidebar(false); } },
-    { icon: "⭐", label: t("sidebar_admin", lang),   action: () => { onNavigate("admin"); setShowSidebar(false); } },
+    ...(isAdminMember ? [{ icon: "⭐", label: t("sidebar_admin", lang), action: () => { onNavigate("admin"); setShowSidebar(false); } }] : []),
     { icon: "🆘", label: t("sidebar_help", lang),    action: () => { setShowHelp(true); setShowSidebar(false); } },
   ];
 
   return (
-    <div className="min-h-dvh flex flex-col max-w-md mx-auto" style={{ background: "#0B0F1A" }}>
+    <div className="min-h-dvh flex flex-col max-w-md mx-auto" style={{ background: "#F7F8FA" }}>
 
       {/* ─── Sidebar Overlay ─── */}
       {showSidebar && (
         <div className="fixed inset-0 z-50 flex max-w-md mx-auto left-0 right-0">
           {/* backdrop */}
-          <div className="absolute inset-0 bg-black/60" onClick={() => setShowSidebar(false)} />
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowSidebar(false)} />
           {/* drawer */}
           <div className="relative w-72 h-full flex flex-col z-10"
-            style={{ background: "#111827", borderRight: "1px solid rgba(255,255,255,0.08)" }}>
+            style={{ background: "#FFFFFF", borderRight: "1px solid #E2E8F0" }}>
             {/* Profile section */}
-            <div className="px-5 pt-10 pb-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            <div className="px-5 pt-10 pb-5" style={{ borderBottom: "1px solid #F1F5F9" }}>
               <div className="flex flex-col items-start gap-1">
                 <span className="text-2xl font-black gradient-text-brand">RoneyCell</span>
-                <span className="text-xs text-white/40">Sistem Jualan Pulsa Profesional</span>
+                <span className="text-xs" style={{ color: "#94A3B8" }}>Sistem Jualan Pulsa Profesional</span>
               </div>
               <div className="mt-4 space-y-0.5">
-                <p className="text-sm font-bold text-white/90">{member.name}</p>
-                <p className="text-xs text-white/40">CS WA: +{ADMIN_WA}</p>
-                <p className="text-xs text-white/30">roneycell.id</p>
+                <p className="text-sm font-bold" style={{ color: "#0F172A" }}>{member.name}</p>
+                <p className="text-xs" style={{ color: "#64748B" }}>CS WA: +{ADMIN_WA}</p>
+                <p className="text-xs" style={{ color: "#94A3B8" }}>roneycell.id</p>
               </div>
             </div>
             {/* Menu items */}
             <div className="flex-1 overflow-y-auto py-2">
               {SIDEBAR_ITEMS.map((item) => (
                 <button key={item.label} onClick={item.action}
-                  className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-white/5 transition-colors text-left">
+                  className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50 transition-colors text-left">
                   <span className="text-xl w-6 text-center flex-shrink-0">{item.icon}</span>
-                  <span className="text-sm font-medium text-white/75">{item.label}</span>
+                  <span className="text-sm font-medium" style={{ color: "#334155" }}>{item.label}</span>
                 </button>
               ))}
 
               {/* ─── Language picker ─── */}
               <div className="px-5 pt-4 pb-2">
                 <p className="text-[10px] font-bold uppercase tracking-widest mb-2.5"
-                  style={{ color: "rgba(255,255,255,0.30)" }}>
+                  style={{ color: "#94A3B8" }}>
                   🌐 {t("sidebar_lang", lang)}
                 </p>
                 <div className="grid grid-cols-2 gap-2">
@@ -361,17 +363,17 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
                         style={{
                           background: active
                             ? "linear-gradient(135deg,#7F1D1D,#C81E3A)"
-                            : "rgba(255,255,255,0.05)",
+                            : "#F8FAFC",
                           border: active
                             ? "1px solid #C81E3A50"
-                            : "1px solid rgba(255,255,255,0.07)",
-                          boxShadow: active ? "0 2px 10px rgba(200,30,58,0.40)" : "none",
+                            : "1px solid #E2E8F0",
+                          boxShadow: active ? "0 2px 10px rgba(200,30,58,0.30)" : "none",
                         }}
                       >
                         <span className="text-lg leading-none">{opt.flag}</span>
                         <div className="min-w-0">
                           <p className="text-[11px] font-bold leading-none"
-                            style={{ color: active ? "#fff" : "rgba(255,255,255,0.6)" }}>
+                            style={{ color: active ? "#fff" : "#334155" }}>
                             {opt.nativeLabel}
                           </p>
                         </div>
@@ -394,10 +396,10 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
 
       {/* ─── Header ─── */}
       <header className="sticky top-0 z-40 pt-safe"
-        style={{ background: "#0B0F1A", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        style={{ background: "#FFFFFF", borderBottom: "1px solid #E2E8F0" }}>
         <div className="flex items-center justify-between px-4 h-14">
           <button onClick={() => setShowSidebar(true)} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-white/8 transition-colors">
-            <svg width="20" height="20" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.8" viewBox="0 0 24 24">
+            <svg width="20" height="20" fill="none" stroke="#334155" strokeWidth="1.8" viewBox="0 0 24 24">
               <path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h10"/>
             </svg>
           </button>
@@ -408,14 +410,14 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
                 const isV2 = !!getV2Token();
                 if (isV2) v2GetBalance().then((r) => { setMemberBalance(r.balance); onMemberUpdate({ ...member, balance: r.balance }); }).catch(() => {});
               }}
-              className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-white/8 transition-colors">
-              <svg width="17" height="17" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" viewBox="0 0 24 24">
+              className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-slate-100 transition-colors">
+              <svg width="17" height="17" fill="none" stroke="#64748B" strokeWidth="1.8" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
               </svg>
             </button>
             <button onClick={() => setShowHelp(true)}
-              className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-white/8 transition-colors">
-              <svg width="17" height="17" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" viewBox="0 0 24 24">
+              className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-slate-100 transition-colors">
+              <svg width="17" height="17" fill="none" stroke="#64748B" strokeWidth="1.8" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
               </svg>
             </button>
@@ -423,7 +425,7 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
         </div>
 
         {/* Sub-tab bar */}
-        <div className="flex border-b" style={{ borderColor: "rgba(255,255,255,0.07)", background: "#0D1220" }}>
+        <div className="flex border-b" style={{ borderColor: "#E2E8F0", background: "#FFFFFF" }}>
           {(["transaksi", "menu", "history"] as SubTab[]).map((tab) => {
             const labels: Record<SubTab, string> = { transaksi: "TRANSAKSI", menu: "MENU AGEN", history: "DATA HISTORY" };
             const isActive = subTab === tab;
@@ -434,7 +436,7 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
                   setSubTab(tab);
                 }}
                 className="flex-1 py-3 text-xs font-black tracking-wider relative transition-colors"
-                style={{ color: isActive ? "#fff" : "rgba(255,255,255,0.35)" }}>
+                style={{ color: isActive ? "#C81E3A" : "#94A3B8" }}>
                 {labels[tab]}
                 {isActive && (
                   <span className="absolute bottom-0 left-1/4 right-1/4 h-0.5 rounded-full" style={{ background: "linear-gradient(90deg,#C81E3A,#F87171)" }} />
@@ -464,7 +466,7 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
                   {a.icon}
                 </div>
                 <span className="text-[10px] font-semibold text-center leading-tight whitespace-pre-line"
-                  style={{ color: "rgba(255,255,255,0.65)", width: "60px" }}>
+                  style={{ color: "#64748B", width: "60px" }}>
                   {a.label}
                 </span>
               </button>
@@ -493,16 +495,16 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
           {/* Sale Banner */}
           <div className="px-3 pt-2">
             <div className="rounded-xl flex items-center gap-3 px-3 py-2.5"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              style={{ background: "#FFFFFF", border: "1px solid #F1F5F9", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
               <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-[10px] text-center leading-tight shrink-0"
                 style={{ background: "#F59E0B", color: "#000" }}>BIG SALE!</div>
               <div className="flex-1">
-                <p className="text-sm font-bold text-white/90">Big Sale Produk</p>
-                <p className="text-[11px] text-white/40">Hot Promo Paket Internet Terlaris</p>
+                <p className="text-sm font-bold" style={{ color: "#0F172A" }}>Big Sale Produk</p>
+                <p className="text-[11px]" style={{ color: "#94A3B8" }}>Hot Promo Paket Internet Terlaris</p>
               </div>
               <button onClick={() => handleSelectCategory("data")}
-                className="shrink-0 px-3 py-1.5 rounded-lg font-black text-xs text-white"
-                style={{ background: "#1A0608", border: "1px solid rgba(200,30,58,0.5)" }}>
+                className="shrink-0 px-3 py-1.5 rounded-lg font-black text-xs"
+                style={{ background: "linear-gradient(135deg,#C81E3A,#9B1835)", color: "#fff" }}>
                 AMBIL
               </button>
             </div>
@@ -510,7 +512,7 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
 
           {/* Main Product Grid */}
           <div className="mx-3 mt-4 rounded-2xl overflow-hidden"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            style={{ background: "#FFFFFF", border: "1px solid #F1F5F9", boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
             <div className="grid grid-cols-4 gap-y-4 px-3 pt-4 pb-4">
               {MAIN_GRID.map((item) => (
                 <GridIcon key={item.key} item={item} onPress={handleSelectCategory} />
@@ -541,7 +543,7 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
           {/* Aktivasi Voucher Kosong */}
           <SectionHeader title="Aktivasi Voucher Kosong" subtitle="Beli produk dan isi voucher kamu" />
           <div className="mx-3 rounded-2xl overflow-hidden"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            style={{ background: "#FFFFFF", border: "1px solid #F1F5F9", boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
             <div className="grid grid-cols-4 gap-y-4 px-3 pt-4 pb-4">
               {VOUCHER_GRID.map((item) => (
                 <GridIcon key={item.key} item={item} onPress={handleSelectCategory} />
@@ -569,7 +571,7 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
           {/* Tagihan Pascabayar */}
           <SectionHeader title="Tagihan Pascabayar" subtitle="Praktis Mengisi dan Membayar Tagihan" />
           <div className="mx-3 rounded-2xl overflow-hidden"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            style={{ background: "#FFFFFF", border: "1px solid #F1F5F9", boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
             <div className="grid grid-cols-4 gap-y-4 px-3 pt-4 pb-4">
               {TAGIHAN_GRID.map((item) => (
                 <GridIcon key={item.key} item={item} onPress={handleSelectCategory} />
@@ -580,7 +582,7 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
           {/* Trending */}
           <SectionHeader title="Produk Terlaris" subtitle="Paling banyak dibeli hari ini" />
           <div className="mx-3 mb-4 rounded-2xl overflow-hidden"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            style={{ background: "#FFFFFF", border: "1px solid #F1F5F9", boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
             <div className="grid grid-cols-3 gap-2 p-3">
               {trendingProducts.map((p) => {
                 const m = CATEGORY_META[p.category];
@@ -588,12 +590,12 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
                   <button key={p.id}
                     onClick={() => { setSelectedCategory(p.category); setSelectedProduct(null); setPhone(""); }}
                     className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl active:scale-95 transition-transform"
-                    style={{ background: `${m.color}10`, border: `1px solid ${m.color}20` }}>
+                    style={{ background: `${m.color}10`, border: `1px solid ${m.color}25` }}>
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl"
                       style={{ background: `${m.color}18` }}>
                       {p.icon}
                     </div>
-                    <p className="text-[9px] font-bold text-white/80 leading-tight line-clamp-2 text-center">{p.name}</p>
+                    <p className="text-[9px] font-bold leading-tight line-clamp-2 text-center" style={{ color: "#334155" }}>{p.name}</p>
                     <p className="text-[9px] font-black gradient-text-gold">{formatRupiah(p.price)}</p>
                   </button>
                 );
@@ -607,18 +609,18 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
       {/* ─── MENU AGEN sub-tab ─── */}
       {subTab === "menu" && (
         <div className="flex-1 overflow-y-auto pb-32 px-4 pt-4 space-y-3">
-          <div className="surface p-4 rounded-2xl">
-            <p className="text-[10px] text-white/35 tracking-widest uppercase font-bold mb-3">Saldo & Akun</p>
+          <div className="p-4 rounded-2xl" style={{ background: "#FFFFFF", border: "1px solid #F1F5F9", boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
+            <p className="text-[10px] tracking-widest uppercase font-bold mb-3" style={{ color: "#94A3B8" }}>Saldo & Akun</p>
             {[
               { icon: "💰", label: "Saldo Saat Ini", value: formatRupiah(memberBalance), color: "#F59E0B" },
               { icon: "🆔", label: "ID Agen",         value: shortId,                    color: "#3B82F6" },
               { icon: "👤", label: "Nama",             value: member.name,                color: "#10B981" },
               { icon: "📱", label: "Nomor HP",         value: `+${member.phone}`,         color: "#8B5CF6" },
             ].map((row) => (
-              <div key={row.label} className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
+              <div key={row.label} className="flex items-center justify-between py-2.5 last:border-0" style={{ borderBottom: "1px solid #F1F5F9" }}>
                 <div className="flex items-center gap-2.5">
                   <span className="text-base">{row.icon}</span>
-                  <span className="text-sm text-white/55">{row.label}</span>
+                  <span className="text-sm" style={{ color: "#64748B" }}>{row.label}</span>
                 </div>
                 <span className="text-sm font-bold" style={{ color: row.color }}>{row.value}</span>
               </div>
@@ -629,11 +631,13 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
             + Tambah Saldo
           </button>
           <button onClick={() => onNavigate("member")}
-            className="w-full py-3.5 rounded-2xl font-semibold text-sm border border-white/10 bg-white/4 text-white/70 hover:bg-white/8 transition-all">
+            className="w-full py-3.5 rounded-2xl font-semibold text-sm transition-all"
+            style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", color: "#334155" }}>
             Kelola Akun
           </button>
           <button onClick={() => setShowHelp(true)}
-            className="w-full py-3.5 rounded-2xl font-semibold text-sm border border-white/10 bg-white/4 text-white/70 hover:bg-white/8 transition-all">
+            className="w-full py-3.5 rounded-2xl font-semibold text-sm transition-all"
+            style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", color: "#334155" }}>
             🎧 Hubungi Customer Service
           </button>
         </div>
@@ -641,17 +645,17 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
 
       {/* ─── Fixed bottom info bar ─── */}
       <div className="fixed bottom-16 left-0 right-0 max-w-md mx-auto z-30"
-        style={{ background: "#111827", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+        style={{ background: "#FFFFFF", borderTop: "1px solid #E2E8F0", boxShadow: "0 -2px 12px rgba(0,0,0,0.06)" }}>
         {/* drag handle */}
         <div className="flex justify-center pt-1.5 pb-0.5">
-          <div className="w-10 h-1 rounded-full bg-white/15" />
+          <div className="w-10 h-1 rounded-full" style={{ background: "#E2E8F0" }} />
         </div>
         <div className="flex items-center justify-between px-4 py-2.5">
           <div className="space-y-0.5">
             <p className="text-xs font-black gradient-text-brand">{member.name.toUpperCase().slice(0, 10)}</p>
             <div className="flex items-center gap-3">
-              <span className="text-[10px] text-white/40">
-                Isi Saldo <span className="text-white/70 font-bold">{formatRupiah(memberBalance)}</span>
+              <span className="text-[10px]" style={{ color: "#94A3B8" }}>
+                Isi Saldo <span className="font-bold" style={{ color: "#334155" }}>{formatRupiah(memberBalance)}</span>
               </span>
             </div>
           </div>
@@ -668,10 +672,10 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
         <div className="fixed inset-0 z-40 flex flex-col justify-end max-w-md mx-auto left-0 right-0">
           <div className="absolute inset-0 bg-black/60" onClick={() => { setSelectedCategory(null); setSelectedProduct(null); setPhone(""); }} />
           <div className="relative rounded-t-3xl overflow-hidden flex flex-col"
-            style={{ background: "#111827", maxHeight: "90dvh", borderTop: "1px solid rgba(255,255,255,0.10)" }}>
+            style={{ background: "#FFFFFF", maxHeight: "90dvh", borderTop: "2px solid #F1F5F9", boxShadow: "0 -4px 32px rgba(0,0,0,0.10)" }}>
             {/* Sheet handle */}
             <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 rounded-full bg-white/20" />
+              <div className="w-10 h-1 rounded-full" style={{ background: "#E2E8F0" }} />
             </div>
             {/* Sheet header */}
             <div className="flex items-center justify-between px-4 py-2">
@@ -680,7 +684,8 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
                 <p className="font-black text-sm" style={{ color: meta.color }}>{meta.label}</p>
               </div>
               <button onClick={() => { setSelectedCategory(null); setSelectedProduct(null); setPhone(""); }}
-                className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center text-white/50 text-lg leading-none">×</button>
+                className="w-8 h-8 rounded-full flex items-center justify-center text-lg leading-none"
+                style={{ background: "#F1F5F9", color: "#64748B" }}>×</button>
             </div>
             {/* Scrollable content */}
             <div className="overflow-y-auto flex-1 px-4 pb-6 space-y-3">
@@ -717,12 +722,12 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
 
               {/* Order Summary */}
               {selectedProduct && phoneReady && (
-                <div className="surface p-4 border border-blue-500/15 rounded-2xl">
-                  <p className="text-[10px] text-white/35 tracking-widest uppercase font-bold mb-3">{t("order_summary", lang)}</p>
+                <div className="p-4 rounded-2xl" style={{ background: "#FFF7F8", border: "1px solid #FEE2E2" }}>
+                  <p className="text-[10px] tracking-widest uppercase font-bold mb-3" style={{ color: "#94A3B8" }}>{t("order_summary", lang)}</p>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-bold text-white/90">{selectedProduct.name}</p>
-                      <p className="text-xs text-white/45 mt-0.5">{countryCode !== "+62" ? `${countryCode} ${phone}` : phone}</p>
+                      <p className="text-sm font-bold" style={{ color: "#0F172A" }}>{selectedProduct.name}</p>
+                      <p className="text-xs mt-0.5" style={{ color: "#94A3B8" }}>{countryCode !== "+62" ? `${countryCode} ${phone}` : phone}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-black gradient-text-gold">{formatRupiah(selectedProduct.price)}</p>
@@ -775,19 +780,19 @@ function ProductCard({ product, selected, onSelect, color, lang, dimmed }: {
       className="relative rounded-2xl p-3.5 text-left transition-all duration-200 active:scale-[0.97]"
       style={{
         opacity: dimmed ? 0.55 : 1,
-        border: selected ? `2px solid ${color}` : "1px solid rgba(255,255,255,0.08)",
-        background: selected ? `${color}12` : "rgba(255,255,255,0.03)",
-        boxShadow: selected ? `0 0 0 1px ${color}40, 0 4px 16px ${color}25` : undefined,
+        border: selected ? `2px solid ${color}` : "1px solid #E2E8F0",
+        background: selected ? `${color}08` : "#FFFFFF",
+        boxShadow: selected ? `0 0 0 1px ${color}30, 0 4px 16px ${color}15` : "0 1px 4px rgba(0,0,0,0.05)",
       }}>
       {badgeStyle && product.badge && (
         <div className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full text-[8px] font-black z-10"
-          style={{ background: badgeStyle.bg, color: badgeStyle.text, boxShadow: "0 2px 8px rgba(0,0,0,0.4)" }}>
+          style={{ background: badgeStyle.bg, color: badgeStyle.text, boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
           {product.badge}
         </div>
       )}
       <div className="flex items-start justify-between mb-2.5">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-          style={{ background: `${color}15`, border: `1.5px solid ${color}22` }}>
+          style={{ background: `${color}12`, border: `1.5px solid ${color}22` }}>
           {product.icon}
         </div>
         {selected && (
@@ -798,10 +803,10 @@ function ProductCard({ product, selected, onSelect, color, lang, dimmed }: {
           </div>
         )}
       </div>
-      <p className="text-xs font-bold text-white/90 leading-snug mb-0.5 line-clamp-2">{product.name}</p>
-      <p className="text-[10px] text-white/40 leading-tight mb-2.5 line-clamp-1">{product.description}</p>
-      <div className="pt-2 border-t border-white/6">
-        <p className="text-[9px] text-white/30 mb-0.5">{lang === "en" ? "Price" : "Harga Jual"}</p>
+      <p className="text-xs font-bold leading-snug mb-0.5 line-clamp-2" style={{ color: "#0F172A" }}>{product.name}</p>
+      <p className="text-[10px] leading-tight mb-2.5 line-clamp-1" style={{ color: "#94A3B8" }}>{product.description}</p>
+      <div className="pt-2" style={{ borderTop: "1px solid #F1F5F9" }}>
+        <p className="text-[9px] mb-0.5" style={{ color: "#CBD5E1" }}>{lang === "en" ? "Price" : "Harga Jual"}</p>
         <p className="text-sm font-black gradient-text-gold">{formatRupiah(product.price)}</p>
       </div>
     </button>

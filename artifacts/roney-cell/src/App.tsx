@@ -21,6 +21,10 @@ function isSuperAdmin(m: Member): boolean {
   );
 }
 
+function isAdminUser(m: Member): boolean {
+  return m.type === "admin" || isSuperAdmin(m);
+}
+
 const SESSION_KEY = "roneycell_member_session_v2";
 
 function saveAppSession(member: Member) {
@@ -60,7 +64,7 @@ export default function App() {
     if (session) {
       setMember(session);
       setAppState("app");
-      if (isSuperAdmin(session)) setActiveTab("admin");
+      if (isAdminUser(session)) setActiveTab("admin");
 
       if (!getV2Token() && getV2RefreshToken()) {
         import("@/lib/apiV2").then(({ tryV2Refresh }) => {
@@ -81,7 +85,7 @@ export default function App() {
     saveAppSession(m);
     setMember(m);
     setAppState("app");
-    setActiveTab(isSuperAdmin(m) ? "admin" : "home");
+    setActiveTab(isAdminUser(m) ? "admin" : "home");
   }
 
   function handleLogout() {
