@@ -162,7 +162,7 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
   return (
     <div className="px-4 pt-5 pb-3">
       <h2 className="font-black text-base" style={{ color: "rgba(255,255,255,0.9)" }}>{title}</h2>
-      {subtitle && <p className="text-xs mt-0.5" style={{ color: "#1A56DB" }}>{subtitle}</p>}
+      {subtitle && <p className="text-xs mt-0.5" style={{ color: "#E11D48" }}>{subtitle}</p>}
     </div>
   );
 }
@@ -360,12 +360,12 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
                         className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-left"
                         style={{
                           background: active
-                            ? "linear-gradient(135deg,#1e3a8a,#1A56DB)"
+                            ? "linear-gradient(135deg,#7F1D1D,#C81E3A)"
                             : "rgba(255,255,255,0.05)",
                           border: active
-                            ? "1px solid #3b82f640"
+                            ? "1px solid #C81E3A50"
                             : "1px solid rgba(255,255,255,0.07)",
-                          boxShadow: active ? "0 2px 10px #1A56DB40" : "none",
+                          boxShadow: active ? "0 2px 10px rgba(200,30,58,0.40)" : "none",
                         }}
                       >
                         <span className="text-lg leading-none">{opt.flag}</span>
@@ -377,7 +377,7 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
                         </div>
                         {active && (
                           <span className="ml-auto text-[9px] font-black"
-                            style={{ color: "#60a5fa" }}>✓</span>
+                            style={{ color: "#FCA5A5" }}>✓</span>
                         )}
                       </button>
                     );
@@ -437,7 +437,7 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
                 style={{ color: isActive ? "#fff" : "rgba(255,255,255,0.35)" }}>
                 {labels[tab]}
                 {isActive && (
-                  <span className="absolute bottom-0 left-1/4 right-1/4 h-0.5 rounded-full" style={{ background: "#1A56DB" }} />
+                  <span className="absolute bottom-0 left-1/4 right-1/4 h-0.5 rounded-full" style={{ background: "linear-gradient(90deg,#C81E3A,#F87171)" }} />
                 )}
               </button>
             );
@@ -460,7 +460,7 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
               <button key={a.label} onClick={a.action}
                 className="flex flex-col items-center gap-1.5 py-3 active:scale-95 transition-transform">
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl"
-                  style={{ background: "rgba(26,86,219,0.15)", border: "1.5px solid rgba(26,86,219,0.3)" }}>
+                  style={{ background: "rgba(200,30,58,0.15)", border: "1.5px solid rgba(200,30,58,0.35)" }}>
                   {a.icon}
                 </div>
                 <span className="text-[10px] font-semibold text-center leading-tight whitespace-pre-line"
@@ -474,7 +474,7 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
           {/* Promo Banner */}
           <div className="px-3 pt-3 pb-1">
             <div className="rounded-2xl overflow-hidden relative flex items-center gap-3 px-4 py-3"
-              style={{ background: "linear-gradient(135deg,#1A56DB 0%,#1C3FAA 60%,#7C3AED 100%)", minHeight: "76px" }}>
+              style={{ background: "linear-gradient(135deg,#C81E3A 0%,#9B1835 60%,#7F1D1D 100%)", minHeight: "76px" }}>
               <div className="flex-1">
                 <p className="font-black text-sm text-white">Ajak Teman Bergabung</p>
                 <p className="text-[11px] text-white/70 mt-0.5">Makin untung, banyak teman banyak cuan</p>
@@ -482,7 +482,7 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
               <button
                 onClick={() => window.open(`https://wa.me/${ADMIN_WA}?text=${encodeURIComponent("Halo Admin RoneyCell, saya ingin mendaftarkan teman.")}`, "_blank")}
                 className="shrink-0 px-3 py-1.5 rounded-xl font-black text-xs"
-                style={{ background: "#fff", color: "#1A56DB" }}>
+                style={{ background: "#fff", color: "#C81E3A" }}>
                 Klik Disini
               </button>
               <span className="absolute top-2 right-20 text-xl">⭐</span>
@@ -502,7 +502,7 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
               </div>
               <button onClick={() => handleSelectCategory("data")}
                 className="shrink-0 px-3 py-1.5 rounded-lg font-black text-xs text-white"
-                style={{ background: "#0D1220", border: "1px solid rgba(26,86,219,0.4)" }}>
+                style={{ background: "#1A0608", border: "1px solid rgba(200,30,58,0.5)" }}>
                 AMBIL
               </button>
             </div>
@@ -522,7 +522,7 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
           <div className="grid grid-cols-2 gap-2 px-3 mt-3">
             <button onClick={() => onNavigate("deposit")}
               className="rounded-2xl p-3 text-left relative overflow-hidden"
-              style={{ background: "linear-gradient(135deg,#1A56DB 0%,#1C3FAA 100%)" }}>
+              style={{ background: "linear-gradient(135deg,#C81E3A 0%,#7F1D1D 100%)" }}>
               <p className="font-black text-xs text-white">Topup Uang Digital</p>
               <p className="text-[10px] text-white/60 mt-0.5 leading-snug">Isi Dana, Ovo, Gopay, Shopeepay dll</p>
               <span className="block mt-2 text-[10px] font-bold text-white underline">Klik Disini</span>
@@ -657,7 +657,7 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
           </div>
           <button onClick={() => onNavigate("deposit")}
             className="px-5 py-2 rounded-xl font-black text-xs text-white"
-            style={{ background: "#0D1220", border: "1px solid rgba(26,86,219,0.5)", color: "rgba(255,255,255,0.9)" }}>
+            style={{ background: "linear-gradient(135deg,#C81E3A,#9B1835)", boxShadow: "0 3px 12px rgba(200,30,58,0.40)" }}>
             TAMBAH SALDO
           </button>
         </div>

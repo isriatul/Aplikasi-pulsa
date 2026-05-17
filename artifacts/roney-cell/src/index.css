@@ -36,11 +36,11 @@
   --foreground: 210 40% 96%;
   --border: 224 25% 14%;
   --input: 224 25% 14%;
-  --ring: 217 91% 60%;
+  --ring: 348 80% 44%;
   --card: 224 28% 9%;
   --card-foreground: 210 40% 96%;
-  --primary: 217 91% 60%;
-  --primary-foreground: 224 30% 6%;
+  --primary: 348 80% 44%;
+  --primary-foreground: 0 0% 100%;
   --secondary: 224 25% 14%;
   --secondary-foreground: 210 35% 85%;
   --muted: 224 22% 12%;
@@ -54,10 +54,14 @@
   --app-font-sans: 'Inter', sans-serif;
   --radius: 0.875rem;
 
-  /* Brand gradient — biru tua elegan */
-  --brand-from: #1A56DB;
-  --brand-to:   #1C3FAA;
-  --brand-mid:  #1E429F;
+  /* Brand gradient — Ruby Crimson */
+  --brand-from: #C81E3A;
+  --brand-to:   #9B1835;
+  --brand-mid:  #B0193A;
+  /* Ruby accent helpers */
+  --ruby:       #C81E3A;
+  --ruby-dark:  #9B1835;
+  --ruby-glow:  rgba(200,30,58,0.40);
 }
 
 @layer base {
@@ -97,8 +101,8 @@
 
 /* ─── Brand Button ─── */
 .btn-brand {
-  background: linear-gradient(135deg, #1A56DB 0%, #1C3FAA 100%);
-  box-shadow: 0 4px 18px rgba(26,86,219,0.45), inset 0 1px 0 rgba(255,255,255,0.12);
+  background: linear-gradient(135deg, #C81E3A 0%, #9B1835 100%);
+  box-shadow: 0 4px 18px rgba(200,30,58,0.45), inset 0 1px 0 rgba(255,255,255,0.12);
 }
 .btn-brand:active { transform: scale(0.98); opacity: 0.92; }
 
@@ -115,6 +119,7 @@
 }
 
 /* ─── Glow ─── */
+.glow-ruby  { box-shadow: 0 0 24px rgba(200,30,58,0.40); }
 .glow-blue  { box-shadow: 0 0 24px rgba(26,86,219,0.35); }
 .glow-green { box-shadow: 0 0 24px rgba(16,185,129,0.3); }
 .glow-gold  { box-shadow: 0 0 24px rgba(245,158,11,0.3); }
@@ -124,7 +129,7 @@
 .text-gold { color: hsl(38 92% 60%); }
 .text-neon  { color: hsl(171 77% 48%); }
 .gradient-text-brand {
-  background: linear-gradient(135deg, #60A5FA 0%, #818CF8 100%);
+  background: linear-gradient(135deg, #F87171 0%, #C81E3A 60%, #9B1835 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -193,8 +198,8 @@ input[type="number"] { -moz-appearance: textfield; }
 
 /* ─── Product badge ─── */
 .product-selected {
-  border-color: #1A56DB !important;
-  box-shadow: 0 0 0 2px rgba(26,86,219,0.35), 0 4px 16px rgba(26,86,219,0.2);
+  border-color: #C81E3A !important;
+  box-shadow: 0 0 0 2px rgba(200,30,58,0.35), 0 4px 16px rgba(200,30,58,0.2);
 }
 .operator-badge {
   font-size: 0.6rem;
@@ -212,12 +217,12 @@ input[type="number"] { -moz-appearance: textfield; }
   width: 20px;
   height: 3px;
   border-radius: 99px;
-  background: linear-gradient(90deg, #1A56DB, #818CF8);
+  background: linear-gradient(90deg, #C81E3A, #F87171);
 }
 
 /* ─── Hero balance card ─── */
 .balance-hero {
-  background: linear-gradient(145deg, #1A3A6B 0%, #111D3F 60%, #0B1229 100%);
+  background: linear-gradient(145deg, #3A0A14 0%, #1F060D 60%, #0B0508 100%);
   position: relative;
   overflow: hidden;
 }
@@ -229,7 +234,7 @@ input[type="number"] { -moz-appearance: textfield; }
   width: 280px;
   height: 280px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(26,86,219,0.25) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(200,30,58,0.25) 0%, transparent 70%);
   pointer-events: none;
 }
 .balance-hero::after {
@@ -240,7 +245,7 @@ input[type="number"] { -moz-appearance: textfield; }
   width: 200px;
   height: 200px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(155,24,53,0.18) 0%, transparent 70%);
   pointer-events: none;
 }
 
