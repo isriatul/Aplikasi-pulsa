@@ -132,10 +132,20 @@ export async function v2BuyProduct(data: {
 
 /* ─── Deposits ─── */
 export async function v2CreateDeposit(data: { amount: number; method: string; note?: string }) {
-  return apiFetch<{ deposit: V2Deposit; instructions: unknown }>("/deposits", { method: "POST", body: JSON.stringify(data) });
+  return apiFetch<{ deposit: V2Deposit; instructions: DepositInstructions }>("/deposits", { method: "POST", body: JSON.stringify(data) });
 }
 export async function v2GetDeposits(page = 1) {
   return apiFetch<{ page: number; limit: number; data: V2Deposit[] }>(`/deposits?page=${page}`);
+}
+export async function v2UploadDepositProof(
+  depositId: number,
+  imageBase64: string,
+  mimeType: "image/jpeg" | "image/png" | "image/webp",
+) {
+  return apiFetch<{ message: string; imageUrl: string }>(
+    `/deposits/${depositId}/upload-proof`,
+    { method: "POST", body: JSON.stringify({ imageBase64, mimeType }) },
+  );
 }
 
 /* ─── Admin ─── */
@@ -235,13 +245,29 @@ export interface V2Deposit {
   id: number;
   userId: number;
   amount: number;
+  uniqueCode: number;
+  totalAmount: number;
   method: string;
   status: "pending" | "paid" | "confirmed" | "failed" | "expired";
   paymentRef?: string;
+  proofImageUrl?: string;
+  proofUploadedAt?: string;
   note?: string;
   expiredAt?: string;
+  paidAt?: string;
   confirmedAt?: string;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface DepositInstructions {
+  method: string;
+  nominalAsli: number;
+  kodeUnik: number;
+  totalBayar: number;
+  ref: string;
+  penting: string;
+  langkah: string[];
 }
 
 export interface BalanceMutation {

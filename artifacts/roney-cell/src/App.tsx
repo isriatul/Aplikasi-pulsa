@@ -116,7 +116,7 @@ export default function App() {
         <Home member={member!} onMemberUpdate={handleMemberUpdate} />
       </div>
       <div style={{ display: activeTab === "deposit" ? "block" : "none" }}>
-        <DepositPage member={member} />
+        <DepositPage />
       </div>
       <div style={{ display: activeTab === "member" ? "block" : "none" }}>
         <MemberPortal member={member} onLogin={handleLogin} onLogout={handleLogout} />

@@ -128,7 +128,7 @@ export function notifyTxFailed(opts: {
   );
 }
 
-/** Notifikasi deposit baru */
+/** Notifikasi deposit baru (tanpa bukti) */
 export function notifyDeposit(opts: {
   userName: string;
   amount: number;
@@ -142,5 +142,32 @@ export function notifyDeposit(opts: {
       level: "info",
     },
     ["telegram"],
+  );
+}
+
+/** Notifikasi deposit dengan bukti pembayaran sudah diupload */
+export function notifyDepositWithProof(opts: {
+  userName: string;
+  amount: number;
+  uniqueCode: number;
+  totalAmount: number;
+  method: string;
+  paymentRef: string;
+  userId: number;
+}): void {
+  void notify(
+    {
+      title: "Bukti Deposit Masuk 📸 — Perlu Konfirmasi",
+      message: [
+        `User: ${opts.userName} (#${opts.userId})`,
+        `Nominal: Rp${opts.amount.toLocaleString()} + kode unik ${opts.uniqueCode}`,
+        `Total Bayar: Rp${opts.totalAmount.toLocaleString()}`,
+        `Metode: ${opts.method.toUpperCase()}`,
+        `Ref: ${opts.paymentRef}`,
+        `\n➡️ Cek panel admin untuk konfirmasi`,
+      ].join("\n"),
+      level: "warning",
+    },
+    ["telegram", "discord"],
   );
 }

@@ -384,9 +384,11 @@ function DepositsPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
-  const [filterStatus, setFilterStatus] = useState("pending");
+  const [filterStatus, setFilterStatus] = useState("paid");
   const [actionMsg, setActionMsg] = useState<Record<number, string>>({});
   const [rejectReason, setRejectReason] = useState<Record<number, string>>({});
+  const [expandedProof, setExpandedProof] = useState<number | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState<Record<number, boolean>>({});
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -400,66 +402,158 @@ function DepositsPanel() {
   useEffect(() => { void load(); }, [load]);
 
   async function doConfirm(id: number) {
+    setConfirmLoading((p) => ({ ...p, [id]: true }));
     try {
       await v2AdminConfirmDeposit(id);
-      setActionMsg((p) => ({ ...p, [id]: "✓ Dikonfirmasi" }));
+      setActionMsg((p) => ({ ...p, [id]: "✓ Saldo berhasil ditambahkan" }));
       void load();
-    } catch (e) { setActionMsg((p) => ({ ...p, [id]: (e as Error).message })); }
+    } catch (e) {
+      setActionMsg((p) => ({ ...p, [id]: (e as Error).message }));
+    } finally {
+      setConfirmLoading((p) => ({ ...p, [id]: false }));
+    }
   }
 
   async function doReject(id: number) {
     const reason = rejectReason[id] ?? "";
     if (!reason.trim()) { setActionMsg((p) => ({ ...p, [id]: "Isi alasan penolakan" })); return; }
+    setConfirmLoading((p) => ({ ...p, [id]: true }));
     try {
       await v2AdminRejectDeposit(id, reason);
-      setActionMsg((p) => ({ ...p, [id]: "✓ Ditolak" }));
+      setActionMsg((p) => ({ ...p, [id]: "✓ Deposit ditolak" }));
       void load();
-    } catch (e) { setActionMsg((p) => ({ ...p, [id]: (e as Error).message })); }
+    } catch (e) {
+      setActionMsg((p) => ({ ...p, [id]: (e as Error).message }));
+    } finally {
+      setConfirmLoading((p) => ({ ...p, [id]: false }));
+    }
   }
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
           className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white focus:outline-none">
           <option value="">Semua</option>
-          <option value="pending">Pending</option>
+          <option value="pending">Pending (belum bayar)</option>
+          <option value="paid">Bukti Terkirim ★</option>
           <option value="confirmed">Dikonfirmasi</option>
           <option value="failed">Ditolak</option>
+          <option value="expired">Kedaluwarsa</option>
         </select>
         <button onClick={load} className="px-3 py-2 rounded-lg text-sm bg-white/10 text-white hover:bg-white/20">↻ Refresh</button>
       </div>
 
       {loading ? <LoadingSpinner /> : error ? <ErrorBox msg={error} /> : (
-        <div className="space-y-2">
-          {deps.map((d) => (
-            <div key={d.id} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="text-xs text-muted-foreground font-mono">{d.paymentRef ?? `DEP-${d.id}`}</div>
-                  <div className="font-bold text-emerald-400">{formatRp(d.amount)}</div>
-                  <div className="text-xs text-muted-foreground">{d.method} · User #{d.userId}</div>
-                </div>
-                <span className={statusBadge(d.status)}>{d.status}</span>
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">{new Date(d.createdAt).toLocaleString("id-ID")}</div>
-              {actionMsg[d.id] && <p className="text-xs text-emerald-400 mt-1">{actionMsg[d.id]}</p>}
-
-              {d.status === "pending" && (
-                <div className="mt-2 space-y-2">
-                  <button onClick={() => doConfirm(d.id)}
-                    className="w-full py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white">Konfirmasi Deposit</button>
-                  <div className="flex gap-2">
-                    <input value={rejectReason[d.id] ?? ""} onChange={(e) => setRejectReason((p) => ({ ...p, [d.id]: e.target.value }))}
-                      placeholder="Alasan tolak…"
-                      className="flex-1 px-2 py-1.5 rounded-lg text-xs bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none" />
-                    <button onClick={() => doReject(d.id)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 text-red-400 hover:bg-red-500/30">Tolak</button>
+        <div className="space-y-3">
+          {deps.map((d) => {
+            const totalAmount = d.totalAmount ?? d.amount;
+            const uniqueCode = d.uniqueCode ?? 0;
+            const isActionable = d.status === "paid" || d.status === "pending";
+            return (
+              <div key={d.id} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${d.status === "paid" ? "rgba(59,130,246,0.35)" : "rgba(255,255,255,0.08)"}`, background: d.status === "paid" ? "rgba(59,130,246,0.04)" : "rgba(255,255,255,0.04)" }}>
+                {/* Header baris */}
+                <div className="p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-xs text-muted-foreground font-mono truncate">{d.paymentRef ?? `DEP-${d.id}`}</div>
+                      <div className="flex items-baseline gap-1.5 mt-0.5">
+                        <span className="font-black text-emerald-400 text-base">{formatRp(totalAmount)}</span>
+                        {uniqueCode > 0 && (
+                          <span className="text-[10px] text-amber-400/80 font-mono">(+{uniqueCode} kode unik)</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{d.method.toUpperCase()} · User #{d.userId}</div>
+                    </div>
+                    <span className={statusBadge(d.status)}>
+                      {d.status === "paid" ? "📸 Bukti Ada" : d.status === "confirmed" ? "✓ Confirmed" : d.status}
+                    </span>
                   </div>
+                  <div className="text-xs text-muted-foreground mt-1.5">{new Date(d.createdAt).toLocaleString("id-ID")}</div>
+                  {d.proofUploadedAt && (
+                    <div className="text-xs text-blue-400/80 mt-0.5">Upload: {new Date(d.proofUploadedAt).toLocaleString("id-ID")}</div>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+
+                {/* Bukti pembayaran */}
+                {d.proofImageUrl && (
+                  <div className="px-3 pb-2">
+                    <button
+                      onClick={() => setExpandedProof(expandedProof === d.id ? null : d.id)}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold w-full"
+                      style={{ background: "rgba(59,130,246,0.1)", color: "#93C5FD", border: "1px solid rgba(59,130,246,0.2)" }}
+                    >
+                      <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      {expandedProof === d.id ? "Sembunyikan Bukti" : "Lihat Bukti Pembayaran"}
+                      <svg className="w-3.5 h-3.5 ml-auto transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        style={{ transform: expandedProof === d.id ? "rotate(180deg)" : "rotate(0)" }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {expandedProof === d.id && (
+                      <div className="mt-2">
+                        <img
+                          src={d.proofImageUrl}
+                          alt="Bukti pembayaran"
+                          className="w-full rounded-xl object-contain max-h-80"
+                          style={{ border: "1px solid rgba(59,130,246,0.2)" }}
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        />
+                        <a
+                          href={d.proofImageUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                          style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)" }}
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                          Buka di tab baru
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Aksi admin */}
+                {isActionable && (
+                  <div className="px-3 pb-3 space-y-2">
+                    {actionMsg[d.id] && (
+                      <p className={`text-xs font-semibold px-2 py-1.5 rounded-lg ${actionMsg[d.id]?.startsWith("✓") ? "text-emerald-400 bg-emerald-500/10" : "text-red-400 bg-red-500/10"}`}>
+                        {actionMsg[d.id]}
+                      </p>
+                    )}
+                    <button
+                      onClick={() => void doConfirm(d.id)}
+                      disabled={confirmLoading[d.id]}
+                      className="w-full py-2 rounded-lg text-xs font-black text-white disabled:opacity-50 transition-opacity"
+                      style={{ background: "linear-gradient(135deg, #10B981, #059669)", boxShadow: "0 2px 12px rgba(16,185,129,0.3)" }}
+                    >
+                      {confirmLoading[d.id] ? "Memproses..." : "✓ Konfirmasi & Kredit Saldo"}
+                    </button>
+                    <div className="flex gap-2">
+                      <input
+                        value={rejectReason[d.id] ?? ""}
+                        onChange={(e) => setRejectReason((p) => ({ ...p, [d.id]: e.target.value }))}
+                        placeholder="Alasan tolak…"
+                        className="flex-1 px-2 py-1.5 rounded-lg text-xs bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none"
+                      />
+                      <button
+                        onClick={() => void doReject(d.id)}
+                        disabled={confirmLoading[d.id]}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 text-red-400 hover:bg-red-500/30 disabled:opacity-50"
+                      >
+                        Tolak
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
           {deps.length === 0 && <p className="text-center text-sm text-muted-foreground py-6">Tidak ada deposit</p>}
         </div>
       )}

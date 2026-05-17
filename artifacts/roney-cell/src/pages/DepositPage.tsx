@@ -1,11 +1,24 @@
-import { useState, useRef } from "react";
-import { loadConfig, saveConfig, buildDepositMessage, buildWhatsAppUrl } from "@/lib/config";
+/**
+ * Halaman Deposit — sistem kode unik QRIS statis
+ * - User pilih nominal + metode
+ * - Sistem buat deposit dengan kode unik 3 digit
+ * - Tampilkan instruksi bayar + QR code
+ * - User upload foto bukti → notif admin
+ */
+import { useState, useRef, useCallback } from "react";
+import { loadConfig } from "@/lib/config";
 import { formatRupiah } from "@/lib/products";
-import { Member } from "@/lib/members";
+import {
+  v2CreateDeposit,
+  v2GetDeposits,
+  v2UploadDepositProof,
+  type V2Deposit,
+} from "@/lib/apiV2";
 
-const PRESET_AMOUNTS = [50000, 100000, 200000, 500000, 1000000];
+const PRESET_AMOUNTS = [50_000, 100_000, 200_000, 500_000, 1_000_000];
 const DEFAULT_QRIS_URL = "/qris.jpeg";
 
+/* ─── Helpers UI ─── */
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   async function handleCopy() {
@@ -19,144 +32,432 @@ function CopyButton({ text }: { text: string }) {
       className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex-shrink-0"
       style={copied
         ? { background: "rgba(16,185,129,0.15)", color: "#34D399" }
-        : { background: "rgba(59,130,246,0.1)", color: "#60A5FA" }
-      }
+        : { background: "rgba(59,130,246,0.1)", color: "#60A5FA" }}
     >
-      {copied ? (
-        <><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>Disalin</>
-      ) : (
-        <><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Salin</>
-      )}
+      {copied
+        ? <><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>Disalin</>
+        : <><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Salin</>}
     </button>
   );
 }
 
-function WAButton({ onClick }: { onClick: () => void }) {
+function StatusBadge({ status }: { status: V2Deposit["status"] }) {
+  const map: Record<string, { bg: string; color: string; label: string }> = {
+    pending: { bg: "rgba(245,158,11,0.15)", color: "#FCD34D", label: "Menunggu Bayar" },
+    paid: { bg: "rgba(59,130,246,0.15)", color: "#93C5FD", label: "Bukti Terkirim" },
+    confirmed: { bg: "rgba(16,185,129,0.15)", color: "#6EE7B7", label: "Dikonfirmasi ✓" },
+    failed: { bg: "rgba(239,68,68,0.15)", color: "#FCA5A5", label: "Ditolak" },
+    expired: { bg: "rgba(107,114,128,0.15)", color: "#9CA3AF", label: "Kedaluwarsa" },
+  };
+  const s = map[status] ?? map["pending"]!;
   return (
-    <button
-      onClick={onClick}
-      className="w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all mt-4"
-      style={{ background: "linear-gradient(135deg, #25D366 0%, #128C7E 100%)", color: "white", boxShadow: "0 4px 15px rgba(37,211,102,0.25)" }}
-    >
-      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-      </svg>
-      Konfirmasi via WhatsApp
-    </button>
+    <span className="px-2.5 py-1 rounded-full text-xs font-bold" style={{ background: s.bg, color: s.color }}>
+      {s.label}
+    </span>
   );
 }
 
-interface AccordionItemProps {
-  id: string;
-  open: boolean;
-  onToggle: (id: string) => void;
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  accentColor: string;
-  badge?: string;
-  children: React.ReactNode;
-}
+/* ─── Komponen: Form Upload Bukti ─── */
+function UploadProofForm({ deposit, onSuccess }: { deposit: V2Deposit; onSuccess: () => void }) {
+  const [preview, setPreview] = useState<string | null>(null);
+  const [mimeType, setMimeType] = useState<"image/jpeg" | "image/png" | "image/webp">("image/jpeg");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-function AccordionItem({ id, open, onToggle, icon, title, subtitle, accentColor, badge, children }: AccordionItemProps) {
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Format tidak didukung. Gunakan JPG, PNG, atau WebP.");
+      return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      setError("Ukuran file terlalu besar (max 3MB).");
+      return;
+    }
+    setError("");
+    setMimeType(file.type as "image/jpeg" | "image/png" | "image/webp");
+    const reader = new FileReader();
+    reader.onload = (ev) => setPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  async function handleUpload() {
+    if (!preview) return;
+    setLoading(true);
+    setError("");
+    try {
+      await v2UploadDepositProof(deposit.id, preview, mimeType);
+      setDone(true);
+      setTimeout(onSuccess, 1500);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="rounded-xl p-4 text-center" style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)" }}>
+        <div className="text-2xl mb-2">✅</div>
+        <p className="text-sm font-bold text-emerald-400">Bukti berhasil dikirim!</p>
+        <p className="text-xs text-muted-foreground mt-1">Menunggu konfirmasi admin...</p>
+      </div>
+    );
+  }
+
   return (
-    <div
-      className="rounded-2xl overflow-hidden border transition-all duration-200 mb-3"
-      style={open
-        ? { borderColor: `${accentColor}50`, boxShadow: `0 0 20px ${accentColor}15` }
-        : { borderColor: "rgba(255,255,255,0.08)" }
-      }
-    >
-      {/* Header row — always visible */}
-      <button
-        onClick={() => onToggle(id)}
-        className="w-full flex items-center gap-4 px-5 py-4 text-left transition-all"
-        style={{ background: open ? `${accentColor}0d` : "rgba(255,255,255,0.02)" }}
+    <div className="space-y-3">
+      <p className="text-xs font-semibold text-white/70 uppercase tracking-wider">Upload Bukti Pembayaran</p>
+
+      {/* Drop zone */}
+      <div
+        onClick={() => inputRef.current?.click()}
+        className="rounded-xl border-2 border-dashed cursor-pointer transition-all flex flex-col items-center justify-center py-6 gap-2"
+        style={{ borderColor: preview ? "rgba(16,185,129,0.4)" : "rgba(255,255,255,0.15)", background: preview ? "rgba(16,185,129,0.05)" : "rgba(255,255,255,0.02)" }}
       >
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all"
-          style={{ background: `${accentColor}20`, border: `1px solid ${accentColor}35` }}
-        >
-          {icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="font-bold text-sm text-foreground">{title}</p>
-            {badge && (
-              <span
-                className="px-2 py-0.5 rounded-full text-[10px] font-black"
-                style={{ background: `${accentColor}25`, color: accentColor }}
-              >
-                {badge}
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
-        </div>
-        <svg
-          className="w-4 h-4 flex-shrink-0 transition-transform duration-200"
-          fill="none" viewBox="0 0 24 24" stroke="currentColor"
-          style={{ color: open ? accentColor : "rgba(255,255,255,0.3)", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+        {preview ? (
+          <img src={preview} alt="Preview" className="max-h-48 rounded-lg object-contain" />
+        ) : (
+          <>
+            <svg className="w-8 h-8 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <p className="text-xs text-muted-foreground">Ketuk untuk pilih foto struk</p>
+            <p className="text-[10px] text-muted-foreground/60">JPG / PNG / WebP · max 3MB</p>
+          </>
+        )}
+      </div>
+      <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFile} />
 
-      {/* Expandable content */}
-      {open && (
-        <div className="px-5 pb-5 pt-1 border-t" style={{ borderColor: `${accentColor}20` }}>
-          {children}
+      {error && <p className="text-xs text-red-400">{error}</p>}
+
+      {preview && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setPreview(null); if (inputRef.current) inputRef.current.value = ""; }}
+            className="flex-1 py-2.5 rounded-xl text-xs font-semibold border border-white/10 text-white/60 hover:bg-white/5"
+          >
+            Ganti Foto
+          </button>
+          <button
+            onClick={() => void handleUpload()}
+            disabled={loading}
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white disabled:opacity-50 transition-opacity"
+            style={{ background: "linear-gradient(135deg, #10B981, #059669)" }}
+          >
+            {loading ? "Mengirim..." : "Kirim Bukti"}
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-interface DepositPageProps {
-  member?: Member | null;
+/* ─── Komponen: Card Deposit Aktif ─── */
+function ActiveDepositCard({ deposit, qrisImageSrc, onProofUploaded }: {
+  deposit: V2Deposit;
+  qrisImageSrc: string;
+  onProofUploaded: () => void;
+}) {
+  const expiredAt = deposit.expiredAt ? new Date(deposit.expiredAt) : null;
+  const isExpired = expiredAt ? expiredAt < new Date() : false;
+  const totalAmount = deposit.totalAmount ?? deposit.amount;
+  const uniqueCode = deposit.uniqueCode ?? 0;
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(168,85,247,0.3)", background: "rgba(168,85,247,0.05)" }}>
+      {/* Header */}
+      <div className="px-5 py-4 flex items-center justify-between" style={{ background: "rgba(168,85,247,0.1)" }}>
+        <div>
+          <p className="text-xs text-purple-300 font-semibold tracking-wider uppercase">Deposit Aktif</p>
+          <p className="font-mono text-xs text-white/50 mt-0.5">{deposit.paymentRef}</p>
+        </div>
+        <StatusBadge status={isExpired ? "expired" : deposit.status} />
+      </div>
+
+      <div className="px-5 pb-5 pt-4 space-y-4">
+        {/* Nominal */}
+        <div className="rounded-xl p-4 space-y-2" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Nominal deposit</span>
+            <span className="text-sm font-semibold text-white">{formatRupiah(deposit.amount)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Kode unik</span>
+            <span className="text-sm font-semibold text-amber-400">+{uniqueCode}</span>
+          </div>
+          <div className="h-px bg-white/10" />
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-white">TOTAL BAYAR</span>
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-black text-emerald-400">{formatRupiah(totalAmount)}</span>
+              <CopyButton text={String(totalAmount)} />
+            </div>
+          </div>
+          <p className="text-[10px] text-amber-300/80 mt-1">
+            ⚠️ Bayar TEPAT {formatRupiah(totalAmount)} agar teridentifikasi otomatis
+          </p>
+        </div>
+
+        {/* QR Code + instruksi */}
+        {deposit.status === "pending" && !isExpired && (
+          <>
+            <div className="text-center">
+              <img
+                src={qrisImageSrc}
+                alt="QRIS RoneyCell"
+                className="w-full max-w-[240px] mx-auto rounded-2xl block"
+                style={{ border: "1px solid rgba(168,85,247,0.25)", boxShadow: "0 8px 32px rgba(168,85,247,0.15)" }}
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                Scan QRIS · Masukkan nominal <span className="font-bold text-emerald-400">{formatRupiah(totalAmount)}</span>
+              </p>
+            </div>
+
+            {/* Timer kedaluwarsa */}
+            {expiredAt && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)" }}>
+                <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-xs text-amber-300">Berlaku sampai {expiredAt.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</p>
+              </div>
+            )}
+
+            {/* Upload bukti */}
+            <UploadProofForm deposit={deposit} onSuccess={onProofUploaded} />
+          </>
+        )}
+
+        {/* Sudah upload bukti */}
+        {deposit.status === "paid" && (
+          <div className="rounded-xl p-4 text-center" style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.2)" }}>
+            <p className="text-sm font-bold text-blue-300">📸 Bukti sudah dikirim</p>
+            <p className="text-xs text-muted-foreground mt-1">Admin sedang memverifikasi. Biasanya dalam beberapa menit.</p>
+          </div>
+        )}
+
+        {/* Sudah dikonfirmasi */}
+        {deposit.status === "confirmed" && (
+          <div className="rounded-xl p-4 text-center" style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)" }}>
+            <p className="text-sm font-bold text-emerald-400">✅ Saldo berhasil ditambahkan</p>
+            <p className="text-xs text-muted-foreground mt-1">Dikonfirmasi {deposit.confirmedAt ? new Date(deposit.confirmedAt).toLocaleString("id-ID") : ""}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
-export default function DepositPage({ member }: DepositPageProps) {
-  const [cfg, setCfg] = useState(() => loadConfig());
+/* ─── Komponen: Form Buat Deposit Baru ─── */
+function NewDepositForm({ onCreated }: { onCreated: (d: V2Deposit) => void }) {
   const [amount, setAmount] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const qrisInputRef = useRef<HTMLInputElement>(null);
-
-  const qrisImageSrc = cfg.qrisImage || DEFAULT_QRIS_URL;
-
-  function toggleAccordion(id: string) {
-    setOpenId((prev) => (prev === id ? null : id));
-  }
+  const [method, setMethod] = useState<"qris" | "transfer" | "manual">("qris");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   function selectPreset(val: number) {
     setSelectedPreset(val);
     setAmount(String(val));
   }
 
-  function handleAmountChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setAmount(e.target.value.replace(/\D/g, ""));
-    setSelectedPreset(null);
-  }
-
-  function sendWhatsApp(method: string, accountInfo: string) {
-    if (!cfg.whatsappNumber) { alert("Nomor WhatsApp owner belum dikonfigurasi."); return; }
+  async function handleSubmit() {
     const num = Number(amount);
-    if (!num || num < 10000) { alert("Masukkan jumlah deposit yang sah (minimum Rp 10.000)"); return; }
-    const msg = buildDepositMessage(num, method, accountInfo, member?.name);
-    window.open(buildWhatsAppUrl(msg, cfg.whatsappNumber), "_blank");
+    if (!num || num < 10_000) { setError("Minimal deposit Rp 10.000"); return; }
+    if (num > 50_000_000) { setError("Maksimal deposit Rp 50.000.000"); return; }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await v2CreateDeposit({ amount: num, method });
+      onCreated(res.deposit);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  async function handleQrisUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const b64 = ev.target?.result as string;
-      saveConfig({ qrisImage: b64 });
-      setCfg(loadConfig());
-    };
-    reader.readAsDataURL(file);
+  return (
+    <div className="space-y-5">
+      {/* Nominal */}
+      <div className="glass-card rounded-2xl p-5">
+        <label className="text-xs text-muted-foreground tracking-widest uppercase font-semibold block mb-3">
+          Jumlah Deposit
+        </label>
+        <div className="relative mb-3">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold text-sm">Rp</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            value={amount}
+            onChange={(e) => { setAmount(e.target.value.replace(/\D/g, "")); setSelectedPreset(null); }}
+            placeholder="0"
+            className="w-full pl-10 pr-4 py-3.5 rounded-xl text-sm font-bold bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-yellow-500/60 focus:ring-1 focus:ring-yellow-500/40 transition-all"
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {PRESET_AMOUNTS.map((p) => (
+            <button
+              key={p}
+              onClick={() => selectPreset(p)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border"
+              style={selectedPreset === p
+                ? { borderColor: "#FBBF24", background: "rgba(251,191,36,0.1)", color: "#FBBF24" }
+                : { borderColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }}
+            >
+              {formatRupiah(p)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Metode */}
+      <div className="glass-card rounded-2xl p-5">
+        <label className="text-xs text-muted-foreground tracking-widest uppercase font-semibold block mb-3">
+          Metode Pembayaran
+        </label>
+        <div className="space-y-2">
+          {([
+            { value: "qris", label: "QRIS DANA Bisnis", sub: "GoPay · OVO · DANA · ShopeePay", color: "#A855F7" },
+            { value: "transfer", label: "Transfer Bank", sub: "BCA · BRI · Mandiri · dll", color: "#3B82F6" },
+            { value: "manual", label: "Manual (konfirmasi WA)", sub: "Hubungi admin langsung", color: "#10B981" },
+          ] as const).map((m) => (
+            <button
+              key={m.value}
+              onClick={() => setMethod(m.value)}
+              className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-left transition-all"
+              style={method === m.value
+                ? { background: `${m.color}15`, border: `1px solid ${m.color}40` }
+                : { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}
+            >
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${m.color}20` }}>
+                <div className="w-2 h-2 rounded-full" style={{ background: method === m.value ? m.color : "rgba(255,255,255,0.2)" }} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">{m.label}</p>
+                <p className="text-xs text-muted-foreground">{m.sub}</p>
+              </div>
+              {method === m.value && (
+                <svg className="w-4 h-4 ml-auto shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: m.color }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Info kode unik */}
+      <div className="flex items-start gap-3 px-4 py-3 rounded-xl" style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.2)" }}>
+        <svg className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Nominal bayar akan ditambah <span className="text-blue-300 font-semibold">kode unik 3 digit</span> untuk identifikasi otomatis. Misal: deposit Rp 100.000 → bayar Rp 100.123.
+        </p>
+      </div>
+
+      {error && (
+        <div className="px-4 py-3 rounded-xl text-sm text-red-400" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
+          {error}
+        </div>
+      )}
+
+      <button
+        onClick={() => void handleSubmit()}
+        disabled={loading || !amount || Number(amount) < 10_000}
+        className="w-full py-4 rounded-2xl text-sm font-black text-gray-900 disabled:opacity-40 transition-all"
+        style={{ background: "linear-gradient(135deg, #FBBF24, #F59E0B)", boxShadow: "0 4px 20px rgba(251,191,36,0.3)" }}
+      >
+        {loading ? "Membuat Deposit..." : "Lanjutkan →"}
+      </button>
+    </div>
+  );
+}
+
+/* ─── Komponen: Riwayat Deposit ─── */
+function DepositHistory({ refreshKey }: { refreshKey: number }) {
+  const [deposits, setDeposits] = useState<V2Deposit[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await v2GetDeposits(1);
+      setDeposits(res.data);
+    } catch { /* silent */ }
+    finally { setLoading(false); }
+  }, []);
+
+  useState(() => { void load(); });
+
+  // Re-load when refreshKey changes
+  const prevKey = useRef(refreshKey);
+  if (prevKey.current !== refreshKey) {
+    prevKey.current = refreshKey;
+    void load();
+  }
+
+  if (loading) return (
+    <div className="flex justify-center py-6">
+      <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (deposits.length === 0) return (
+    <p className="text-center text-xs text-muted-foreground py-4">Belum ada riwayat deposit</p>
+  );
+
+  return (
+    <div className="space-y-2">
+      {deposits.map((d) => {
+        const totalAmount = d.totalAmount ?? d.amount;
+        return (
+          <div key={d.id} className="rounded-xl px-4 py-3 flex items-center justify-between gap-3"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div className="min-w-0">
+              <div className="text-sm font-bold text-white">{formatRupiah(totalAmount)}</div>
+              <div className="text-xs text-muted-foreground truncate">{d.paymentRef}</div>
+              <div className="text-[10px] text-muted-foreground">{new Date(d.createdAt).toLocaleString("id-ID")}</div>
+            </div>
+            <StatusBadge status={d.status} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─── Main Page ─── */
+export default function DepositPage() {
+  const cfg = loadConfig();
+  const qrisImageSrc = cfg.qrisImage || DEFAULT_QRIS_URL;
+
+  const [activeDeposit, setActiveDeposit] = useState<V2Deposit | null>(null);
+  const [step, setStep] = useState<"form" | "payment">("form");
+  const [historyRefresh, setHistoryRefresh] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
+
+  function handleDepositCreated(deposit: V2Deposit) {
+    setActiveDeposit(deposit);
+    setStep("payment");
+  }
+
+  function handleProofUploaded() {
+    if (activeDeposit) {
+      setActiveDeposit({ ...activeDeposit, status: "paid" });
+    }
+    setHistoryRefresh((p) => p + 1);
+  }
+
+  function handleNewDeposit() {
+    setActiveDeposit(null);
+    setStep("form");
   }
 
   return (
@@ -170,200 +471,74 @@ export default function DepositPage({ member }: DepositPageProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
             </svg>
           </div>
-          <div>
-            <h1 className="font-black text-lg leading-none" style={{ background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+          <div className="flex-1">
+            <h1 className="font-black text-lg leading-none"
+              style={{ background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
               ISI SALDO
             </h1>
-            <p className="text-[10px] text-muted-foreground tracking-widest">PILIH METODE PEMBAYARAN</p>
+            <p className="text-[10px] text-muted-foreground tracking-widest">DEPOSIT VIA QRIS / TRANSFER</p>
           </div>
+          {step === "payment" && (
+            <button
+              onClick={handleNewDeposit}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/10 text-white/60 hover:bg-white/5"
+            >
+              ← Baru
+            </button>
+          )}
         </div>
-        {member && (
-          <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20">
-            <div className="w-2 h-2 rounded-full bg-blue-400" />
-            <p className="text-xs text-blue-300">Deposit untuk: <span className="font-bold text-blue-200">{member.name}</span></p>
+      </div>
+
+      {/* Stepper */}
+      <div className="flex items-center gap-2 mb-5">
+        {[
+          { id: "form", label: "1 · Pilih Nominal" },
+          { id: "payment", label: "2 · Bayar & Upload" },
+        ].map((s) => (
+          <div key={s.id} className="flex items-center gap-2">
+            <div className="px-3 py-1 rounded-full text-xs font-semibold transition-all"
+              style={step === s.id
+                ? { background: "rgba(251,191,36,0.2)", color: "#FBBF24", border: "1px solid rgba(251,191,36,0.4)" }
+                : { background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.3)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              {s.label}
+            </div>
+            {s.id === "form" && <div className="w-4 h-px" style={{ background: step === "payment" ? "rgba(251,191,36,0.4)" : "rgba(255,255,255,0.1)" }} />}
+          </div>
+        ))}
+      </div>
+
+      {/* Content */}
+      {step === "form" && (
+        <NewDepositForm onCreated={handleDepositCreated} />
+      )}
+
+      {step === "payment" && activeDeposit && (
+        <ActiveDepositCard
+          deposit={activeDeposit}
+          qrisImageSrc={qrisImageSrc}
+          onProofUploaded={handleProofUploaded}
+        />
+      )}
+
+      {/* Riwayat */}
+      <div className="mt-6">
+        <button
+          onClick={() => setShowHistory((p) => !p)}
+          className="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all"
+          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
+        >
+          <span className="text-xs font-semibold text-white/70 uppercase tracking-wider">Riwayat Deposit</span>
+          <svg className="w-4 h-4 text-white/40 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            style={{ transform: showHistory ? "rotate(180deg)" : "rotate(0)" }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {showHistory && (
+          <div className="mt-2">
+            <DepositHistory refreshKey={historyRefresh} />
           </div>
         )}
       </div>
-
-      {/* Amount */}
-      <div className="glass-card rounded-2xl p-5 mb-5">
-        <label className="text-xs text-muted-foreground tracking-widest uppercase font-semibold block mb-3">
-          Jumlah Deposit
-        </label>
-        <div className="relative mb-3">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold text-sm">Rp</span>
-          <input
-            type="number" inputMode="numeric" value={amount} onChange={handleAmountChange} placeholder="0"
-            className="w-full pl-10 pr-4 py-3.5 rounded-xl text-sm font-bold bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-yellow-500/60 focus:ring-1 focus:ring-yellow-500/40 transition-all"
-          />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {PRESET_AMOUNTS.map((p) => (
-            <button key={p} onClick={() => selectPreset(p)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border"
-              style={selectedPreset === p
-                ? { borderColor: "#FBBF24", background: "rgba(251,191,36,0.1)", color: "#FBBF24" }
-                : { borderColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }
-              }>
-              {formatRupiah(p)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Info */}
-      <div className="mb-5 flex items-start gap-3 px-4 py-3 rounded-xl border border-blue-500/20 bg-blue-500/8">
-        <svg className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          Pilih metode di bawah → lihat detail rekening → transfer → konfirmasi via WhatsApp.
-          Saldo dikreditkan setelah konfirmasi manual oleh owner.
-        </p>
-      </div>
-
-      {/* ── Accordion list ── */}
-      <p className="text-xs text-muted-foreground tracking-widest uppercase font-semibold mb-3">
-        Pilih Metode Pembayaran
-      </p>
-
-      {/* QRIS */}
-      <AccordionItem
-        id="qris"
-        open={openId === "qris"}
-        onToggle={toggleAccordion}
-        accentColor="#A855F7"
-        badge="Scan & Pay"
-        icon={<span className="text-base font-black" style={{ color: "#A855F7" }}>QR</span>}
-        title="QRIS — Scan & Bayar"
-        subtitle="GoPay · OVO · DANA · ShopeePay · semua e-wallet"
-      >
-        <div className="mt-3">
-          <img
-            src={qrisImageSrc}
-            alt="QRIS RoneyCell"
-            className="w-full max-w-[280px] mx-auto rounded-2xl border border-purple-500/20 block mb-3"
-            style={{ boxShadow: "0 8px 32px rgba(168,85,247,0.15)" }}
-          />
-          <p className="text-center text-xs text-muted-foreground mb-1">
-            <span className="font-bold text-purple-300">Toko rsy</span> · NMID: ID1026519584738
-          </p>
-          <button
-            onClick={() => qrisInputRef.current?.click()}
-            className="w-full py-2 rounded-xl text-xs font-semibold border border-white/10 text-muted-foreground hover:bg-white/5 transition-all mb-1"
-          >
-            Ganti Gambar QRIS
-          </button>
-          <input ref={qrisInputRef} type="file" accept="image/*" className="hidden" onChange={handleQrisUpload} />
-          <WAButton onClick={() => sendWhatsApp("QRIS DANA", "QRIS (lihat gambar)")} />
-        </div>
-      </AccordionItem>
-
-      {/* E-Wallet */}
-      <AccordionItem
-        id="ewallet"
-        open={openId === "ewallet"}
-        onToggle={toggleAccordion}
-        accentColor="#118EEA"
-        icon={<span className="text-lg">💙</span>}
-        title="E-Wallet (DANA / GoPay)"
-        subtitle="Transfer dompet digital"
-      >
-        <div className="mt-3 space-y-3">
-          {/* DANA */}
-          {cfg.danaNumber && (
-            <div className="rounded-xl p-4 border border-white/6 bg-white/3">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="font-black text-xs px-2 py-0.5 rounded-md" style={{ background: "#118EEA20", color: "#118EEA" }}>DANA</span>
-                <span className="text-xs text-muted-foreground">Dompet Digital</span>
-              </div>
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <p className="text-xs text-muted-foreground">Nomor</p>
-                  <p className="font-bold text-foreground tracking-wider">{cfg.danaNumber}</p>
-                </div>
-                <CopyButton text={cfg.danaNumber} />
-              </div>
-              <p className="text-xs text-muted-foreground">a/n <span className="text-foreground font-semibold">{cfg.danaName}</span></p>
-              <WAButton onClick={() => sendWhatsApp("DANA", `${cfg.danaNumber} a/n ${cfg.danaName}`)} />
-            </div>
-          )}
-          {/* GoPay */}
-          {cfg.gopayNumber && (
-            <div className="rounded-xl p-4 border border-white/6 bg-white/3">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="font-black text-xs px-2 py-0.5 rounded-md" style={{ background: "#00AED620", color: "#00AED6" }}>GoPay</span>
-                <span className="text-xs text-muted-foreground">Dompet Digital</span>
-              </div>
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <p className="text-xs text-muted-foreground">Nomor</p>
-                  <p className="font-bold text-foreground tracking-wider">{cfg.gopayNumber}</p>
-                </div>
-                <CopyButton text={cfg.gopayNumber} />
-              </div>
-              <p className="text-xs text-muted-foreground">a/n <span className="text-foreground font-semibold">{cfg.gopayName}</span></p>
-              <WAButton onClick={() => sendWhatsApp("GoPay", `${cfg.gopayNumber} a/n ${cfg.gopayName}`)} />
-            </div>
-          )}
-        </div>
-      </AccordionItem>
-
-      {/* BCA */}
-      {cfg.bcaAccountNumber && (
-        <AccordionItem
-          id="bca"
-          open={openId === "bca"}
-          onToggle={toggleAccordion}
-          accentColor="#0062AE"
-          icon={<span className="font-black text-[11px]" style={{ color: "#0062AE" }}>BCA</span>}
-          title="Transfer Bank BCA"
-          subtitle="Transfer antar bank"
-        >
-          <div className="mt-3 space-y-2">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-white/3 border border-white/6">
-              <div>
-                <p className="text-xs text-muted-foreground">No. Rekening</p>
-                <p className="font-bold text-foreground tracking-wider mt-0.5">{cfg.bcaAccountNumber}</p>
-              </div>
-              <CopyButton text={cfg.bcaAccountNumber} />
-            </div>
-            <div className="p-3 rounded-xl bg-white/3 border border-white/6">
-              <p className="text-xs text-muted-foreground">Atas Nama</p>
-              <p className="font-semibold text-foreground mt-0.5">{cfg.bcaAccountName}</p>
-            </div>
-            <WAButton onClick={() => sendWhatsApp("BCA", `${cfg.bcaAccountNumber} a/n ${cfg.bcaAccountName}`)} />
-          </div>
-        </AccordionItem>
-      )}
-
-      {/* BRI — only if configured */}
-      {cfg.briAccountNumber && (
-        <AccordionItem
-          id="bri"
-          open={openId === "bri"}
-          onToggle={toggleAccordion}
-          accentColor="#4169E1"
-          icon={<span className="font-black text-[11px] text-white">BRI</span>}
-          title="Transfer Bank BRI"
-          subtitle="Transfer antar bank"
-        >
-          <div className="mt-3 space-y-2">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-white/3 border border-white/6">
-              <div>
-                <p className="text-xs text-muted-foreground">No. Rekening</p>
-                <p className="font-bold text-foreground tracking-wider mt-0.5">{cfg.briAccountNumber}</p>
-              </div>
-              <CopyButton text={cfg.briAccountNumber} />
-            </div>
-            <div className="p-3 rounded-xl bg-white/3 border border-white/6">
-              <p className="text-xs text-muted-foreground">Atas Nama</p>
-              <p className="font-semibold text-foreground mt-0.5">{cfg.briAccountName}</p>
-            </div>
-            <WAButton onClick={() => sendWhatsApp("BRI", `${cfg.briAccountNumber} a/n ${cfg.briAccountName}`)} />
-          </div>
-        </AccordionItem>
-      )}
     </div>
   );
 }
