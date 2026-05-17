@@ -1,45 +1,128 @@
-# [Project name]
+# RoneyCell
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Sistem jualan pulsa & PPOB professional berbasis web (PWA) dengan dual-backend: Google Sheets (sistem lama) + PostgreSQL (sistem v2).
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `pnpm --filter @workspace/api-server run dev` — jalankan API server (port 8080)
+- `pnpm --filter @workspace/roney-cell run dev` — jalankan frontend (port 21418)
+- `pnpm run typecheck` — full typecheck semua packages
+- `pnpm run build` — typecheck + build semua packages
+- `pnpm --filter @workspace/db run push` — push DB schema ke PostgreSQL (dev only)
+- `pnpm run typecheck:libs` — build composite libs (wajib sebelum typecheck api-server jika schema DB berubah)
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- **Frontend**: React + Vite, Tailwind CSS, PWA mobile-first
+- **API**: Express 5, pino logger
+- **DB**: PostgreSQL + Drizzle ORM (lib/db)
+- **Validation**: Zod, drizzle-zod
+- **Auth**: JWT (access 8h) + refresh token (30 hari), bcrypt
+- **Security**: helmet, CORS, rate-limit, requireRole middleware
+- **Build**: esbuild (CJS bundle)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+```
+artifacts/
+  api-server/src/
+    routes/
+      v2/           ← Endpoint baru (PostgreSQL)
+        auth.ts     ← Register, login, refresh, logout, profile, change-pwd, forgot-pwd
+        transactions.ts ← POST beli, GET history, GET detail, POST retry
+        balance.ts  ← GET saldo, GET mutasi
+        deposits.ts ← POST ajukan, GET riwayat
+        admin/
+          dashboard.ts   ← Statistik ringkasan
+          users.ts       ← CRUD + suspend + topup + role
+          products.ts    ← CRUD produk + provider
+          transactions.ts ← All txs + reset pending + konfirmasi deposit
+          audit.ts       ← Audit log
+        monitoring.ts  ← Health check + provider status
+      auth.ts      ← v1: tukar session GSheets → JWT
+      digiflazz.ts ← v1: proxy ke Digiflazz API
+      callback.ts  ← Webhook Digiflazz (signature verified)
+    lib/
+      v2/
+        userService.ts    ← User CRUD, password hash, refresh token, reset token
+        balanceService.ts ← Atomic debit/credit dengan row-level lock
+        auditService.ts   ← Tulis dan baca audit log
+        notificationService.ts ← Telegram / Discord / WhatsApp hooks
+      jwt.ts       ← sign/verify JWT (support 4 role)
+      env.ts       ← Validasi env startup + isAllowedAdminPhone()
+      sanitize.ts  ← Strip field sensitif dari response
+    middlewares/
+      requireRole.ts  ← requireAuthV2, requireRole(minRole), requireAdminV2
+      auth.ts         ← v1: requireAuth, requireAdmin
+      rateLimiter.ts  ← globalLimiter, authLimiter, topupLimiter, readLimiter
+
+  roney-cell/src/
+    lib/
+      apiV2.ts     ← Client API v2 (auto-refresh token, typed)
+    components/admin/
+      AdminDashboardV2.tsx ← Panel admin lengkap (dasbor, users, tx, deposit, audit, monitoring)
+      StatCard.tsx
+    pages/
+      AdminPage.tsx ← Tab "Panel DB" → AdminDashboardV2 (lazy loaded)
+
+lib/db/src/schema/
+  users.ts            ← role: superadmin/admin/reseller/member, balance, status
+  refreshTokens.ts    ← Token hash + TTL 30 hari
+  transactions.ts     ← Status: pending/success/failed, category, sn
+  balanceMutations.ts ← Setiap perubahan saldo tercatat (7 tipe mutasi)
+  deposits.ts         ← QRIS/VA/transfer/manual, status lifecycle
+  products.ts         ← Harga per role (base/member/reseller/admin)
+  providers.ts        ← Status provider (digiflazz dll)
+  auditLogs.ts        ← Semua aksi penting tercatat
+  passwordResets.ts   ← Token reset hash + TTL 30 menit
+  notifications.ts    ← Queue notif (telegram/discord/whatsapp)
+```
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- **Dual backend**: v1 (Google Sheets via Apps Script) dan v2 (PostgreSQL) berjalan bersamaan. v1 tidak diubah agar tidak memutus layanan existing.
+- **Prefix /api/v2/**: Semua endpoint baru di bawah prefix ini agar tidak ada konflik dengan v1.
+- **Role hierarchy**: superadmin(4) > admin(3) > reseller(2) > member(1). `requireRole("admin")` otomatis mengizinkan superadmin juga.
+- **Atomic balance**: Semua operasi saldo menggunakan `SELECT ... FOR UPDATE` di dalam transaksi DB untuk mencegah race condition dan saldo minus.
+- **Refresh token rotation**: Setiap refresh menghasilkan token baru dan merevoke yang lama (one-time use).
+- **Sanitize response**: Semua response Digiflazz di-strip field sensitif (username, sign, api_key) sebelum dikirim ke client.
+- **Soft delete**: Users menggunakan `deleted_at` timestamp, bukan hapus fisik.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Reseller pulsa/PPOB mobile-first PWA untuk pasar Lombok, Indonesia
+- Kategori: Pulsa, Paket Data, PLN, Pascabayar, E-wallet, Game, TV, Voucher, International
+- Auth via Google Sheets (v1) atau PostgreSQL (v2)
+- Admin panel terintegrasi di tab "Panel DB" di halaman Owner
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Bahasa Indonesia untuk semua teks UI dan komentar kode
+- Jangan ubah/hapus sistem Google Sheets yang sudah ada
+- Semua fitur baru di prefix `/api/v2/` agar tidak konflik
+- PIN admin default bisa diubah di halaman Tetapan
+- Super admin: phone `081288080752`, pass `311296`
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- **Wajib** `pnpm run typecheck:libs` sebelum `typecheck` api-server jika ada perubahan di `lib/db/src/schema/`
+- PORT api-server = 8080, frontend = 21418 — keduanya di-route via shared proxy di port 80
+- Jangan gunakan `pnpm run dev` di root workspace — jalankan via workflow per artifact
+- `zod` di api-server: import dari `"zod"` (bukan `"zod/v4"`). Di lib/db: `"zod/v4"` ✓
+- Rate limit topup: 3 req/menit per IP — normal untuk production
+- TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID + DISCORD_WEBHOOK_URL bersifat opsional (notif hanya aktif jika diset)
 
-## Pointers
+## Required Env (Secrets)
 
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+| Key | Wajib | Keterangan |
+|-----|-------|------------|
+| DATABASE_URL | ✅ | PostgreSQL connection string (auto-set oleh Replit DB) |
+| SESSION_SECRET | ✅ | JWT signing secret |
+| DIGIFLAZZ_USERNAME | ✅ | Username akun Digiflazz |
+| DIGIFLAZZ_KEY | ✅ | API key Digiflazz |
+| VITE_FONNTE_TOKEN | ⚪ | WhatsApp via Fonnte (opsional) |
+| ADMIN_PHONES | ⚪ | Tambahan nomor admin, comma-separated |
+| TELEGRAM_BOT_TOKEN | ⚪ | Notif Telegram (opsional) |
+| TELEGRAM_CHAT_ID | ⚪ | Chat ID Telegram (opsional) |
+| DISCORD_WEBHOOK_URL | ⚪ | Notif Discord (opsional) |

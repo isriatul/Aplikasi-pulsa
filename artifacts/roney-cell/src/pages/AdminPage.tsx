@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+const AdminDashboardV2 = lazy(() => import("@/components/admin/AdminDashboardV2"));
 import { loadConfig, saveConfig } from "@/lib/config";
 import {
   ALL_PRODUCTS,
@@ -32,7 +33,7 @@ import {
 } from "@/lib/sheetsApi";
 import { getServerIp, checkDigiflazzBalance, sendTestTransaction, TestTransactionResult } from "@/lib/digiflazz";
 
-type AdminTab = "report" | "prices" | "members" | "settings" | "uji";
+type AdminTab = "report" | "prices" | "members" | "settings" | "uji" | "v2";
 
 function PinGate({ onUnlock }: { onUnlock: () => void }) {
   const [pin, setPin] = useState("");
@@ -1060,6 +1061,7 @@ export default function AdminPage({ onMemberChange }: { onMemberChange?: () => v
     { id: "report", label: "Laporan", icon: "📊" },
     { id: "prices", label: "Harga", icon: "💲" },
     { id: "members", label: "Member", icon: "👥" },
+    { id: "v2", label: "Panel DB", icon: "🗄️" },
     { id: "uji", label: "Uji", icon: "🧪" },
     { id: "settings", label: "Tetapan", icon: "⚙️" },
   ];
@@ -1082,12 +1084,12 @@ export default function AdminPage({ onMemberChange }: { onMemberChange?: () => v
         </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-1 mb-5 p-1 rounded-2xl bg-white/3 border border-white/6">
+      <div className="flex gap-1 mb-5 p-1 rounded-2xl bg-white/3 border border-white/6 overflow-x-auto scrollbar-none">
         {tabs.map((tab) => {
           const pendingCount = tab.id === "members" ? loadMembers().filter(m => m.status === "pending").length : 0;
           return (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className="relative py-2 rounded-xl text-[10px] font-bold transition-all flex flex-col items-center gap-1"
+              className="relative py-2 px-2 rounded-xl text-[10px] font-bold transition-all flex flex-col items-center gap-1 flex-shrink-0 min-w-[52px]"
               style={activeTab === tab.id
                 ? { background: "linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)", color: "white", boxShadow: "0 2px 8px rgba(124,58,237,0.3)" }
                 : { color: "rgba(255,255,255,0.4)" }
@@ -1109,6 +1111,15 @@ export default function AdminPage({ onMemberChange }: { onMemberChange?: () => v
       {activeTab === "members" && <MembersSection onMemberChange={onMemberChange} />}
       {activeTab === "uji" && <UjiSection />}
       {activeTab === "settings" && <SettingsSection onLogout={() => setUnlocked(false)} />}
+      {activeTab === "v2" && (
+        <Suspense fallback={
+          <div className="flex justify-center py-16">
+            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        }>
+          <AdminDashboardV2 />
+        </Suspense>
+      )}
     </div>
   );
 }
