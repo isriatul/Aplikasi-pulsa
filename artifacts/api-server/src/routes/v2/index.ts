@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { join } from "path";
 import { existsSync } from "fs";
 import authRouter from "./auth.js";
+import productsRouter from "./products.js";
 import transactionsRouter from "./transactions.js";
 import balanceRouter from "./balance.js";
 import depositsRouter from "./deposits.js";
@@ -16,6 +17,8 @@ const router: IRouter = Router();
 
 /* Auth */
 router.use(authRouter);
+/* Produk (publik, perlu login) */
+router.use(productsRouter);
 /* User */
 router.use(transactionsRouter);
 router.use(balanceRouter);

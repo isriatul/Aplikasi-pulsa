@@ -1,4 +1,6 @@
+import { useState, useEffect } from "react";
 import { Product, ProductCategory, CATEGORY_META, getProductsByCategory, formatRupiah, MemberType } from "@/lib/products";
+import { getV2Token, v2GetProducts, type V2ProductItem } from "@/lib/apiV2";
 
 interface ProductGridProps {
   selected: Product | null;
@@ -10,8 +12,44 @@ interface ProductGridProps {
 
 const CATEGORIES: ProductCategory[] = ["pulsa", "data", "pln", "game"];
 
+const CATEGORY_ICONS: Record<string, string> = {
+  pulsa: "📱", data: "📶", pln: "⚡", game: "🎮",
+  ewallet: "💳", pascabayar: "🧾", tv: "📺", voucher: "🌐",
+  international: "🌍", other: "📦",
+};
+
+function v2ProductToProduct(item: V2ProductItem): Product {
+  const cat = item.category as ProductCategory;
+  return {
+    id: String(item.id),
+    name: item.name,
+    nominal: item.basePrice,
+    price: item.price,
+    memberPrice: item.memberPrice,
+    resellerPrice: item.resellerPrice,
+    basePrice: item.basePrice,
+    sku: item.code,
+    description: item.description ?? item.name,
+    category: cat,
+    icon: CATEGORY_ICONS[item.category] ?? "📦",
+  };
+}
+
 export default function ProductGrid({ selected, onSelect, activeCategory, onCategoryChange, memberType = "retail" }: ProductGridProps) {
-  const products = getProductsByCategory(activeCategory, memberType);
+  const [dbProducts, setDbProducts] = useState<Product[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const isV2 = !!getV2Token();
+
+  useEffect(() => {
+    if (!isV2) { setDbProducts(null); return; }
+    setLoading(true);
+    v2GetProducts({ category: activeCategory })
+      .then((res) => setDbProducts(res.data.map(v2ProductToProduct)))
+      .catch(() => setDbProducts(null))
+      .finally(() => setLoading(false));
+  }, [activeCategory, isV2]);
+
+  const products = dbProducts ?? getProductsByCategory(activeCategory, memberType);
 
   return (
     <div className="glass-card rounded-2xl p-5">
@@ -40,7 +78,14 @@ export default function ProductGrid({ selected, onSelect, activeCategory, onCate
         })}
       </div>
 
-      {activeCategory === "pulsa" || activeCategory === "pln" ? (
+      {loading && (
+        <div className="flex items-center justify-center py-8 gap-2">
+          <div className="w-5 h-5 rounded-full border-2 border-blue-500/20 border-t-blue-400 animate-spin" />
+          <span className="text-xs text-muted-foreground">Memuat produk...</span>
+        </div>
+      )}
+
+      {!loading && (activeCategory === "pulsa" || activeCategory === "pln" ? (
         <div className="grid grid-cols-2 gap-3">
           {products.map((product) => (
             <ProductCard key={product.id} product={product} selected={selected?.id === product.id} onSelect={onSelect} compact />
@@ -51,6 +96,12 @@ export default function ProductGrid({ selected, onSelect, activeCategory, onCate
           {products.map((product) => (
             <ProductCard key={product.id} product={product} selected={selected?.id === product.id} onSelect={onSelect} compact={false} />
           ))}
+        </div>
+      ))}
+
+      {!loading && products.length === 0 && (
+        <div className="text-center py-8 text-sm text-muted-foreground">
+          Belum ada produk. Admin perlu melakukan sinkronisasi produk.
         </div>
       )}
     </div>
@@ -92,9 +143,7 @@ function ProductCard({ product, selected, onSelect, compact }: {
           )}
         </div>
         <p className="text-sm font-bold text-foreground leading-tight">
-          {product.category === "pulsa" || product.category === "pln"
-            ? formatRupiah(product.nominal)
-            : product.name}
+          {product.name}
         </p>
         <p className="text-[11px] text-muted-foreground mt-0.5">
           {product.category === "pln" ? "Token PLN" : "Pulsa"}

@@ -8,3 +8,4 @@ export * from "./providers.js";
 export * from "./auditLogs.js";
 export * from "./passwordResets.js";
 export * from "./notifications.js";
+export * from "./settings.js";

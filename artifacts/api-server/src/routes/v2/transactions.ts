@@ -9,7 +9,7 @@ import { z } from "zod";
 import { createHash } from "crypto";
 import { eq, desc, and, gte } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { transactionsTable, usersTable } from "@workspace/db";
+import { transactionsTable, usersTable, productsTable } from "@workspace/db";
 import { requireAuthV2 } from "../../middlewares/requireRole.js";
 import { topupLimiter, readLimiter } from "../../middlewares/rateLimiter.js";
 import { debitBalance, creditBalance, InsufficientBalanceError } from "../../lib/v2/balanceService.js";
@@ -111,9 +111,31 @@ router.post("/v2/transactions", requireAuthV2, topupLimiter, async (req, res) =>
     return;
   }
 
-  const price = selling_price ?? 0;
-  if (price > 0 && user.balance < price) {
-    res.status(402).json({ error: `Saldo tidak cukup (Rp${user.balance.toLocaleString()})` });
+  /* Cari produk di DB dan tentukan harga berdasarkan role */
+  const [productRow] = await db
+    .select({
+      basePrice: productsTable.basePrice,
+      memberPrice: productsTable.memberPrice,
+      resellerPrice: productsTable.resellerPrice,
+      adminPrice: productsTable.adminPrice,
+    })
+    .from(productsTable)
+    .where(and(eq(productsTable.code, buyer_sku_code), eq(productsTable.isActive, true)))
+    .limit(1);
+
+  if (!productRow) {
+    res.status(404).json({ error: "Produk tidak ditemukan atau tidak aktif. Hubungi admin untuk sinkronisasi produk." });
+    return;
+  }
+
+  const role = member.role;
+  const price =
+    role === "superadmin" || role === "admin" ? productRow.adminPrice
+    : role === "reseller" ? productRow.resellerPrice
+    : productRow.memberPrice;
+
+  if (user.balance < price) {
+    res.status(402).json({ error: `Saldo tidak cukup. Dibutuhkan Rp${price.toLocaleString()} (saldo: Rp${user.balance.toLocaleString()}).` });
     return;
   }
 
@@ -131,7 +153,7 @@ router.post("/v2/transactions", requireAuthV2, topupLimiter, async (req, res) =>
     customerNo: customer_no,
     amount: price,
     sellingPrice: price,
-    profit: 0,
+    profit: price - productRow.basePrice,
     status: "pending",
     ip: getIp(req),
     userAgent: (req.headers["user-agent"] ?? "").slice(0, 250),

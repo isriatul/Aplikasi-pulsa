@@ -25,7 +25,7 @@ function v2UserToMember(u: V2User): Member {
     email: u.email,
     whatsapp: u.phone,
     pin: "",
-    type: u.role === "superadmin" || u.role === "admin" ? "reseller" : "member",
+    type: u.role === "superadmin" || u.role === "admin" ? "admin" : u.role === "reseller" ? "reseller" : "member",
     status: u.status === "active" ? "approved" : u.status === "pending" ? "pending" : "rejected",
     balance: u.balance ?? 0,
     loginMethod: "phone",

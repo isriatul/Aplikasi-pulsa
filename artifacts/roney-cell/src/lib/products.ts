@@ -24,7 +24,7 @@ export type ProductCategory =
   | "voucher"
   | "intl";
 
-export type MemberType = "retail" | "member" | "reseller";
+export type MemberType = "retail" | "member" | "reseller" | "admin";
 
 /* Helper to build a pulsa product quickly */
 function pulsa(
@@ -264,6 +264,7 @@ export function getProductsWithPrices(memberType: MemberType = "retail"): Produc
     const memberPrice   = c.member   ?? p.memberPrice;
     const resellerPrice = c.reseller ?? p.resellerPrice;
     const effectivePrice =
+      memberType === "admin"    ? resellerPrice :
       memberType === "reseller" ? resellerPrice :
       memberType === "member"   ? memberPrice :
       retailPrice;

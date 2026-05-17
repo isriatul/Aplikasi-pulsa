@@ -13,7 +13,7 @@ import { createHash } from "crypto";
 import { z } from "zod";
 import { eq, desc, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { productsTable, providersTable } from "@workspace/db";
+import { productsTable, providersTable, settingsTable } from "@workspace/db";
 import { requireRole } from "../../../middlewares/requireRole.js";
 import { safeZodErrors } from "../../../lib/sanitize.js";
 import { audit } from "../../../lib/v2/auditService.js";
@@ -79,12 +79,89 @@ async function fetchDigiflazzPricelist(cmd: "prepaid" | "pasca"): Promise<DgProd
   return json.data;
 }
 
+/* ─── Markup settings helpers ─── */
+interface MarkupSettings {
+  member: number;
+  reseller: number;
+  admin: number;
+  minMember: number;
+  minReseller: number;
+  minAdmin: number;
+}
+
+const DEFAULT_MARKUP: MarkupSettings = {
+  member: 5,
+  reseller: 3,
+  admin: 1,
+  minMember: 500,
+  minReseller: 300,
+  minAdmin: 200,
+};
+
+async function getMarkupSettings(): Promise<MarkupSettings> {
+  const [row] = await db.select().from(settingsTable).where(eq(settingsTable.key, "markup")).limit(1);
+  if (!row) return DEFAULT_MARKUP;
+  try {
+    return { ...DEFAULT_MARKUP, ...JSON.parse(row.value) as Partial<MarkupSettings> };
+  } catch {
+    return DEFAULT_MARKUP;
+  }
+}
+
+const MarkupSettingsSchema = z.object({
+  member: z.number().min(0).max(50),
+  reseller: z.number().min(0).max(50),
+  admin: z.number().min(0).max(50),
+  minMember: z.number().int().min(0),
+  minReseller: z.number().int().min(0),
+  minAdmin: z.number().int().min(0),
+});
+
+function getIp(req: Request) {
+  const fwd = req.headers["x-forwarded-for"];
+  if (typeof fwd === "string") return fwd.split(",")[0]?.trim() ?? "unknown";
+  return req.ip ?? "unknown";
+}
+
 const router: IRouter = Router();
+
+/* ── GET /api/v2/admin/markup-settings ── */
+router.get("/v2/admin/markup-settings", requireRole("admin"), async (_req, res) => {
+  const settings = await getMarkupSettings();
+  res.json(settings);
+});
+
+/* ── PUT /api/v2/admin/markup-settings ── */
+router.put("/v2/admin/markup-settings", requireRole("admin"), async (req, res) => {
+  const parsed = MarkupSettingsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Input tidak valid", details: safeZodErrors(parsed.error.issues) });
+    return;
+  }
+  await db
+    .insert(settingsTable)
+    .values({ key: "markup", value: JSON.stringify(parsed.data) })
+    .onConflictDoUpdate({
+      target: settingsTable.key,
+      set: { value: JSON.stringify(parsed.data), updatedAt: new Date() },
+    });
+  await audit({
+    userId: req.member!.userId,
+    action: "admin_update_markup_settings",
+    entity: "settings",
+    ip: getIp(req),
+    data: parsed.data,
+  });
+  res.json({ message: "Pengaturan markup berhasil disimpan", settings: parsed.data });
+});
 
 /* ── POST /api/v2/admin/products/sync — Sync pricelist Digiflazz → DB ── */
 router.post("/v2/admin/products/sync", requireRole("admin"), async (req, res) => {
   try {
-    /* 1. Ambil pricelist prepaid & pasca secara berurutan agar tidak kena rate limit */
+    /* 1. Ambil markup settings dari DB */
+    const markup = await getMarkupSettings();
+
+    /* 2. Ambil pricelist prepaid & pasca secara berurutan agar tidak kena rate limit */
     const fetchErrors: string[] = [];
 
     const prepaid = await fetchDigiflazzPricelist("prepaid").catch((e: Error) => {
@@ -130,9 +207,9 @@ router.post("/v2/admin/products/sync", requireRole("admin"), async (req, res) =>
           category: mapCategory(p.category),
           provider: p.brand || null,
           basePrice: base,
-          memberPrice: markupPrice(base, 0.05, 500),
-          resellerPrice: markupPrice(base, 0.03, 300),
-          adminPrice: markupPrice(base, 0.01, 200),
+          memberPrice: markupPrice(base, markup.member / 100, markup.minMember),
+          resellerPrice: markupPrice(base, markup.reseller / 100, markup.minReseller),
+          adminPrice: markupPrice(base, markup.admin / 100, markup.minAdmin),
           description: p.desc ?? null,
           isActive: active,
           stock: stockVal,
@@ -208,12 +285,6 @@ const ProviderSchema = z.object({
   note: z.string().max(300).optional(),
   isActive: z.boolean().default(true),
 });
-
-function getIp(req: Request) {
-  const fwd = req.headers["x-forwarded-for"];
-  if (typeof fwd === "string") return fwd.split(",")[0]?.trim() ?? "unknown";
-  return req.ip ?? "unknown";
-}
 
 /* ── GET /api/v2/admin/products ── */
 router.get("/v2/admin/products", requireRole("admin"), async (req, res) => {

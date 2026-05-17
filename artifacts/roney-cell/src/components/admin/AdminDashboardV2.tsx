@@ -19,6 +19,8 @@ import {
   v2AdminProducts,
   v2AdminSyncProducts,
   v2AdminToggleProduct,
+  v2GetMarkupSettings,
+  v2SaveMarkupSettings,
   formatRp,
   type AdminDashboard,
   type V2User,
@@ -28,6 +30,7 @@ import {
   type MonitoringHealth,
   type SyncReport,
   type V2Product,
+  type MarkupSettings,
 } from "@/lib/apiV2";
 import StatCard from "./StatCard";
 
@@ -728,6 +731,9 @@ function ProductsPanel() {
         {syncError && <div className="text-xs text-red-400 rounded-lg p-2 bg-red-500/10 border border-red-500/20">{syncError}</div>}
       </div>
 
+      {/* Pengaturan Markup Harga */}
+      <MarkupSettingsPanel />
+
       {/* Filter & Search */}
       <div className="flex gap-2 flex-wrap">
         <input
@@ -781,6 +787,107 @@ function ProductsPanel() {
             </div>
           ))}
           <Pagination page={page} onChange={(p) => { setPage(p); void load(p); }} hasMore={hasMore} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MarkupSettingsPanel() {
+  const [settings, setSettings] = useState<MarkupSettings | null>(null);
+  const [form, setForm] = useState<MarkupSettings>({ member: 5, reseller: 3, admin: 1, minMember: 500, minReseller: 300, minAdmin: 100 });
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setLoading(true); setMsg(""); setError("");
+    v2GetMarkupSettings()
+      .then((s) => { setSettings(s); setForm(s); })
+      .catch((e) => setError((e as Error).message))
+      .finally(() => setLoading(false));
+  }, [open]);
+
+  async function doSave() {
+    setSaving(true); setMsg(""); setError("");
+    try {
+      const res = await v2SaveMarkupSettings(form);
+      setSettings(res.settings);
+      setMsg("Markup berhasil disimpan. Produk perlu di-sync ulang agar harga diperbarui.");
+    } catch (e) { setError((e as Error).message); }
+    finally { setSaving(false); }
+  }
+
+  function Field({ label, field, desc }: { label: string; field: keyof MarkupSettings; desc: string }) {
+    return (
+      <div>
+        <label className="text-xs text-white/60 block mb-1">{label}</label>
+        <div className="flex items-center gap-1.5">
+          <input
+            type="number"
+            min={0}
+            max={field.startsWith("min") ? 100000 : 100}
+            value={form[field]}
+            onChange={(e) => setForm((f) => ({ ...f, [field]: Number(e.target.value) }))}
+            className="w-24 px-3 py-2 rounded-xl text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:border-blue-500/60"
+          />
+          <span className="text-xs text-white/40">{desc}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-white/8 overflow-hidden" style={{ background: "rgba(255,255,255,0.03)" }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/5 transition-colors"
+      >
+        <div>
+          <div className="text-sm font-bold text-white">⚙️ Pengaturan Markup Harga</div>
+          <div className="text-xs text-white/50 mt-0.5">
+            {settings
+              ? `Member +${settings.member}% · Reseller +${settings.reseller}% · Admin +${settings.admin}%`
+              : "Konfigurasi persentase markup per role"}
+          </div>
+        </div>
+        <svg className={`w-4 h-4 text-white/40 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 space-y-4 border-t border-white/8 pt-4">
+          {loading ? (
+            <div className="flex justify-center py-4"><div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Markup Member (%)" field="member" desc="% di atas modal" />
+                <Field label="Min. Markup Member (Rp)" field="minMember" desc="Rp minimum" />
+                <Field label="Markup Reseller (%)" field="reseller" desc="% di atas modal" />
+                <Field label="Min. Markup Reseller (Rp)" field="minReseller" desc="Rp minimum" />
+                <Field label="Markup Admin (%)" field="admin" desc="% di atas modal" />
+                <Field label="Min. Markup Admin (Rp)" field="minAdmin" desc="Rp minimum" />
+              </div>
+              <div className="rounded-lg p-3 bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
+                ⚠️ Setelah menyimpan, lakukan <strong>Sync Produk</strong> agar harga semua produk diperbarui sesuai markup baru.
+              </div>
+              {msg && <div className="text-xs text-emerald-400 rounded-lg p-2 bg-emerald-500/10 border border-emerald-500/20">{msg}</div>}
+              {error && <div className="text-xs text-red-400 rounded-lg p-2 bg-red-500/10 border border-red-500/20">{error}</div>}
+              <button
+                onClick={() => { void doSave(); }}
+                disabled={saving}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity disabled:opacity-50"
+                style={{ background: "linear-gradient(135deg,#10B981,#059669)", boxShadow: "0 2px 12px rgba(16,185,129,0.3)" }}
+              >
+                {saving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Menyimpan...</> : "💾 Simpan Markup"}
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

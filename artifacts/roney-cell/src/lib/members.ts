@@ -1,5 +1,5 @@
 export type MemberStatus = "pending" | "approved" | "rejected";
-export type MemberType = "retail" | "member" | "reseller";
+export type MemberType = "retail" | "member" | "reseller" | "admin";
 export type LoginMethod = "phone" | "email" | "facebook";
 
 export interface Member {
@@ -209,12 +209,14 @@ export const TYPE_LABELS: Record<MemberType, string> = {
   retail: "Retail",
   member: "Member",
   reseller: "Reseller",
+  admin: "Admin/VIP",
 };
 
 export const TYPE_COLORS: Record<MemberType, string> = {
   retail: "#6B7280",
   member: "#3B82F6",
   reseller: "#F59E0B",
+  admin: "#8B5CF6",
 };
 
 export const STATUS_LABELS: Record<MemberStatus, string> = {

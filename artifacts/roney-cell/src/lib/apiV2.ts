@@ -212,6 +212,22 @@ export interface SyncReport {
   errors: string[];
 }
 
+export async function v2GetProducts(params?: { category?: string }) {
+  const qs = params?.category ? `?category=${encodeURIComponent(params.category)}` : "";
+  return apiFetch<{ data: V2ProductItem[]; total: number; role: string }>(`/products${qs}`);
+}
+
+export async function v2GetMarkupSettings() {
+  return apiFetch<MarkupSettings>("/admin/markup-settings");
+}
+
+export async function v2SaveMarkupSettings(data: MarkupSettings) {
+  return apiFetch<{ message: string; settings: MarkupSettings }>("/admin/markup-settings", {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function v2AdminSyncProducts() {
   return apiFetch<SyncReport>("/admin/products/sync", { method: "POST" });
 }
@@ -326,6 +342,31 @@ export interface V2Product {
   adminPrice: number;
   isActive: boolean;
   stock?: string;
+}
+
+export interface V2ProductItem {
+  id: number;
+  code: string;
+  name: string;
+  category: string;
+  provider?: string | null;
+  description?: string | null;
+  price: number;
+  basePrice: number;
+  memberPrice: number;
+  resellerPrice: number;
+  adminPrice: number;
+  stock?: string | null;
+  isActive: boolean;
+}
+
+export interface MarkupSettings {
+  member: number;
+  reseller: number;
+  admin: number;
+  minMember: number;
+  minReseller: number;
+  minAdmin: number;
 }
 
 export interface AuditLog {
