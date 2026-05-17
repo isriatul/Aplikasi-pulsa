@@ -11,6 +11,7 @@ try {
 }
 
 import app from "./app.js";
+import { seedSuperAdmin } from "./lib/v2/seed.js";
 
 app.listen(cfg.PORT, (err) => {
   if (err) {
@@ -25,4 +26,9 @@ app.listen(cfg.PORT, (err) => {
     },
     "RoneyCell API Server started",
   );
+
+  /* Seed superadmin jika belum ada di database */
+  seedSuperAdmin().catch((e: unknown) => {
+    logger.error({ err: e }, "Gagal seed superadmin");
+  });
 });

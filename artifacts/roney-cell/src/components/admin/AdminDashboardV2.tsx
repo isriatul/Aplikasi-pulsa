@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import {
+  v2Login,
+  v2Logout,
+  getV2Token,
   v2AdminDashboard,
   v2AdminUsers,
   v2AdminTransactions,
@@ -568,9 +571,109 @@ function Pagination({ page, onChange, hasMore }: { page: number; onChange: (p: n
   );
 }
 
+/* ─── Login Form V2 ─── */
+function V2LoginForm({ onLogin }: { onLogin: () => void }) {
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await v2Login({ phone, password });
+      onLogin();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-3 py-1">
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: "linear-gradient(135deg,#3B82F6,#8B5CF6)", boxShadow: "0 0 20px rgba(59,130,246,0.3)" }}>
+          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
+          </svg>
+        </div>
+        <div>
+          <h2 className="font-black text-base text-white">Admin Panel V2</h2>
+          <p className="text-xs text-muted-foreground">Login dengan akun PostgreSQL</p>
+        </div>
+      </div>
+
+      <form onSubmit={(e) => { void handleLogin(e); }}
+        className="rounded-2xl border border-white/8 p-5 space-y-4"
+        style={{ background: "rgba(255,255,255,0.03)" }}>
+        <p className="text-sm font-semibold text-white/80">Masuk ke Panel DB</p>
+
+        {error && (
+          <div className="px-3 py-2.5 rounded-xl text-sm text-red-400 border border-red-500/20"
+            style={{ background: "rgba(239,68,68,0.08)" }}>
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-1">
+          <label className="text-[11px] font-semibold text-white/50 uppercase tracking-wider">Nomor HP</label>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="081xxxxxxxxx"
+            required
+            className="w-full px-4 py-3 rounded-xl text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:border-blue-500/60 placeholder-white/20"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-[11px] font-semibold text-white/50 uppercase tracking-wider">Password</label>
+          <div className="relative">
+            <input
+              type={showPass ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••"
+              required
+              className="w-full px-4 py-3 pr-10 rounded-xl text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:border-blue-500/60 placeholder-white/20"
+            />
+            <button type="button" onClick={() => setShowPass(!showPass)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 text-base">
+              {showPass ? "🙈" : "👁️"}
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" disabled={loading}
+          className="w-full py-3 rounded-xl text-sm font-bold text-white transition-opacity disabled:opacity-50"
+          style={{ background: "linear-gradient(135deg,#3B82F6,#8B5CF6)", boxShadow: "0 2px 12px rgba(59,130,246,0.3)" }}>
+          {loading ? "Memproses..." : "Masuk"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 /* ─── Main Component ─── */
 export default function AdminDashboardV2() {
   const [tab, setTab] = useState<PanelTab>("dashboard");
+  const [loggedIn, setLoggedIn] = useState(() => !!getV2Token());
+
+  function handleLogout() {
+    void v2Logout();
+    setLoggedIn(false);
+  }
+
+  if (!loggedIn) {
+    return <V2LoginForm onLogin={() => setLoggedIn(true)} />;
+  }
 
   return (
     <div className="space-y-3">
@@ -582,10 +685,14 @@ export default function AdminDashboardV2() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
           </svg>
         </div>
-        <div>
+        <div className="flex-1">
           <h2 className="font-black text-base text-white">Admin Panel V2</h2>
           <p className="text-xs text-muted-foreground">Database terpusat · PostgreSQL</p>
         </div>
+        <button onClick={handleLogout}
+          className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-red-400 border border-red-500/20 hover:bg-red-500/10 transition-colors">
+          Keluar
+        </button>
       </div>
 
       {/* Tabs */}
