@@ -156,6 +156,7 @@ function DashboardPanel() {
 /* ─── Users Panel ─── */
 function UsersPanel() {
   const [users, setUsers] = useState<V2User[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -167,6 +168,7 @@ function UsersPanel() {
   const [topupNote, setTopupNote] = useState("");
   const [suspendReason, setSuspendReason] = useState("");
   const [actionMsg, setActionMsg] = useState("");
+  const [actionIsError, setActionIsError] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
   const load = useCallback(async () => {
@@ -174,45 +176,66 @@ function UsersPanel() {
     try {
       const res = await v2AdminUsers({ page, q: search || undefined, status: filterStatus || undefined, role: filterRole || undefined });
       setUsers(res.data);
+      /* Selalu ambil jumlah pending tanpa filter agar banner selalu akurat */
+      const pRes = await v2AdminUsers({ status: "pending" });
+      setPendingCount(pRes.data.length);
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
   }, [page, search, filterStatus, filterRole]);
 
   useEffect(() => { void load(); }, [load]);
 
+  function setOk(msg: string) { setActionIsError(false); setActionMsg(msg); }
+  function setErr(e: unknown) { setActionIsError(true); setActionMsg((e as Error).message); }
+
   async function doActivate(id: number) {
     setActionLoading(true);
-    try { await v2AdminActivateUser(id); setActionMsg("User diaktifkan"); void load(); }
-    catch (e) { setActionMsg((e as Error).message); }
+    try { await v2AdminActivateUser(id); setOk("User berhasil diaktifkan"); void load(); }
+    catch (e) { setErr(e); }
     finally { setActionLoading(false); }
   }
 
   async function doSuspend(id: number) {
-    if (!suspendReason.trim()) { setActionMsg("Isi alasan suspend"); return; }
+    if (!suspendReason.trim()) { setActionIsError(true); setActionMsg("Isi alasan suspend terlebih dahulu"); return; }
     setActionLoading(true);
-    try { await v2AdminSuspendUser(id, suspendReason); setActionMsg("User disuspend"); setSuspendReason(""); void load(); }
-    catch (e) { setActionMsg((e as Error).message); }
+    try { await v2AdminSuspendUser(id, suspendReason); setOk("User disuspend"); setSuspendReason(""); void load(); }
+    catch (e) { setErr(e); }
     finally { setActionLoading(false); }
   }
 
   async function doTopup(id: number) {
     const amt = parseInt(topupAmount.replace(/\D/g, ""));
-    if (!amt || amt < 1000) { setActionMsg("Minimal topup Rp1.000"); return; }
+    if (!amt || amt < 1000) { setActionIsError(true); setActionMsg("Minimal topup Rp1.000"); return; }
     setActionLoading(true);
-    try { await v2AdminTopupUser(id, amt, topupNote || undefined); setActionMsg(`Saldo +${formatRp(amt)} berhasil`); setTopupAmount(""); setTopupNote(""); void load(); }
-    catch (e) { setActionMsg((e as Error).message); }
+    try { await v2AdminTopupUser(id, amt, topupNote || undefined); setOk(`Saldo +${formatRp(amt)} berhasil ditambahkan`); setTopupAmount(""); setTopupNote(""); void load(); }
+    catch (e) { setErr(e); }
     finally { setActionLoading(false); }
   }
 
   async function doChangeRole(id: number, role: string) {
     setActionLoading(true);
-    try { await v2AdminUpdateUser(id, { role }); setActionMsg("Role diubah"); void load(); setSelected(null); }
-    catch (e) { setActionMsg((e as Error).message); }
+    try { await v2AdminUpdateUser(id, { role }); setOk("Role berhasil diubah"); void load(); setSelected(null); }
+    catch (e) { setErr(e); }
     finally { setActionLoading(false); }
   }
 
   return (
     <div className="space-y-3">
+      {/* Banner pending persetujuan */}
+      {pendingCount > 0 && (
+        <button
+          onClick={() => { setFilterStatus("pending"); setSearch(""); setPage(1); }}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all"
+          style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.35)" }}>
+          <span className="text-xl">⏳</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-amber-400">{pendingCount} pendaftaran menunggu persetujuan</p>
+            <p className="text-xs text-amber-300/70">Klik untuk lihat &amp; aktifkan user baru</p>
+          </div>
+          <span className="text-amber-400 text-xs font-bold shrink-0">Lihat →</span>
+        </button>
+      )}
+
       {/* Filters */}
       <div className="flex gap-2 flex-wrap">
         <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Cari nama/HP…"
@@ -257,7 +280,11 @@ function UsersPanel() {
               {/* Action panel */}
               {selected?.id === u.id && (
                 <div className="mt-3 pt-3 border-t border-white/10 space-y-3" onClick={(e) => e.stopPropagation()}>
-                  {actionMsg && <p className="text-xs text-emerald-400 font-semibold">{actionMsg}</p>}
+                  {actionMsg && (
+                    <p className={`text-xs font-semibold px-2 py-1.5 rounded-lg ${actionIsError ? "text-red-400 bg-red-500/10" : "text-emerald-400 bg-emerald-500/10"}`}>
+                      {actionIsError ? "⚠ " : "✓ "}{actionMsg}
+                    </p>
+                  )}
 
                   {/* Topup saldo */}
                   <div className="space-y-1.5">
