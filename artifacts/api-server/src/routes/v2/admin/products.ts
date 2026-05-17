@@ -22,6 +22,11 @@ import { audit } from "../../../lib/v2/auditService.js";
 const DG_BASE = "https://api.digiflazz.com/v1";
 const DG_TIMEOUT_MS = 30_000;
 
+/* Cooldown: minimal 10 menit antar sync agar tidak kena rate limit Digiflazz */
+const SYNC_COOLDOWN_MS = 10 * 60 * 1000;
+let lastSyncAt = 0;
+let lastSyncResult: { added: number; updated: number; skipped: number; total: number; errors: string[]; syncedAt: string } | null = null;
+
 function md5(str: string): string {
   return createHash("md5").update(str).digest("hex");
 }
@@ -155,8 +160,38 @@ router.put("/v2/admin/markup-settings", requireRole("admin"), async (req, res) =
   res.json({ message: "Pengaturan markup berhasil disimpan", settings: parsed.data });
 });
 
+/* ── GET /api/v2/admin/products/sync-status — Info cooldown sync ── */
+router.get("/v2/admin/products/sync-status", requireRole("admin"), (_req, res) => {
+  const now = Date.now();
+  const elapsed = now - lastSyncAt;
+  const remaining = Math.max(0, SYNC_COOLDOWN_MS - elapsed);
+  res.json({
+    canSync: remaining === 0,
+    cooldownRemainingMs: remaining,
+    cooldownRemainingMin: Math.ceil(remaining / 60_000),
+    lastSyncAt: lastSyncAt ? new Date(lastSyncAt).toISOString() : null,
+    lastSyncResult: lastSyncResult ?? null,
+  });
+});
+
 /* ── POST /api/v2/admin/products/sync — Sync pricelist Digiflazz → DB ── */
 router.post("/v2/admin/products/sync", requireRole("admin"), async (req, res) => {
+  /* Cek cooldown — jika belum cukup waktu, kembalikan hasil sync terakhir */
+  const now = Date.now();
+  const elapsed = now - lastSyncAt;
+  const remaining = SYNC_COOLDOWN_MS - elapsed;
+  if (lastSyncAt > 0 && remaining > 0) {
+    const menit = Math.ceil(remaining / 60_000);
+    res.status(429).json({
+      error: `Sync baru saja dilakukan. Tunggu ${menit} menit lagi agar tidak kena rate limit Digiflazz.`,
+      cooldownRemainingMs: remaining,
+      cooldownRemainingMin: menit,
+      lastSyncAt: new Date(lastSyncAt).toISOString(),
+      lastSyncResult: lastSyncResult ?? null,
+    });
+    return;
+  }
+
   try {
     /* 1. Ambil markup settings dari DB */
     const markup = await getMarkupSettings();
@@ -251,14 +286,19 @@ router.post("/v2/admin/products/sync", requireRole("admin"), async (req, res) =>
       data: { total: processed, added, updated, errors: errors.length },
     });
 
-    req.log.info({ processed, added, updated }, "Product sync completed");
-    res.json({
+    /* Catat waktu sync berhasil untuk cooldown */
+    lastSyncAt = Date.now();
+    lastSyncResult = {
       added,
       updated,
       skipped: allProducts.length - processed,
       total: processed,
       errors,
-    });
+      syncedAt: new Date().toISOString(),
+    };
+
+    req.log.info({ processed, added, updated }, "Product sync completed");
+    res.json(lastSyncResult);
   } catch (err) {
     req.log.error({ err }, "Product sync failed");
     res.status(500).json({ error: (err as Error).message });

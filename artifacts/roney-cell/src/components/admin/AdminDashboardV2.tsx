@@ -18,6 +18,7 @@ import {
   v2MonitoringHealth,
   v2AdminProducts,
   v2AdminSyncProducts,
+  v2AdminSyncStatus,
   v2AdminToggleProduct,
   v2GetMarkupSettings,
   v2SaveMarkupSettings,
@@ -29,6 +30,7 @@ import {
   type AuditLog,
   type MonitoringHealth,
   type SyncReport,
+  type SyncStatus,
   type V2Product,
   type MarkupSettings,
 } from "@/lib/apiV2";
@@ -785,9 +787,11 @@ function ProductsPanel() {
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
   const [syncing, setSyncing] = useState(false);
-  const [syncReport, setSyncReport] = useState<SyncReport | null>(null);
+  const [syncReport, setSyncReport] = useState<(SyncReport & { syncedAt?: string }) | null>(null);
   const [syncError, setSyncError] = useState("");
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [cooldownSec, setCooldownSec] = useState(0);
 
   const load = useCallback(async (p = page) => {
     setLoading(true); setError("");
@@ -801,23 +805,53 @@ function ProductsPanel() {
     finally { setLoading(false); }
   }, [page, q]);
 
+  /* Load sync status (cooldown info) saat panel dibuka */
+  useEffect(() => {
+    v2AdminSyncStatus().then((s) => {
+      setSyncStatus(s);
+      if (s.lastSyncResult) setSyncReport(s.lastSyncResult);
+      setCooldownSec(Math.ceil(s.cooldownRemainingMs / 1000));
+    }).catch(() => { /* abaikan */ });
+  }, []);
+
+  /* Hitung mundur cooldown setiap detik */
+  useEffect(() => {
+    if (cooldownSec <= 0) return;
+    const id = setInterval(() => setCooldownSec((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(id);
+  }, [cooldownSec]);
+
   useEffect(() => { void load(); }, [load]);
 
   const filtered = category ? products.filter((p) => p.category === category) : products;
 
   async function doSync() {
+    if (cooldownSec > 0) return;
     setSyncing(true); setSyncReport(null); setSyncError("");
     try {
       const report = await v2AdminSyncProducts();
       setSyncReport(report);
       void load(1);
       setPage(1);
+      /* Set cooldown baru setelah sync berhasil */
+      setCooldownSec(10 * 60);
     } catch (e) {
-      setSyncError((e as Error).message);
+      const msg = (e as Error).message;
+      /* Jika rate-limited, ambil info cooldown dari server */
+      setSyncError(msg);
+      v2AdminSyncStatus().then((s) => {
+        setSyncStatus(s);
+        setCooldownSec(Math.ceil(s.cooldownRemainingMs / 1000));
+      }).catch(() => { /* abaikan */ });
     } finally {
       setSyncing(false);
     }
   }
+
+  const syncDisabled = syncing || cooldownSec > 0;
+  const cooldownLabel = cooldownSec > 0
+    ? `${Math.floor(cooldownSec / 60)}:${String(cooldownSec % 60).padStart(2, "0")}`
+    : null;
 
   async function doToggle(p: V2Product) {
     setTogglingId(p.id);
@@ -832,20 +866,32 @@ function ProductsPanel() {
     <div className="space-y-4">
       {/* Sync button */}
       <div className="rounded-xl p-4 border border-white/8 space-y-3" style={{ background: "rgba(255,255,255,0.03)" }}>
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex-1 min-w-0">
             <div className="text-sm font-bold text-white">Sinkronisasi Produk Digiflazz</div>
-            <div className="text-xs text-white/50 mt-0.5">Ambil semua pricelist terbaru (prepaid + pasca) dan simpan ke database</div>
+            <div className="text-xs text-white/50 mt-0.5">Ambil pricelist terbaru (prepaid + pasca) dan simpan ke database</div>
+            {syncStatus?.lastSyncAt && (
+              <div className="text-[10px] text-white/30 mt-1">
+                Sync terakhir: {new Date(syncStatus.lastSyncAt).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+              </div>
+            )}
           </div>
           <button
             onClick={() => { void doSync(); }}
-            disabled={syncing}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity disabled:opacity-50"
-            style={{ background: "linear-gradient(135deg,#3B82F6,#8B5CF6)", boxShadow: "0 2px 12px rgba(59,130,246,0.3)" }}>
+            disabled={syncDisabled}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-60 shrink-0"
+            style={syncDisabled
+              ? { background: "rgba(255,255,255,0.08)", boxShadow: "none" }
+              : { background: "linear-gradient(135deg,#3B82F6,#8B5CF6)", boxShadow: "0 2px 12px rgba(59,130,246,0.3)" }}>
             {syncing ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                 Sinkronisasi...
+              </>
+            ) : cooldownLabel ? (
+              <>
+                <span className="text-base">⏳</span>
+                <span className="font-mono">{cooldownLabel}</span>
               </>
             ) : (
               <>
@@ -858,10 +904,27 @@ function ProductsPanel() {
           </button>
         </div>
 
+        {/* Penjelasan cooldown */}
+        {cooldownSec > 0 && !syncing && (
+          <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)" }}>
+            <span className="text-amber-400 text-sm shrink-0">⏳</span>
+            <p className="text-xs text-amber-300">
+              Digiflazz membatasi frekuensi pengambilan pricelist. Tombol akan aktif kembali dalam <span className="font-bold font-mono">{cooldownLabel}</span> menit.
+            </p>
+          </div>
+        )}
+
         {/* Laporan hasil sync */}
         {syncReport && (
           <div className="rounded-xl p-3 bg-emerald-500/10 border border-emerald-500/20 space-y-1">
-            <div className="text-xs font-bold text-emerald-400">Sync selesai!</div>
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-bold text-emerald-400">✓ Sync selesai</div>
+              {syncReport.syncedAt && (
+                <div className="text-[10px] text-emerald-400/60">
+                  {new Date(syncReport.syncedAt).toLocaleString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                </div>
+              )}
+            </div>
             <div className="grid grid-cols-3 gap-2 text-center mt-2">
               <div className="rounded-lg p-2 bg-white/5">
                 <div className="text-lg font-black text-emerald-400">{syncReport.added.toLocaleString("id-ID")}</div>
@@ -881,7 +944,20 @@ function ProductsPanel() {
             )}
           </div>
         )}
-        {syncError && <div className="text-xs text-red-400 rounded-lg p-2 bg-red-500/10 border border-red-500/20">{syncError}</div>}
+
+        {/* Error sync */}
+        {syncError && (
+          <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20">
+            <span className="text-red-400 text-sm shrink-0">⚠</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-red-400 font-semibold">Sync gagal</p>
+              <p className="text-xs text-red-300/80 mt-0.5">{syncError}</p>
+              {cooldownSec > 0 && (
+                <p className="text-[10px] text-red-300/60 mt-1">Coba lagi dalam {cooldownLabel}</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Pengaturan Markup Harga */}

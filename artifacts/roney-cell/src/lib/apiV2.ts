@@ -237,7 +237,17 @@ export async function v2SaveMarkupSettings(data: MarkupSettings) {
 }
 
 export async function v2AdminSyncProducts() {
-  return apiFetch<SyncReport>("/admin/products/sync", { method: "POST" });
+  return apiFetch<SyncReport & { syncedAt?: string }>("/admin/products/sync", { method: "POST" });
+}
+export interface SyncStatus {
+  canSync: boolean;
+  cooldownRemainingMs: number;
+  cooldownRemainingMin: number;
+  lastSyncAt: string | null;
+  lastSyncResult: (SyncReport & { syncedAt?: string }) | null;
+}
+export async function v2AdminSyncStatus() {
+  return apiFetch<SyncStatus>("/admin/products/sync-status");
 }
 
 export async function v2AdminToggleProduct(id: number, isActive: boolean) {
