@@ -11,8 +11,15 @@ import {
   type V2Deposit,
 } from "@/lib/apiV2";
 
-/* URL QRIS DANA Bisnis yang sudah dicopy ke public/ */
-const QRIS_URL = "/roney-cell/qris-dana.jpeg";
+/* URL QRIS DANA Bisnis — pakai BASE_URL agar tidak hardcoded */
+const QRIS_URL = `${(import.meta.env.BASE_URL as string).replace(/\/$/, "")}/qris-dana.jpg`;
+
+/* Info rekening BCA */
+const BCA_INFO = {
+  bank: "BCA",
+  noRek: "7255211277",
+  atasNama: "Isriatul Bahroni",
+};
 
 const PRESET_AMOUNTS = [50_000, 100_000, 200_000, 500_000, 1_000_000, 2_000_000];
 
@@ -234,45 +241,41 @@ function PaymentInstructions({
         </div>
       </div>
 
-      {/* QRIS image + instruksi */}
-      {!isExpired && deposit.status === "pending" && (
+      {/* Instruksi pembayaran — beda tampilan sesuai metode */}
+      {!isExpired && deposit.status === "pending" && deposit.method === "qris" && (
         <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(168,85,247,0.3)", background: "rgba(168,85,247,0.04)" }}>
-          {/* Banner instruksi — teks besar mencolok */}
           <div className="px-4 py-3 text-center" style={{ background: "linear-gradient(135deg, rgba(168,85,247,0.2), rgba(59,130,246,0.2))", borderBottom: "1px solid rgba(168,85,247,0.2)" }}>
-            <p className="text-xs font-black tracking-widest uppercase text-purple-300 mb-0.5">Cara Bayar</p>
+            <p className="text-xs font-black tracking-widest uppercase text-purple-300 mb-0.5">Cara Bayar QRIS</p>
             <p className="text-base font-black text-white leading-snug">
-              TRANSFER HARUS SESUAI<br />
+              SCAN QR & BAYAR TEPAT<br />
               <span style={{ color: "#FBBF24" }}>NOMINAL + KODE UNIK</span>
             </p>
           </div>
 
-          {/* QRIS */}
+          {/* Gambar QRIS */}
           <div className="px-4 pt-4 pb-2 flex flex-col items-center gap-3">
-            <div className="relative">
+            <div className="relative bg-white p-3 rounded-2xl" style={{ boxShadow: "0 8px 32px rgba(168,85,247,0.25)", border: "2px solid rgba(168,85,247,0.4)" }}>
               <img
                 src={QRIS_URL}
                 alt="QRIS Dana Bisnis RoneyCell"
-                className="w-full max-w-[260px] rounded-2xl"
-                style={{ border: "2px solid rgba(168,85,247,0.4)", boxShadow: "0 8px 32px rgba(168,85,247,0.2)" }}
+                className="w-[220px] h-[220px] object-contain rounded-lg"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
               />
-              {/* Overlay nominal di atas QR */}
-              <div className="absolute bottom-3 left-0 right-0 flex justify-center pointer-events-none">
-                <div className="px-3 py-1 rounded-lg text-xs font-black text-gray-900"
-                  style={{ background: "#FBBF24", boxShadow: "0 2px 8px rgba(0,0,0,0.4)" }}>
+              {/* Overlay nominal */}
+              <div className="absolute -bottom-3 left-0 right-0 flex justify-center pointer-events-none">
+                <div className="px-4 py-1.5 rounded-full text-xs font-black text-gray-900"
+                  style={{ background: "#FBBF24", boxShadow: "0 2px 12px rgba(0,0,0,0.4)" }}>
                   Bayar: {rp(totalAmount)}
                 </div>
               </div>
             </div>
-            <p className="text-xs text-center text-purple-300/80">
-              DANA · GoPay · OVO · ShopeePay · m-banking
-            </p>
+            <p className="text-xs text-center text-purple-300/80 mt-2">DANA · GoPay · OVO · ShopeePay · m-banking</p>
           </div>
 
-          {/* Langkah-langkah */}
           <div className="px-4 pb-4 space-y-2">
             {[
               { no: "1", text: "Buka aplikasi dompet digital atau m-banking" },
-              { no: "2", text: "Scan QRIS di atas" },
+              { no: "2", text: "Pilih menu QRIS / Scan QR" },
               { no: "3", text: `Masukkan nominal TEPAT ${rp(totalAmount)}` },
               { no: "4", text: "Bayar → screenshot struk pembayaran" },
               { no: "5", text: "Upload struk di bawah → saldo otomatis masuk ⚡" },
@@ -284,6 +287,86 @@ function PaymentInstructions({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Instruksi Transfer BCA */}
+      {!isExpired && deposit.status === "pending" && deposit.method === "transfer" && (
+        <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(59,130,246,0.35)", background: "rgba(59,130,246,0.04)" }}>
+          <div className="px-4 py-3 text-center" style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.2), rgba(6,182,212,0.15))", borderBottom: "1px solid rgba(59,130,246,0.2)" }}>
+            <p className="text-xs font-black tracking-widest uppercase text-blue-300 mb-0.5">Transfer Bank BCA</p>
+            <p className="text-base font-black text-white leading-snug">
+              TRANSFER TEPAT NOMINAL<br />
+              <span style={{ color: "#FBBF24" }}>TERMASUK KODE UNIK</span>
+            </p>
+          </div>
+
+          {/* Info rekening BCA */}
+          <div className="px-4 py-4 space-y-3">
+            <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(59,130,246,0.25)", background: "rgba(59,130,246,0.06)" }}>
+              {/* Logo BCA */}
+              <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid rgba(59,130,246,0.15)", background: "rgba(59,130,246,0.1)" }}>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs text-white"
+                  style={{ background: "linear-gradient(135deg,#005DAA,#0071CE)" }}>BCA</div>
+                <div>
+                  <p className="text-xs font-black text-white">Bank BCA</p>
+                  <p className="text-[10px] text-blue-300/80">Bank Central Asia</p>
+                </div>
+              </div>
+              <div className="px-4 py-3 space-y-3">
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Nomor Rekening</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xl font-black text-white tracking-widest">{BCA_INFO.noRek}</p>
+                    <CopyBtn text={BCA_INFO.noRek} />
+                  </div>
+                </div>
+                <div className="h-px bg-white/8" />
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Atas Nama</p>
+                  <p className="text-sm font-semibold text-white">{BCA_INFO.atasNama}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Nominal transfer */}
+            <div className="rounded-xl px-4 py-3 space-y-2" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)" }}>
+              <p className="text-xs font-black text-red-300 uppercase tracking-wider">⚠️ Transfer TEPAT nominal ini</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-2xl font-black text-white">{rp(totalAmount)}</p>
+                <CopyBtn text={String(totalAmount)} />
+              </div>
+              <p className="text-xs text-red-300/80">Nominal berbeda = tidak terdeteksi otomatis</p>
+            </div>
+
+            {/* Langkah */}
+            <div className="space-y-2">
+              {[
+                { no: "1", text: "Buka m-banking atau ATM BCA / bank lain" },
+                { no: "2", text: `Transfer ke BCA ${BCA_INFO.noRek} a.n. ${BCA_INFO.atasNama}` },
+                { no: "3", text: `Masukkan nominal TEPAT ${rp(totalAmount)} (sudah termasuk kode unik)` },
+                { no: "4", text: "Simpan struk / screenshot bukti transfer" },
+                { no: "5", text: "Upload struk di bawah → saldo otomatis masuk ⚡" },
+              ].map((s) => (
+                <div key={s.no} className="flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs font-black mt-0.5"
+                    style={{ background: "rgba(59,130,246,0.25)", color: "#60A5FA" }}>{s.no}</div>
+                  <p className="text-xs text-white/70 leading-relaxed">{s.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Instruksi Manual/WA */}
+      {!isExpired && deposit.status === "pending" && deposit.method === "manual" && (
+        <div className="rounded-2xl px-4 py-4 space-y-2" style={{ border: "1px solid rgba(16,185,129,0.3)", background: "rgba(16,185,129,0.04)" }}>
+          <p className="text-xs font-black text-emerald-400 uppercase tracking-wider">Konfirmasi via WhatsApp</p>
+          <p className="text-xs text-white/70 leading-relaxed">
+            Hubungi admin RoneyCell via WhatsApp untuk konfirmasi deposit manual sebesar <span className="font-bold text-white">{rp(totalAmount)}</span>.<br />
+            Sertakan nomor tiket: <span className="font-mono text-amber-400">{deposit.paymentRef}</span>
+          </p>
         </div>
       )}
 
@@ -496,9 +579,9 @@ function NewDepositForm({
         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Metode Bayar</p>
         <div className="space-y-2">
           {([
-            { v: "qris",     label: "QRIS DANA Bisnis",        sub: "GoPay · OVO · DANA · ShopeePay", color: "#A855F7" },
-            { v: "transfer", label: "Transfer Bank",            sub: "BCA · BRI · Mandiri · dll",      color: "#3B82F6" },
-            { v: "manual",   label: "Manual (konfirmasi WA)",   sub: "Hubungi admin langsung",          color: "#10B981" },
+            { v: "qris",     label: "QRIS DANA Bisnis",          sub: "GoPay · OVO · DANA · ShopeePay", color: "#A855F7" },
+            { v: "transfer", label: "Transfer Bank BCA",         sub: "No. Rek 7255211277 · a.n. Isriatul Bahroni", color: "#3B82F6" },
+            { v: "manual",   label: "Manual (konfirmasi WA)",    sub: "Hubungi admin langsung",          color: "#10B981" },
           ] as const).map((m) => (
             <button key={m.v} onClick={() => setMethod(m.v)}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all"
