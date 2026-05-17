@@ -239,117 +239,188 @@ function UsersPanel() {
     finally { setActionLoading(false); }
   }
 
+  /* Tombol filter status cepat */
+  const STATUS_CHIPS = [
+    { val: "", label: "Semua" },
+    { val: "active", label: "✅ Aktif" },
+    { val: "pending", label: "⏳ Pending" },
+    { val: "suspended", label: "🚫 Suspend" },
+  ];
+  const ROLE_CHIPS = [
+    { val: "", label: "Semua Role" },
+    { val: "member", label: "Member" },
+    { val: "reseller", label: "Reseller" },
+    { val: "admin", label: "Admin" },
+  ];
+
   return (
     <div className="space-y-3">
       {/* Banner pending persetujuan */}
       {pendingCount > 0 && (
         <button
           onClick={() => { setFilterStatus("pending"); setSearch(""); setPage(1); }}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all"
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all active:opacity-80"
           style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.35)" }}>
           <span className="text-xl">⏳</span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-amber-400">{pendingCount} pendaftaran menunggu persetujuan</p>
-            <p className="text-xs text-amber-300/70">Klik untuk lihat &amp; aktifkan user baru</p>
+            <p className="text-xs text-amber-300/70">Ketuk untuk lihat &amp; aktifkan user baru</p>
           </div>
-          <span className="text-amber-400 text-xs font-bold shrink-0">Lihat →</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white shrink-0">{pendingCount}</span>
         </button>
       )}
 
-      {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
-        <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Cari nama/HP…"
-          className="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50" />
-        <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-          className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white focus:outline-none">
-          <option value="">Semua Status</option>
-          <option value="active">Aktif</option>
-          <option value="pending">Pending</option>
-          <option value="suspended">Suspended</option>
-        </select>
-        <select value={filterRole} onChange={(e) => { setFilterRole(e.target.value); setPage(1); }}
-          className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white focus:outline-none">
-          <option value="">Semua Role</option>
-          <option value="member">Member</option>
-          <option value="reseller">Reseller</option>
-          <option value="admin">Admin</option>
-          <option value="superadmin">Superadmin</option>
-        </select>
+      {/* Filter status — pill chips horizontal */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+        {STATUS_CHIPS.map((c) => (
+          <button key={c.val} onClick={() => { setFilterStatus(c.val); setPage(1); }}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all active:scale-95 ${filterStatus === c.val ? "text-white" : "text-white/50"}`}
+            style={filterStatus === c.val
+              ? { background: "linear-gradient(135deg,#3B82F6,#6366F1)", boxShadow: "0 2px 8px rgba(59,130,246,0.4)" }
+              : { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            {c.label}
+          </button>
+        ))}
       </div>
+
+      {/* Filter role — pill chips horizontal */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+        {ROLE_CHIPS.map((c) => (
+          <button key={c.val} onClick={() => { setFilterRole(c.val); setPage(1); }}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all active:scale-95 ${filterRole === c.val ? "text-white" : "text-white/50"}`}
+            style={filterRole === c.val
+              ? { background: "linear-gradient(135deg,#7C3AED,#5B21B6)", boxShadow: "0 2px 8px rgba(124,58,237,0.4)" }
+              : { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            {c.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Pencarian */}
+      <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="🔍 Cari nama / nomor HP…"
+        className="w-full px-3 py-2.5 rounded-xl text-sm bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50" />
 
       {loading ? <LoadingSpinner /> : error ? <ErrorBox msg={error} /> : (
         <div className="space-y-2">
-          {users.map((u) => (
-            <div key={u.id} className="rounded-xl p-3 cursor-pointer transition-all" style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${selected?.id === u.id ? "rgba(59,130,246,0.4)" : "rgba(255,255,255,0.08)"}` }}
-              onClick={() => { setSelected(selected?.id === u.id ? null : u); setActionMsg(""); }}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="font-semibold text-sm text-white truncate">{u.name}</div>
-                  <div className="text-xs text-muted-foreground">{u.phone} {u.email && `· ${u.email}`}</div>
-                </div>
-                <div className="flex flex-col items-end gap-1 shrink-0">
-                  <span className={statusBadge(u.status)}>{u.status}</span>
-                  <span className={roleBadge(u.role)}>{u.role}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 mt-2">
-                <span className="text-xs font-bold text-emerald-400">{formatRp(u.balance)}</span>
-                <span className="text-xs text-muted-foreground">{new Date(u.createdAt).toLocaleDateString("id-ID")}</span>
-              </div>
+          {users.length === 0 && (
+            <p className="text-center text-sm text-muted-foreground py-8">Tidak ada user ditemukan</p>
+          )}
+          {users.map((u) => {
+            const isOpen = selected?.id === u.id;
+            return (
+              <div key={u.id} className="rounded-xl overflow-hidden transition-all"
+                style={{ background: isOpen ? "rgba(59,130,246,0.06)" : "rgba(255,255,255,0.04)", border: `1px solid ${isOpen ? "rgba(59,130,246,0.4)" : "rgba(255,255,255,0.08)"}` }}>
 
-              {/* Action panel */}
-              {selected?.id === u.id && (
-                <div className="mt-3 pt-3 border-t border-white/10 space-y-3" onClick={(e) => e.stopPropagation()}>
-                  {actionMsg && (
-                    <p className={`text-xs font-semibold px-2 py-1.5 rounded-lg ${actionIsError ? "text-red-400 bg-red-500/10" : "text-emerald-400 bg-emerald-500/10"}`}>
-                      {actionIsError ? "⚠ " : "✓ "}{actionMsg}
-                    </p>
-                  )}
-
-                  {/* Topup saldo */}
-                  <div className="space-y-1.5">
-                    <p className="text-xs text-white/60 font-semibold">Manual Topup Saldo</p>
-                    <div className="flex gap-2">
-                      <input value={topupAmount} onChange={(e) => setTopupAmount(e.target.value)} placeholder="Jumlah (Rp)"
-                        className="flex-1 px-2 py-1.5 rounded-lg text-xs bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none" />
-                      <button onClick={() => doTopup(u.id)} disabled={actionLoading}
-                        className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50">Topup</button>
-                    </div>
-                    <input value={topupNote} onChange={(e) => setTopupNote(e.target.value)} placeholder="Catatan (opsional)"
-                      className="w-full px-2 py-1.5 rounded-lg text-xs bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none" />
+                {/* ── Baris ringkasan — ketuk untuk buka detail ── */}
+                <button
+                  className="w-full flex items-center gap-3 px-3 py-3 text-left active:bg-white/5 transition-colors"
+                  onClick={() => { setSelected(isOpen ? null : u); setActionMsg(""); }}>
+                  {/* Avatar inisial */}
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-sm text-white"
+                    style={{ background: u.status === "active" ? "linear-gradient(135deg,#10B981,#059669)" : u.status === "pending" ? "linear-gradient(135deg,#F59E0B,#D97706)" : "linear-gradient(135deg,#6B7280,#4B5563)" }}>
+                    {u.name.charAt(0).toUpperCase()}
                   </div>
 
-                  {/* Suspend */}
-                  {u.status !== "suspended" && (
-                    <div className="space-y-1.5">
-                      <p className="text-xs text-white/60 font-semibold">Suspend User</p>
+                  {/* Info utama */}
+                  <div className="flex-1 min-w-0 text-left">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-white truncate">{u.name}</span>
+                      {u.status === "active" && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-muted-foreground">📱 0{u.phone}</span>
+                      <span className={roleBadge(u.role)}>{u.role}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs font-bold text-emerald-400">{formatRp(u.balance)}</span>
+                      <span className={statusBadge(u.status)}>{u.status}</span>
+                    </div>
+                  </div>
+
+                  {/* Chevron buka/tutup */}
+                  <div className="shrink-0 flex flex-col items-center gap-1">
+                    <svg className="w-4 h-4 text-white/40 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                      style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0)" }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                    <span className="text-[9px] text-white/30">{isOpen ? "Tutup" : "Kelola"}</span>
+                  </div>
+                </button>
+
+                {/* ── Panel aksi (expand) ── */}
+                {isOpen && (
+                  <div className="px-3 pb-4 pt-1 border-t border-white/8 space-y-3">
+                    <p className="text-[10px] text-white/30 font-semibold uppercase tracking-widest pt-1">
+                      Bergabung: {new Date(u.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+                      {u.email && ` · ${u.email}`}
+                    </p>
+
+                    {actionMsg && (
+                      <p className={`text-xs font-semibold px-3 py-2 rounded-xl ${actionIsError ? "text-red-400 bg-red-500/10 border border-red-500/20" : "text-emerald-400 bg-emerald-500/10 border border-emerald-500/20"}`}>
+                        {actionIsError ? "⚠ " : "✓ "}{actionMsg}
+                      </p>
+                    )}
+
+                    {/* Aktifkan — hanya jika bukan aktif */}
+                    {u.status !== "active" && (
+                      <button onClick={() => doActivate(u.id)} disabled={actionLoading}
+                        className="w-full py-2.5 rounded-xl text-sm font-black text-white disabled:opacity-50 active:opacity-80 transition-opacity"
+                        style={{ background: "linear-gradient(135deg,#3B82F6,#2563EB)", boxShadow: "0 2px 12px rgba(59,130,246,0.35)" }}>
+                        {actionLoading ? "Memproses..." : "✓ Aktifkan User Ini"}
+                      </button>
+                    )}
+
+                    {/* Topup saldo */}
+                    <div className="rounded-xl p-3 space-y-2" style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)" }}>
+                      <p className="text-xs font-black text-emerald-400 uppercase tracking-wider">💰 Topup Saldo Manual</p>
                       <div className="flex gap-2">
-                        <input value={suspendReason} onChange={(e) => setSuspendReason(e.target.value)} placeholder="Alasan suspend"
-                          className="flex-1 px-2 py-1.5 rounded-lg text-xs bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none" />
-                        <button onClick={() => doSuspend(u.id)} disabled={actionLoading}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-red-600 hover:bg-red-500 disabled:opacity-50">Suspend</button>
+                        <input value={topupAmount} onChange={(e) => setTopupAmount(e.target.value)} placeholder="Jumlah (contoh: 50000)"
+                          type="number" inputMode="numeric"
+                          className="flex-1 px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-emerald-500/50" />
+                        <button onClick={() => doTopup(u.id)} disabled={actionLoading}
+                          className="px-4 py-2 rounded-lg text-sm font-black text-white bg-emerald-600 disabled:opacity-50 active:opacity-80 shrink-0">
+                          Topup
+                        </button>
+                      </div>
+                      <input value={topupNote} onChange={(e) => setTopupNote(e.target.value)} placeholder="Catatan (opsional)"
+                        className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none" />
+                    </div>
+
+                    {/* Ubah role */}
+                    <div className="rounded-xl p-3 space-y-2" style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)" }}>
+                      <p className="text-xs font-black text-indigo-400 uppercase tracking-wider">🎖 Ubah Role</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(["member","reseller","admin"] as const).map((r) => (
+                          <button key={r} onClick={() => doChangeRole(u.id, r)} disabled={actionLoading || u.role === r}
+                            className={`py-2 rounded-lg text-xs font-bold capitalize transition-all disabled:opacity-40 active:opacity-70 ${u.role === r ? "text-white" : "text-white/60"}`}
+                            style={u.role === r
+                              ? { background: "linear-gradient(135deg,#6366F1,#4F46E5)", boxShadow: "0 2px 8px rgba(99,102,241,0.3)" }
+                              : { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                            {r === u.role ? "✓ " : ""}{r}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  )}
 
-                  {/* Activate */}
-                  {u.status !== "active" && (
-                    <button onClick={() => doActivate(u.id)} disabled={actionLoading}
-                      className="w-full py-1.5 rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50">Aktifkan User</button>
-                  )}
-
-                  {/* Role */}
-                  <div className="flex gap-2 flex-wrap">
-                    <p className="text-xs text-white/60 font-semibold w-full">Ubah Role:</p>
-                    {(["member","reseller","admin"] as const).map((r) => (
-                      <button key={r} onClick={() => doChangeRole(u.id, r)} disabled={actionLoading || u.role === r}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold disabled:opacity-40 ${u.role === r ? "bg-blue-600 text-white" : "bg-white/10 text-white hover:bg-white/20"}`}>{r}</button>
-                    ))}
+                    {/* Suspend */}
+                    {u.status !== "suspended" && (
+                      <div className="rounded-xl p-3 space-y-2" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
+                        <p className="text-xs font-black text-red-400 uppercase tracking-wider">🚫 Suspend User</p>
+                        <div className="flex gap-2">
+                          <input value={suspendReason} onChange={(e) => setSuspendReason(e.target.value)} placeholder="Alasan suspend (wajib)"
+                            className="flex-1 px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-red-500/40" />
+                          <button onClick={() => doSuspend(u.id)} disabled={actionLoading}
+                            className="px-4 py-2 rounded-lg text-sm font-black text-white bg-red-600 disabled:opacity-50 active:opacity-80 shrink-0">
+                            Suspend
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
-            </div>
-          ))}
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
