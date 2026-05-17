@@ -31,8 +31,12 @@ import {
   updateSheetUserStatus,
   SheetUser,
 } from "@/lib/sheetsApi";
-import { v2AdminUsers, v2AdminActivateUser, getV2Token, type V2User } from "@/lib/apiV2";
-import { getServerIp, checkDigiflazzBalance, sendTestTransaction, TestTransactionResult } from "@/lib/digiflazz";
+import {
+  v2AdminUsers, v2AdminActivateUser, getV2Token,
+  v2MonitoringServerIp, v2MonitoringDigiflazzBalance,
+  type V2User,
+} from "@/lib/apiV2";
+import { sendTestTransaction, TestTransactionResult } from "@/lib/digiflazz";
 
 type AdminTab = "report" | "prices" | "members" | "settings" | "uji" | "v2";
 
@@ -911,10 +915,15 @@ function DigiflazzStatusCard() {
 
   const fetchStatus = useCallback(async () => {
     setLoading(true); setError(null);
+    if (!getV2Token()) {
+      setError("Login ke Panel DB terlebih dahulu untuk melihat status Digiflazz");
+      setLoading(false);
+      return;
+    }
     try {
       const [ipResult, balResult] = await Promise.all([
-        getServerIp(),
-        checkDigiflazzBalance(),
+        v2MonitoringServerIp(),
+        v2MonitoringDigiflazzBalance(),
       ]);
       setIp(ipResult);
       if (balResult.error) setError(balResult.error);

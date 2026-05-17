@@ -263,6 +263,22 @@ export async function v2MonitoringHealth() {
 export async function v2MonitoringProviders() {
   return apiFetch<{ providers: unknown[] }>("/monitoring/providers");
 }
+export async function v2MonitoringServerIp(): Promise<string> {
+  try {
+    const res = await apiFetch<{ ip: string }>("/monitoring/server-ip");
+    return res.ip ?? "Tidak tersedia";
+  } catch {
+    return "Tidak tersedia";
+  }
+}
+export async function v2MonitoringDigiflazzBalance(): Promise<{ balance: number; error?: string }> {
+  try {
+    const res = await apiFetch<{ data?: { deposit?: number }; error?: string }>("/monitoring/digiflazz-balance");
+    return { balance: (res as { data?: { deposit?: number } }).data?.deposit ?? 0 };
+  } catch (e) {
+    return { balance: 0, error: (e as Error).message };
+  }
+}
 
 /* ─── Types ─── */
 export interface V2User {

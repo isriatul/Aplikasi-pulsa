@@ -1,12 +1,15 @@
 /**
- * GET /api/v2/monitoring/health     — health check detail
- * GET /api/v2/monitoring/providers  — status semua provider
+ * GET /api/v2/monitoring/health            — health check detail
+ * GET /api/v2/monitoring/providers         — status semua provider
+ * GET /api/v2/monitoring/server-ip         — IP publik server (untuk whitelist Digiflazz)
+ * GET /api/v2/monitoring/digiflazz-balance — saldo deposit Digiflazz
  */
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { createHash } from "crypto";
 import { db } from "@workspace/db";
 import { providersTable } from "@workspace/db";
-import { requireRole } from "../../middlewares/requireRole.js";
+import { requireRole, requireAuthV2 } from "../../middlewares/requireRole.js";
+import { sanitizeDigiflazzResponse } from "../../lib/sanitize.js";
 
 const router: IRouter = Router();
 
@@ -64,6 +67,45 @@ router.get("/v2/monitoring/providers", requireRole("admin"), async (_req, res) =
   });
 
   res.json({ providers: result });
+});
+
+/* ── GET /api/v2/monitoring/server-ip ── */
+router.get("/v2/monitoring/server-ip", requireAuthV2, async (req, res) => {
+  try {
+    const r = await fetch("https://api.ipify.org?format=json", {
+      signal: AbortSignal.timeout(8_000),
+    });
+    const data = (await r.json()) as { ip: string };
+    res.json({ ip: data.ip });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch public IP");
+    res.status(500).json({ error: "Gagal mengambil IP server" });
+  }
+});
+
+/* ── GET /api/v2/monitoring/digiflazz-balance ── */
+router.get("/v2/monitoring/digiflazz-balance", requireRole("admin"), async (req, res) => {
+  const username = process.env["DIGIFLAZZ_USERNAME"];
+  const apiKey   = process.env["DIGIFLAZZ_KEY"];
+  if (!username || !apiKey) {
+    res.status(503).json({ error: "Kredensial Digiflazz belum dikonfigurasi di server" });
+    return;
+  }
+  try {
+    const sign = createHash("md5").update(username + apiKey + "depo").digest("hex");
+    const raw  = await fetch("https://api.digiflazz.com/v1/cek-saldo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cmd: "deposit", username, sign }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    const json = await raw.json();
+    req.log.info({ status: raw.status }, "Digiflazz balance checked via v2");
+    res.json(sanitizeDigiflazzResponse(json));
+  } catch (err) {
+    req.log.error({ err }, "Failed to check Digiflazz balance via v2");
+    res.status(500).json({ error: "Gagal cek saldo Digiflazz" });
+  }
 });
 
 export default router;
