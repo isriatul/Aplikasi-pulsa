@@ -1,6 +1,6 @@
 # RoneyCell
 
-Sistem jualan pulsa & PPOB professional berbasis web (PWA) dengan dual-backend: Google Sheets (sistem lama) + PostgreSQL (sistem v2).
+Sistem jualan pulsa & PPOB professional berbasis web (PWA). Database utama: **PostgreSQL v2**. Google Sheets sudah di-deprecated — hanya tersimpan sebagai referensi backup.
 
 ## Run & Operate
 

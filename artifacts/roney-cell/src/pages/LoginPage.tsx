@@ -1,56 +1,12 @@
+/**
+ * Halaman Login & Daftar — menggunakan PostgreSQL v2
+ */
 import { useState } from "react";
-import {
-  SheetUser, loginWithPhone, loginByEmail,
-  registerUser, registerFacebook,
-} from "@/lib/sheetsApi";
+import { v2Login, v2Register, type V2User } from "@/lib/apiV2";
 import { Member } from "@/lib/members";
 import { getCountryInfo, COUNTRY_MAP } from "@/lib/operator";
 
-type LoginMethod = "phone" | "email" | "facebook";
 type Mode = "login" | "register" | "registered";
-
-/* ── Super Admin bypass (hardcoded, always active) ── */
-const SUPER_ADMIN_PHONE = "81288080752"; // tanpa leading 0, tanpa kode negara
-const SUPER_ADMIN_PASS  = "311296";
-
-function buildSuperAdminMember(): Member {
-  return {
-    id:          "SUPER_ADMIN",
-    name:        "Admin RoneyCell",
-    phone:       "081288080752",
-    whatsapp:    "081288080752",
-    pin:         "",
-    type:        "reseller",
-    status:      "approved",
-    balance:     0,
-    loginMethod: "phone",
-    createdAt:   new Date().toISOString(),
-    approvedAt:  new Date().toISOString(),
-    notes:       "__superadmin__",
-  };
-}
-
-interface LoginPageProps {
-  onLogin: (member: Member) => void;
-}
-
-function sheetToMember(u: SheetUser): Member {
-  return {
-    id: u.id,
-    name: u.name,
-    phone: u.phone,
-    email: u.email,
-    whatsapp: u.phone,
-    pin: "",
-    type: "member",
-    status: u.status === "active" ? "approved" : u.status === "pending" ? "pending" : "rejected",
-    balance: u.balance,
-    loginMethod: u.loginMethod as Member["loginMethod"],
-    deviceId: u.deviceId,
-    createdAt: u.createdAt,
-    approvedAt: u.status === "active" ? u.createdAt : undefined,
-  };
-}
 
 const ADMIN_WA = "6281288080752";
 
@@ -61,28 +17,38 @@ const DIAL_OPTIONS = Object.values(COUNTRY_MAP).map((c) => ({
   label: `${c.flag} ${c.dialCode}`,
 }));
 
-export default function LoginPage({ onLogin }: LoginPageProps) {
-  const [method, setMethod]     = useState<LoginMethod>("phone");
-  const [mode, setMode]         = useState<Mode>("login");
+function v2UserToMember(u: V2User): Member {
+  return {
+    id: String(u.id),
+    name: u.name,
+    phone: u.phone,
+    email: u.email,
+    whatsapp: u.phone,
+    pin: "",
+    type: u.role === "superadmin" || u.role === "admin" ? "reseller" : "member",
+    status: u.status === "active" ? "approved" : u.status === "pending" ? "pending" : "rejected",
+    balance: u.balance ?? 0,
+    loginMethod: "phone",
+    createdAt: u.createdAt,
+    approvedAt: u.status === "active" ? u.createdAt : undefined,
+    notes: u.role === "superadmin" ? "__superadmin__" : undefined,
+  };
+}
 
-  /* phone */
+interface LoginPageProps {
+  onLogin: (member: Member) => void;
+}
+
+export default function LoginPage({ onLogin }: LoginPageProps) {
+  const [mode, setMode] = useState<Mode>("login");
+
+  /* form fields */
   const [dialCode, setDialCode] = useState("+62");
   const [phone, setPhone]       = useState("");
-  const [pin, setPin]           = useState("");
-  const [txPin, setTxPin]       = useState("");
+  const [password, setPassword] = useState("");
   const [name, setName]         = useState("");
 
-  /* email */
-  const [email, setEmail]           = useState("");
-  const [password, setPassword]     = useState("");
-  const [emailTxPin, setEmailTxPin] = useState("");
-  const [emailName, setEmailName]   = useState("");
-
-  /* facebook */
-  const [fbName, setFbName] = useState("");
-  const [fbStep, setFbStep] = useState<"button" | "name">("button");
-
-  /* registered info (for pending screen) */
+  /* registered info */
   const [registeredName, setRegisteredName]   = useState("");
   const [registeredPhone, setRegisteredPhone] = useState("");
 
@@ -98,127 +64,60 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     return `https://wa.me/${ADMIN_WA}?text=${txt}`;
   }
 
-  /* ── Phone submit ── */
-  async function handlePhoneSubmit(e: React.FormEvent) {
+  /* ── Submit login / register ── */
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!phone || !pin) { setError("Isi nomor HP dan password."); return; }
-    setLoading(true); clearMsg();
-    try {
-      if (mode === "login") {
-        const cleanPhone = phone.replace(/\D/g, "").replace(/^0/, "");
+    clearMsg();
 
-        /* ── SUPER ADMIN BYPASS ── */
-        if (cleanPhone === SUPER_ADMIN_PHONE && pin === SUPER_ADMIN_PASS) {
-          onLogin(buildSuperAdminMember());
-          setLoading(false);
-          return;
-        }
+    if (!phone.trim() || !password.trim()) {
+      setError("Isi nomor HP dan password.");
+      return;
+    }
 
-        const res = await loginWithPhone(cleanPhone, pin);
-        if (res.ok && res.user) {
-          const m = sheetToMember(res.user);
-          if (m.status === "pending") {
-            setError("⏳ Akun Anda belum aktif. Silakan hubungi Admin untuk aktivasi.");
-          } else if (m.status === "rejected") {
-            setError("❌ Akun Anda ditolak. Hubungi Admin untuk informasi lebih lanjut.");
-          } else {
-            onLogin(m);
-          }
+    const digits = phone.replace(/\D/g, "");
+
+    if (mode === "login") {
+      /* Normalisasi nomor: hapus leading 0, tambah kode negara */
+      const cleanPhone = dialCode.replace("+", "") + digits.replace(/^0/, "");
+      setLoading(true);
+      try {
+        const res = await v2Login({ phone: cleanPhone, password });
+        const m = v2UserToMember(res.user);
+        if (m.status === "pending") {
+          setError("⏳ Akun Anda belum aktif. Silakan hubungi Admin untuk aktivasi.");
+        } else if (m.status === "rejected") {
+          setError("❌ Akun Anda ditolak. Hubungi Admin untuk informasi lebih lanjut.");
         } else {
-          setError(res.message ?? "Login gagal. Periksa nomor dan password.");
+          onLogin(m);
         }
-      } else {
-        if (!name.trim())       { setError("Nama tidak boleh kosong."); setLoading(false); return; }
-        if (pin.length < 6)     { setError("Password minimal 6 karakter."); setLoading(false); return; }
-        if (txPin.length !== 6) { setError("PIN Transaksi harus 6 digit."); setLoading(false); return; }
-        const countryInfo = getCountryInfo(dialCode);
-        const digits = phone.replace(/\D/g, "");
-        if (digits.length < countryInfo.minLen) {
-          setError(`Nomor HP minimal ${countryInfo.minLen} digit untuk ${countryInfo.name}.`);
-          setLoading(false); return;
-        }
-        /* build full international number */
-        const intlPhone = dialCode.replace("+", "") + digits.replace(/^0/, "");
-        const res = await registerUser({
-          name: name.trim(),
-          phone: intlPhone,
-          password: pin,
-          txPin,
-          loginMethod: "phone",
-          status: "pending",
-        });
-        if (res.ok) {
-          setRegisteredName(name.trim());
-          setRegisteredPhone(`${dialCode} ${phone}`);
-          setMode("registered");
-        } else {
-          setError(res.message ?? "Gagal mendaftar. Coba lagi.");
-        }
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Login gagal. Periksa nomor dan password.");
       }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Terjadi kesalahan.");
-    }
-    setLoading(false);
-  }
+      setLoading(false);
 
-  /* ── Email submit ── */
-  async function handleEmailSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email || !password) { setError("Isi email dan password."); return; }
-    setLoading(true); clearMsg();
-    try {
-      if (mode === "login") {
-        const res = await loginByEmail(email, password);
-        if (res.ok && res.user) {
-          const m = sheetToMember(res.user);
-          if (m.status === "pending") {
-            setError("⏳ Akun Anda belum aktif. Silakan hubungi Admin untuk aktivasi.");
-          } else if (m.status === "rejected") {
-            setError("❌ Akun Anda ditolak. Hubungi Admin untuk informasi lebih lanjut.");
-          } else {
-            onLogin(m);
-          }
-        } else {
-          setError(res.message ?? "Login gagal.");
-        }
-      } else {
-        if (!emailName.trim())       { setError("Nama tidak boleh kosong."); setLoading(false); return; }
-        if (password.length < 6)     { setError("Password minimal 6 karakter."); setLoading(false); return; }
-        if (emailTxPin.length !== 6) { setError("PIN Transaksi harus 6 digit."); setLoading(false); return; }
-        const res = await registerUser({
-          name: emailName.trim(),
-          email,
-          password,
-          txPin: emailTxPin,
-          loginMethod: "email",
-          status: "pending",
-        });
-        if (res.ok) {
-          setRegisteredName(emailName.trim());
-          setRegisteredPhone(email);
-          setMode("registered");
-        } else {
-          setError(res.message ?? "Gagal mendaftar.");
-        }
+    } else {
+      /* Register */
+      if (!name.trim()) { setError("Nama tidak boleh kosong."); return; }
+      if (password.length < 6) { setError("Password minimal 6 karakter."); return; }
+
+      const countryInfo = getCountryInfo(dialCode);
+      if (digits.length < countryInfo.minLen) {
+        setError(`Nomor HP minimal ${countryInfo.minLen} digit untuk ${countryInfo.name}.`);
+        return;
       }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Terjadi kesalahan.");
-    }
-    setLoading(false);
-  }
+      const intlPhone = dialCode.replace("+", "") + digits.replace(/^0/, "");
 
-  /* ── Facebook ── */
-  async function handleFacebookLogin() {
-    if (!fbName.trim()) { setError("Masukkan nama Anda."); return; }
-    setLoading(true); clearMsg();
-    try {
-      const res = await registerFacebook(fbName.trim());
-      if (res.ok && res.user) onLogin(sheetToMember(res.user));
-      else setError(res.message ?? "Gagal masuk dengan Facebook.");
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Terjadi kesalahan.");
+      setLoading(true);
+      try {
+        await v2Register({ phone: intlPhone, name: name.trim(), password });
+        setRegisteredName(name.trim());
+        setRegisteredPhone(`${dialCode} ${phone}`);
+        setMode("registered");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Gagal mendaftar. Coba lagi.");
+      }
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   /* ── REGISTERED / PENDING screen ── */
@@ -227,7 +126,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       <div className="min-h-dvh flex flex-col items-center justify-center max-w-md mx-auto px-5 py-10"
         style={{ background: "linear-gradient(160deg, hsl(220 45% 5%) 0%, hsl(230 50% 8%) 100%)" }}>
 
-        {/* Success icon */}
         <div className="w-24 h-24 rounded-3xl flex items-center justify-center mb-6"
           style={{ background: "linear-gradient(135deg,rgba(16,185,129,0.2) 0%,rgba(5,150,105,0.2) 100%)", border: "1.5px solid rgba(16,185,129,0.4)", boxShadow: "0 0 40px rgba(16,185,129,0.2)" }}>
           <span className="text-5xl">✅</span>
@@ -248,7 +146,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </div>
         </div>
 
-        {/* Contact info */}
         <div className="w-full p-4 rounded-2xl border border-white/8 bg-white/3 mb-5 space-y-2">
           <p className="text-xs text-muted-foreground font-semibold uppercase tracking-widest">Data Terdaftar</p>
           <div className="flex items-center gap-2">
@@ -261,7 +158,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </div>
         </div>
 
-        {/* WA confirmation button */}
         <a href={waLink(registeredName)} target="_blank" rel="noopener noreferrer"
           className="w-full py-4 rounded-2xl font-black text-base text-white flex items-center justify-center gap-3 mb-3 transition-all hover:opacity-90"
           style={{ background: "linear-gradient(135deg,#25D366 0%,#128C7E 100%)", boxShadow: "0 6px 24px rgba(37,211,102,0.35)" }}>
@@ -275,7 +171,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           Klik tombol di atas untuk menghubungi Admin agar akun Anda segera diaktifkan.
         </p>
 
-        <button onClick={() => { setMode("login"); setPhone(""); setPin(""); setTxPin(""); setName(""); }}
+        <button onClick={() => { setMode("login"); setPhone(""); setPassword(""); setName(""); }}
           className="w-full py-3 rounded-2xl font-bold text-sm border border-white/10 bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/8 transition-all">
           ← Kembali ke Halaman Login
         </button>
@@ -293,12 +189,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   }
 
   /* ── Main login/register screen ── */
-  const METHODS: { id: LoginMethod; icon: string; label: string }[] = [
-    { id: "phone",    icon: "📱", label: "No. HP" },
-    { id: "email",    icon: "✉️", label: "Email" },
-    { id: "facebook", icon: "👤", label: "Facebook" },
-  ];
-
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center max-w-md mx-auto px-5"
       style={{ background: "linear-gradient(160deg, hsl(220 45% 5%) 0%, hsl(230 50% 8%) 100%)" }}>
@@ -320,39 +210,22 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           <p className="text-xs text-muted-foreground tracking-widest">SISTEM JUALAN PULSA PROFESIONAL</p>
         </div>
 
-        {/* Method tabs */}
-        <div className="w-full flex gap-2 mb-5 p-1 rounded-2xl bg-white/4 border border-white/6">
-          {METHODS.map((m) => (
-            <button key={m.id} onClick={() => { setMethod(m.id); clearMsg(); }}
-              className="flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl text-[11px] font-bold transition-all"
-              style={method === m.id
-                ? { background: "linear-gradient(135deg,#3B82F6 0%,#6366F1 100%)", color: "white", boxShadow: "0 4px 12px rgba(59,130,246,0.3)" }
-                : { color: "rgba(255,255,255,0.45)" }
+        {/* Login / Register toggle */}
+        <div className="w-full flex gap-2 mb-5">
+          {(["login", "register"] as const).map((m) => (
+            <button key={m} onClick={() => { setMode(m); clearMsg(); }}
+              className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all border"
+              style={mode === m
+                ? { background: "rgba(59,130,246,0.15)", borderColor: "rgba(59,130,246,0.4)", color: "#60A5FA" }
+                : { borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)" }
               }>
-              <span className="text-base">{m.icon}</span>
-              {m.label}
+              {m === "login" ? "🔑 Masuk" : "✍️ Daftar"}
             </button>
           ))}
         </div>
 
-        {/* Login / Register toggle */}
-        {method !== "facebook" && (
-          <div className="w-full flex gap-2 mb-5">
-            {(["login", "register"] as const).map((m) => (
-              <button key={m} onClick={() => { setMode(m); clearMsg(); }}
-                className="flex-1 py-2 rounded-xl text-xs font-bold transition-all border"
-                style={mode === m
-                  ? { background: "rgba(59,130,246,0.15)", borderColor: "rgba(59,130,246,0.4)", color: "#60A5FA" }
-                  : { borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)" }
-                }>
-                {m === "login" ? "🔑 Masuk" : "✍️ Daftar"}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Admin approval notice for register */}
-        {mode === "register" && method !== "facebook" && (
+        {/* Admin approval notice */}
+        {mode === "register" && (
           <div className="w-full flex items-start gap-2.5 px-4 py-3 rounded-xl border border-yellow-500/20 bg-yellow-500/8 mb-4">
             <span className="flex-shrink-0 text-yellow-400 mt-0.5">🛡️</span>
             <div>
@@ -364,128 +237,64 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </div>
         )}
 
-        {/* ── Phone form ── */}
-        {method === "phone" && (
-          <form onSubmit={handlePhoneSubmit} className="w-full space-y-3">
-            {mode === "register" && (
-              <FormInput label="Nama Lengkap" type="text" value={name} onChange={setName} placeholder="Nama Anda" icon="👤" />
-            )}
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="w-full space-y-3">
+          {mode === "register" && (
+            <FormInput label="Nama Lengkap" type="text" value={name} onChange={setName}
+              placeholder="Nama Anda" icon="👤" />
+          )}
 
-            {/* Phone with country code */}
-            <div>
-              <label className="text-xs text-muted-foreground tracking-widest uppercase font-semibold block mb-1.5">
-                Nomor HP
-              </label>
-              <div className="flex gap-2">
-                {mode === "register" ? (
-                  <select value={dialCode} onChange={(e) => setDialCode(e.target.value)}
-                    className="w-28 px-2 py-3.5 rounded-xl text-sm font-bold bg-white/5 border border-white/10 text-foreground focus:outline-none focus:border-blue-500/60 transition-all">
-                    {DIAL_OPTIONS.map((d) => (
-                      <option key={d.code} value={d.code}>{d.label}</option>
-                    ))}
-                  </select>
-                ) : null}
-                <input type="tel" inputMode="numeric" value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                  placeholder={dialCode === "+62" ? "08xxxxxxxxxx" : "Nomor lokal"}
-                  className="flex-1 px-4 py-3.5 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-all" />
-              </div>
-              {/* Country detection badge */}
-              {mode === "register" && phone.length >= 3 && (
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <span className="text-base">{getCountryInfo(dialCode).flag}</span>
-                  <span className="text-xs text-muted-foreground">{getCountryInfo(dialCode).name}</span>
-                  <span className="text-[10px] font-bold text-emerald-400">
-                    {phone.replace(/\D/g, "").length >= getCountryInfo(dialCode).minLen ? "✓ Valid" : `min ${getCountryInfo(dialCode).minLen} digit`}
-                  </span>
-                </div>
-              )}
+          {/* Phone with country code */}
+          <div>
+            <label className="text-xs text-muted-foreground tracking-widest uppercase font-semibold block mb-1.5">
+              Nomor HP
+            </label>
+            <div className="flex gap-2">
+              {mode === "register" ? (
+                <select value={dialCode} onChange={(e) => setDialCode(e.target.value)}
+                  className="w-28 px-2 py-3.5 rounded-xl text-sm font-bold bg-white/5 border border-white/10 text-foreground focus:outline-none focus:border-blue-500/60 transition-all">
+                  {DIAL_OPTIONS.map((d) => (
+                    <option key={d.code} value={d.code}>{d.label}</option>
+                  ))}
+                </select>
+              ) : null}
+              <input type="tel" inputMode="numeric" value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                placeholder={dialCode === "+62" ? "08xxxxxxxxxx" : "Nomor lokal"}
+                className="flex-1 px-4 py-3.5 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-all" />
             </div>
-
-            <FormInput label={mode === "register" ? "Password (min 6 karakter)" : "Password"}
-              type="password" value={pin} onChange={setPin} placeholder="••••••" icon="🔒" />
-
-            {mode === "register" && (
-              <div>
-                <FormInput label="PIN Transaksi (6 digit)" type="password" value={txPin} onChange={setTxPin}
-                  placeholder="6 digit PIN untuk konfirmasi transaksi" icon="🔐" numeric maxLen={6} />
-                <p className="text-[10px] text-muted-foreground mt-1 ml-1">PIN ini digunakan setiap kali melakukan pembelian.</p>
+            {mode === "register" && phone.length >= 3 && (
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <span className="text-base">{getCountryInfo(dialCode).flag}</span>
+                <span className="text-xs text-muted-foreground">{getCountryInfo(dialCode).name}</span>
+                <span className="text-[10px] font-bold text-emerald-400">
+                  {phone.replace(/\D/g, "").length >= getCountryInfo(dialCode).minLen ? "✓ Valid" : `min ${getCountryInfo(dialCode).minLen} digit`}
+                </span>
               </div>
-            )}
-
-            {error && <ErrorBox msg={error} />}
-            <SubmitBtn loading={loading} disabled={!phone || !pin}
-              label={mode === "login" ? "Masuk" : "Daftar Sekarang →"} />
-
-            {mode === "login" && (
-              <div className="text-center pt-1">
-                <a
-                  href={`https://wa.me/6281288080752?text=${encodeURIComponent("Halo Admin, saya lupa password akun RoneyCell saya.")}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors underline-offset-2 hover:underline">
-                  Lupa Password? Hubungi Admin
-                </a>
-              </div>
-            )}
-          </form>
-        )}
-
-        {/* ── Email form ── */}
-        {method === "email" && (
-          <form onSubmit={handleEmailSubmit} className="w-full space-y-3">
-            {mode === "register" && (
-              <FormInput label="Nama Lengkap" type="text" value={emailName} onChange={setEmailName} placeholder="Nama Anda" icon="👤" />
-            )}
-            <FormInput label="Email" type="email" value={email} onChange={setEmail} placeholder="nama@email.com" icon="✉️" />
-            <FormInput label={mode === "register" ? "Buat Password" : "Password"}
-              type="password" value={password} onChange={setPassword} placeholder="Min. 6 karakter" icon="🔒" />
-            {mode === "register" && (
-              <FormInput label="PIN Transaksi (6 digit)" type="password" value={emailTxPin} onChange={setEmailTxPin}
-                placeholder="6 digit PIN rahasia" icon="🔐" numeric maxLen={6} />
-            )}
-            {error && <ErrorBox msg={error} />}
-            <SubmitBtn loading={loading} disabled={!email || !password}
-              label={mode === "login" ? "Masuk dengan Email" : "Daftar Sekarang →"} />
-          </form>
-        )}
-
-        {/* ── Facebook form ── */}
-        {method === "facebook" && (
-          <div className="w-full space-y-4">
-            {fbStep === "button" ? (
-              <>
-                <div className="px-4 py-3 rounded-xl border border-blue-500/20 bg-blue-500/8">
-                  <p className="text-xs text-muted-foreground leading-relaxed text-center">
-                    Masuk dengan nama Facebook. Akun dibuat otomatis & langsung aktif.{" "}
-                    PIN Transaksi default: <span className="font-bold text-yellow-400">123456</span> (ubah setelah masuk).
-                  </p>
-                </div>
-                <button onClick={() => setFbStep("name")}
-                  className="w-full py-4 rounded-2xl font-black text-base text-white flex items-center justify-center gap-3"
-                  style={{ background: "linear-gradient(135deg,#1877F2 0%,#0B5ED7 100%)", boxShadow: "0 6px 20px rgba(24,119,242,0.4)" }}>
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                  Lanjutkan dengan Facebook
-                </button>
-              </>
-            ) : (
-              <>
-                <FormInput label="Nama Facebook Anda" type="text" value={fbName} onChange={setFbName} placeholder="Contoh: Budi Santoso" icon="👤" />
-                {error && <ErrorBox msg={error} />}
-                <button onClick={handleFacebookLogin} disabled={loading || !fbName.trim()}
-                  className="w-full py-4 rounded-2xl font-black text-base text-white disabled:opacity-40 flex items-center justify-center gap-3"
-                  style={{ background: "linear-gradient(135deg,#1877F2 0%,#0B5ED7 100%)", boxShadow: "0 6px 20px rgba(24,119,242,0.4)" }}>
-                  {loading ? "⏳ Memproses..." : "Masuk Sekarang"}
-                </button>
-                <button type="button" onClick={() => { setFbStep("button"); clearMsg(); }}
-                  className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-1">
-                  ← Kembali
-                </button>
-              </>
             )}
           </div>
-        )}
+
+          <FormInput
+            label={mode === "register" ? "Password (min 6 karakter)" : "Password"}
+            type="password" value={password} onChange={setPassword}
+            placeholder="••••••" icon="🔒" />
+
+          {error && <ErrorBox msg={error} />}
+
+          <SubmitBtn loading={loading} disabled={!phone || !password}
+            label={mode === "login" ? "Masuk" : "Daftar Sekarang →"} />
+
+          {mode === "login" && (
+            <div className="text-center pt-1">
+              <a
+                href={`https://wa.me/${ADMIN_WA}?text=${encodeURIComponent("Halo Admin, saya lupa password akun RoneyCell saya.")}`}
+                target="_blank" rel="noopener noreferrer"
+                className="text-xs text-blue-400 hover:text-blue-300 transition-colors underline-offset-2 hover:underline">
+                Lupa Password? Hubungi Admin
+              </a>
+            </div>
+          )}
+        </form>
 
         {/* Footer */}
         <div className="mt-8 text-center space-y-1">
@@ -526,9 +335,7 @@ function FormInput({ label, type, value, onChange, placeholder, icon, numeric, m
           className={`w-full pl-11 py-3.5 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-all ${isPassword ? "pr-11" : "pr-4"}`}
         />
         {isPassword && (
-          <button
-            type="button"
-            onClick={() => setShowPw(!showPw)}
+          <button type="button" onClick={() => setShowPw(!showPw)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
             tabIndex={-1}>
             {showPw ? (

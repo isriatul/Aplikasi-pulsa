@@ -8,7 +8,6 @@ import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { transactionsTable } from "@workspace/db";
 import { creditBalance } from "../lib/v2/balanceService.js";
-import { appendTxLog } from "../lib/txLog.js";
 import { saveIdempotentResult } from "../lib/idempotency.js";
 import { cancelPendingRetry } from "../lib/pendingRetry.js";
 import { logger } from "../lib/logger.js";
@@ -128,21 +127,6 @@ router.post("/callback/digiflazz", async (req, res) => {
   const isFinal = isSuccess || isFailed;
 
   logger.info({ ref_id, status, buyer_sku_code, customer_no, sn }, "Callback received");
-
-  /* ── v1: Update txLog dan idempotency cache ── */
-  appendTxLog({
-    memberId: "CALLBACK",
-    phone: "CALLBACK",
-    memberPhone: customer_no,
-    role: "system",
-    refId: ref_id,
-    productCode: buyer_sku_code,
-    customerNo: customer_no,
-    status: isSuccess ? "success" : "failed",
-    message: message ?? `Callback: ${status}`,
-    ip: "digiflazz-server",
-    userAgent: "Digiflazz-Callback",
-  });
 
   if (isFinal) {
     const txStatus = isSuccess ? "success" : "failed";

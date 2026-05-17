@@ -5,14 +5,13 @@ import DepositPage from "@/pages/DepositPage";
 import AdminPage from "@/pages/AdminPage";
 import MemberPortal from "@/pages/MemberPortal";
 import LoginPage from "@/pages/LoginPage";
-import SetupPage from "@/pages/SetupPage";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { Member, clearSession } from "@/lib/members";
-import { loadConfig } from "@/lib/config";
-import { fetchApiToken, clearApiToken } from "@/lib/apiAuth";
+import { clearApiToken } from "@/lib/apiAuth";
+import { clearV2Tokens } from "@/lib/apiV2";
 
 type Tab = "home" | "deposit" | "member" | "admin";
-type AppState = "checking" | "setup" | "login" | "app";
+type AppState = "checking" | "login" | "app";
 
 function isSuperAdmin(m: Member): boolean {
   return (
@@ -46,38 +45,26 @@ export default function App() {
   const [member, setMember] = useState<Member | null>(null);
 
   useEffect(() => {
-    // Allow accessing setup page via ?setup=1 or #setup in URL
-    const params = new URLSearchParams(window.location.search);
-    const hash = window.location.hash;
-    if (params.get("setup") === "1" || hash === "#setup") {
-      setAppState("setup");
-      return;
-    }
-    const cfg = loadConfig();
-    if (!cfg.scriptsUrl?.trim()) {
-      setAppState("setup");
-      return;
-    }
     const session = loadAppSession();
     if (session) {
       setMember(session);
       setAppState("app");
       if (isSuperAdmin(session)) setActiveTab("admin");
-      /* Pulihkan JWT setelah reload halaman */
-      void fetchApiToken({
-        memberId: session.id,
-        phone: session.phone,
-        role: isSuperAdmin(session) ? "admin" : "member",
-        name: session.name,
-      });
     } else {
       setAppState("login");
     }
-  }, []);
 
-  function handleSetupDone() {
-    setAppState("login");
-  }
+    /* Auto-logout saat sesi v2 habis (refresh token expired) */
+    function onSessionExpired() {
+      clearAppSession();
+      clearApiToken();
+      clearV2Tokens();
+      setMember(null);
+      setAppState("login");
+    }
+    window.addEventListener("v2-session-expired", onSessionExpired);
+    return () => window.removeEventListener("v2-session-expired", onSessionExpired);
+  }, []);
 
   function handleLogin(m: Member) {
     if (m.status === "pending" || m.status === "rejected") return;
@@ -85,18 +72,12 @@ export default function App() {
     setMember(m);
     setAppState("app");
     setActiveTab(isSuperAdmin(m) ? "admin" : "home");
-    /* Ambil JWT untuk proteksi endpoint API — fire-and-forget */
-    void fetchApiToken({
-      memberId: m.id,
-      phone: m.phone,
-      role: isSuperAdmin(m) ? "admin" : "member",
-      name: m.name,
-    });
   }
 
   function handleLogout() {
     clearAppSession();
     clearApiToken();
+    clearV2Tokens();
     setMember(null);
     setAppState("login");
   }
@@ -107,7 +88,6 @@ export default function App() {
   }
 
   if (appState === "checking") return null;
-  if (appState === "setup")   return <SetupPage onDone={handleSetupDone} />;
   if (appState === "login")   return <LoginPage onLogin={handleLogin} />;
 
   return (
