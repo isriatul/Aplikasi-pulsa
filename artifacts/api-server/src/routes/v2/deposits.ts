@@ -13,10 +13,9 @@ import { requireAuthV2 } from "../../middlewares/requireRole.js";
 import { readLimiter, depositLimiter } from "../../middlewares/rateLimiter.js";
 import { safeZodErrors } from "../../lib/sanitize.js";
 import { audit } from "../../lib/v2/auditService.js";
-import { notifyDepositWithProof, notifyDepositAutoConfirmed } from "../../lib/v2/notificationService.js";
+import { notifyDepositWithProof } from "../../lib/v2/notificationService.js";
 import { findUserById } from "../../lib/v2/userService.js";
 import { saveProofImage } from "../../lib/v2/proofStorage.js";
-import { creditBalance } from "../../lib/v2/balanceService.js";
 
 const router: IRouter = Router();
 
@@ -159,7 +158,7 @@ router.post("/v2/deposits", requireAuthV2, depositLimiter, async (req, res) => {
 });
 
 /* ── POST /api/v2/deposits/:id/upload-proof ── */
-/* AUTO-CREDIT: saldo langsung dikreditkan setelah bukti diupload */
+/* Upload bukti pembayaran → status menjadi "paid" dan menunggu konfirmasi admin */
 router.post("/v2/deposits/:id/upload-proof", requireAuthV2, async (req, res) => {
   const userId = req.member!.userId!;
   const id = Number(req.params["id"]);
@@ -177,12 +176,15 @@ router.post("/v2/deposits/:id/upload-proof", requireAuthV2, async (req, res) => 
     res.status(404).json({ error: "Deposit tidak ditemukan" });
     return;
   }
+  if (dep.status === "confirmed") {
+    res.json({ message: "Deposit sudah dikonfirmasi admin.", waitingConfirmation: false });
+    return;
+  }
+  if (dep.status === "paid") {
+    res.json({ message: "Bukti sudah dikirim, menunggu konfirmasi admin.", waitingConfirmation: true });
+    return;
+  }
   if (dep.status !== "pending") {
-    /* Jika sudah confirmed, kembalikan sukses agar idempoten */
-    if (dep.status === "confirmed") {
-      res.json({ message: "Deposit sudah dikonfirmasi.", autoConfirmed: true });
-      return;
-    }
     res.status(400).json({ error: `Status deposit saat ini: ${dep.status}. Hanya pending yang bisa upload bukti.` });
     return;
   }
@@ -196,42 +198,30 @@ router.post("/v2/deposits/:id/upload-proof", requireAuthV2, async (req, res) => 
   /* Simpan gambar ke disk */
   const imageUrl = await saveProofImage(id, parsed.data.imageBase64, parsed.data.mimeType);
 
-  /* ─── AUTO-CONFIRM: kredit saldo secara atomik ─── */
+  /* Atomic update: status → "paid" (menunggu konfirmasi admin) */
   const now = new Date();
-
-  /* Atomic update: hanya berhasil jika status masih "pending" — cegah double-credit */
   const updated = await db
     .update(depositsTable)
     .set({
       proofImageUrl: imageUrl,
       proofUploadedAt: now,
-      status: "confirmed",
+      status: "paid",
       paidAt: now,
-      confirmedAt: now,
       updatedAt: now,
     })
     .where(and(eq(depositsTable.id, id), eq(depositsTable.status, "pending")))
     .returning();
 
   if (updated.length === 0) {
-    /* Race condition: deposit sudah diproses bersamaan */
-    res.json({ message: "Deposit sudah dikonfirmasi sebelumnya.", autoConfirmed: true });
+    /* Race condition: status sudah berubah, kembalikan status terkini */
+    res.json({ message: "Bukti sudah dikirim sebelumnya, menunggu konfirmasi admin.", waitingConfirmation: true });
     return;
   }
 
-  /* Kredit saldo user */
-  await creditBalance({
-    userId,
-    type: "credit",
-    amount: dep.amount, /* Kredit hanya nominal asli (tanpa kode unik) */
-    refId: `DEP-AUTO-${id}`,
-    note: `Auto-credit deposit ${dep.paymentRef ?? `#${id}`}`,
-  });
-
-  /* Notifikasi admin via Telegram/Discord */
+  /* Notifikasi admin bahwa ada bukti baru menunggu konfirmasi */
   const user = await findUserById(userId);
   if (user) {
-    notifyDepositAutoConfirmed({
+    notifyDepositWithProof({
       userName: user.name,
       amount: dep.amount,
       uniqueCode: dep.uniqueCode,
@@ -244,17 +234,16 @@ router.post("/v2/deposits/:id/upload-proof", requireAuthV2, async (req, res) => 
 
   await audit({
     userId,
-    action: "deposit_auto_confirmed",
+    action: "deposit_proof_uploaded",
     entity: "deposit",
     entityId: id,
     ip: getIp(req),
-    data: { amount: dep.amount, uniqueCode: dep.uniqueCode, totalAmount: dep.totalAmount },
+    data: { amount: dep.amount, totalAmount: dep.totalAmount, method: dep.method },
   });
 
   res.json({
-    message: `Bukti diterima! Saldo Rp${dep.amount.toLocaleString("id-ID")} langsung ditambahkan.`,
-    autoConfirmed: true,
-    creditedAmount: dep.amount,
+    message: "Bukti diterima! Menunggu konfirmasi admin. Saldo akan masuk setelah dikonfirmasi.",
+    waitingConfirmation: true,
     imageUrl,
   });
 });

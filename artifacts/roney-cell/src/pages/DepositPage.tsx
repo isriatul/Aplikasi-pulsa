@@ -205,8 +205,9 @@ function UploadProofForm({ deposit, onSuccess }: { deposit: V2Deposit; onSuccess
     setLoading(true);
     setError("");
     try {
-      const res = await v2UploadDepositProof(deposit.id, preview, mime);
-      onSuccess(res.creditedAmount ?? deposit.amount);
+      await v2UploadDepositProof(deposit.id, preview, mime);
+      /* Kirim nominal asli ke parent untuk ditampilkan di SuccessScreen */
+      onSuccess(deposit.amount);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -256,23 +257,30 @@ function UploadProofForm({ deposit, onSuccess }: { deposit: V2Deposit; onSuccess
   );
 }
 
-/* ─── Layar sukses auto-credit ─── */
+/* ─── Layar sukses upload bukti (menunggu konfirmasi admin) ─── */
 function SuccessScreen({ amount, onReset }: { amount: number; onReset: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 space-y-5 text-center">
-      <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl animate-bounce"
-        style={{ background: "rgba(16,185,129,0.15)", border: "2px solid rgba(16,185,129,0.4)" }}>
-        ✅
+    <div className="flex flex-col items-center justify-center py-10 space-y-5 text-center">
+      <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl"
+        style={{ background: "rgba(59,130,246,0.15)", border: "2px solid rgba(59,130,246,0.4)" }}>
+        📸
       </div>
-      <div>
-        <p className="text-xl font-black text-white">Saldo Berhasil Ditambahkan!</p>
-        <p className="text-3xl font-black mt-1" style={{ color: "#34D399" }}>{rp(amount)}</p>
-        <p className="text-sm text-muted-foreground mt-2">Cek saldo di halaman utama</p>
+      <div className="space-y-2">
+        <p className="text-xl font-black text-white">Bukti Pembayaran Terkirim!</p>
+        <div className="px-4 py-3 rounded-2xl text-sm space-y-1"
+          style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.25)" }}>
+          <p className="font-bold text-blue-300">⏳ Menunggu Konfirmasi Admin</p>
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            Nominal <span className="font-bold text-white">{rp(amount)}</span> akan masuk ke saldo
+            setelah admin mengkonfirmasi bukti pembayaran Anda.
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground">Biasanya dikonfirmasi dalam 1–15 menit.</p>
       </div>
       <button
         onClick={onReset}
         className="px-8 py-3 rounded-2xl text-sm font-bold text-white"
-        style={{ background: "rgba(16,185,129,0.2)", border: "1px solid rgba(16,185,129,0.35)" }}>
+        style={{ background: "rgba(59,130,246,0.2)", border: "1px solid rgba(59,130,246,0.35)" }}>
         Deposit Lagi
       </button>
     </div>
@@ -601,16 +609,19 @@ function PaymentInstructions({
       {!isExpired && deposit.status === "pending" && (
         <div className="rounded-2xl p-4 space-y-1" style={{ border: "1px solid rgba(16,185,129,0.25)", background: "rgba(16,185,129,0.04)" }}>
           <p className="text-xs font-black text-emerald-400 uppercase tracking-wider">Upload Bukti Pembayaran</p>
-          <p className="text-xs text-muted-foreground">Screenshot struk → kirim → saldo langsung masuk ⚡</p>
+          <p className="text-xs text-muted-foreground">Screenshot struk → upload → menunggu konfirmasi admin ⏳</p>
           <UploadProofForm deposit={deposit} onSuccess={onProofUploaded} />
         </div>
       )}
 
-      {/* Sudah bayar tapi sistem auto delay */}
+      {/* Sudah upload bukti, menunggu konfirmasi admin */}
       {deposit.status === "paid" && (
-        <div className="rounded-2xl p-4 text-center space-y-1" style={{ border: "1px solid rgba(59,130,246,0.3)", background: "rgba(59,130,246,0.05)" }}>
+        <div className="rounded-2xl p-4 space-y-2" style={{ border: "1px solid rgba(59,130,246,0.3)", background: "rgba(59,130,246,0.05)" }}>
           <p className="text-sm font-black text-blue-300">📸 Bukti Sudah Dikirim</p>
-          <p className="text-xs text-muted-foreground">Saldo sedang diproses. Biasanya instan, maks 5 menit.</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Bukti pembayaran Anda sudah diterima dan sedang menunggu konfirmasi admin.
+            Saldo akan masuk setelah admin menyetujui. Biasanya 1–15 menit.
+          </p>
         </div>
       )}
 
@@ -888,8 +899,8 @@ function NewDepositForm({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Sistem menambahkan <span className="text-blue-300 font-semibold">kode unik 3 digit</span> ke nominal.
-          Setelah upload struk, saldo langsung masuk otomatis ⚡ tanpa perlu menunggu admin.
+          Sistem menambahkan <span className="text-blue-300 font-semibold">kode unik 3 digit</span> ke nominal agar pembayaran mudah diverifikasi admin.
+          Setelah upload struk, admin akan mengkonfirmasi dan saldo masuk dalam 1–15 menit.
         </p>
       </div>
 

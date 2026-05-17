@@ -70,23 +70,35 @@ function roleBadge(r: string) {
   return `inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${map[r] ?? "bg-white/10 text-white/60"}`;
 }
 
+const DASHBOARD_POLL_MS = 60_000; /* refresh dasbor setiap 60 detik */
+const DEPOSITS_POLL_MS = 20_000;  /* refresh deposit setiap 20 detik */
+
 /* ─── Dashboard Panel ─── */
 function DashboardPanel() {
   const [data, setData] = useState<AdminDashboard | null>(null);
   const [health, setHealth] = useState<MonitoringHealth | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const [d, h] = await Promise.all([v2AdminDashboard(), v2MonitoringHealth()]);
-        setData(d); setHealth(h);
-      } catch (e) {
-        setError((e as Error).message);
-      } finally { setLoading(false); }
-    })();
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setError("");
+    try {
+      const [d, h] = await Promise.all([v2AdminDashboard(), v2MonitoringHealth()]);
+      setData(d); setHealth(h); setLastUpdate(new Date());
+    } catch (e) {
+      if (!silent) setError((e as Error).message);
+    } finally { if (!silent) setLoading(false); }
   }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  /* Auto-poll setiap 60 detik */
+  useEffect(() => {
+    const id = setInterval(() => void load(true), DASHBOARD_POLL_MS);
+    return () => clearInterval(id);
+  }, [load]);
 
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorBox msg={error} />;
@@ -94,6 +106,14 @@ function DashboardPanel() {
 
   return (
     <div className="space-y-4">
+      {/* Baris header dengan tombol refresh + waktu update */}
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] text-white/40">
+          {lastUpdate ? `Update ${lastUpdate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : ""}
+        </span>
+        <button onClick={() => void load()} className="text-xs text-blue-400 hover:text-blue-300 transition-colors">🔄 Refresh</button>
+      </div>
+
       {/* Health status */}
       {health && (
         <div className={`rounded-xl px-4 py-3 flex items-center gap-3 ${health.status === "ok" ? "bg-emerald-500/10 border border-emerald-500/20" : "bg-amber-500/10 border border-amber-500/20"}`}>
@@ -415,8 +435,9 @@ function TransactionsPanel() {
 }
 
 /* ─── Deposits Panel ─── */
-function DepositsPanel() {
+function DepositsPanel({ onPaidCount }: { onPaidCount?: (n: number) => void }) {
   const [deps, setDeps] = useState<V2Deposit[]>([]);
+  const [paidCount, setPaidCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
@@ -425,17 +446,31 @@ function DepositsPanel() {
   const [rejectReason, setRejectReason] = useState<Record<number, string>>({});
   const [expandedProof, setExpandedProof] = useState<number | null>(null);
   const [confirmLoading, setConfirmLoading] = useState<Record<number, boolean>>({});
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
+  const load = useCallback(async (silent = false) => {
+    if (!silent) { setLoading(true); setError(""); }
     try {
-      const res = await v2AdminDeposits({ page, status: filterStatus || undefined });
+      const [res, paidRes] = await Promise.all([
+        v2AdminDeposits({ page, status: filterStatus || undefined }),
+        v2AdminDeposits({ status: "paid" }),
+      ]);
       setDeps(res.data);
-    } catch (e) { setError((e as Error).message); }
-    finally { setLoading(false); }
-  }, [page, filterStatus]);
+      setLastRefresh(new Date());
+      const pc = paidRes.data.length;
+      setPaidCount(pc);
+      onPaidCount?.(pc);
+    } catch (e) { if (!silent) setError((e as Error).message); }
+    finally { if (!silent) setLoading(false); }
+  }, [page, filterStatus, onPaidCount]);
 
   useEffect(() => { void load(); }, [load]);
+
+  /* Auto-refresh setiap 20 detik */
+  useEffect(() => {
+    const id = setInterval(() => void load(true), DEPOSITS_POLL_MS);
+    return () => clearInterval(id);
+  }, [load]);
 
   async function doConfirm(id: number) {
     setConfirmLoading((p) => ({ ...p, [id]: true }));
@@ -467,17 +502,37 @@ function DepositsPanel() {
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2 flex-wrap">
+      {/* Banner deposit menunggu konfirmasi */}
+      {paidCount > 0 && (
+        <button
+          onClick={() => { setFilterStatus("paid"); setPage(1); }}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all"
+          style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.35)" }}>
+          <span className="text-xl">📸</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-blue-300">{paidCount} deposit menunggu konfirmasi</p>
+            <p className="text-xs text-blue-300/70">Bukti sudah dikirim — klik untuk lihat &amp; konfirmasi</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-500 text-white animate-pulse">{paidCount}</span>
+            <span className="text-blue-400 text-xs font-bold">Lihat →</span>
+          </div>
+        </button>
+      )}
+
+      <div className="flex gap-2 flex-wrap items-center">
         <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-          className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white focus:outline-none">
-          <option value="">Semua</option>
+          className="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white focus:outline-none">
+          <option value="">Semua Status</option>
           <option value="pending">Pending (belum bayar)</option>
-          <option value="paid">Bukti Terkirim ★</option>
-          <option value="confirmed">Dikonfirmasi</option>
+          <option value="paid">📸 Bukti Terkirim (perlu konfirmasi)</option>
+          <option value="confirmed">✓ Dikonfirmasi</option>
           <option value="failed">Ditolak</option>
           <option value="expired">Kedaluwarsa</option>
         </select>
-        <button onClick={load} className="px-3 py-2 rounded-lg text-sm bg-white/10 text-white hover:bg-white/20">↻ Refresh</button>
+        <button onClick={() => void load()} className="px-3 py-2 rounded-lg text-sm bg-white/10 text-white hover:bg-white/20 flex items-center gap-1.5">
+          ↻ <span className="text-[10px] text-white/50">{lastRefresh ? lastRefresh.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : ""}</span>
+        </button>
       </div>
 
       {loading ? <LoadingSpinner /> : error ? <ErrorBox msg={error} /> : (
@@ -1079,6 +1134,7 @@ function V2LoginForm({ onLogin }: { onLogin: () => void }) {
 export default function AdminDashboardV2() {
   const [tab, setTab] = useState<PanelTab>("dashboard");
   const [loggedIn, setLoggedIn] = useState(() => !!getV2Token());
+  const [depositPaidCount, setDepositPaidCount] = useState(0);
 
   /* Reset ke form login otomatis ketika sesi v2 habis di tengah pemakaian */
   useEffect(() => {
@@ -1116,13 +1172,33 @@ export default function AdminDashboardV2() {
         </button>
       </div>
 
+      {/* Banner global jika ada deposit menunggu konfirmasi (saat di tab lain) */}
+      {depositPaidCount > 0 && tab !== "deposits" && (
+        <button
+          onClick={() => setTab("deposits")}
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-left"
+          style={{ background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.3)" }}>
+          <span className="text-base">📸</span>
+          <p className="text-xs font-bold text-blue-300 flex-1">
+            {depositPaidCount} deposit menunggu konfirmasi saldo
+          </p>
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-500 text-white animate-pulse shrink-0">{depositPaidCount}</span>
+        </button>
+      )}
+
       {/* Tabs */}
       <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
         {(Object.keys(TAB_LABELS) as PanelTab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${tab === t ? "text-white" : "text-white/50 hover:text-white/70"}`}
+            className={`relative px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${tab === t ? "text-white" : "text-white/50 hover:text-white/70"}`}
             style={tab === t ? { background: "linear-gradient(135deg,#3B82F6,#8B5CF6)", boxShadow: "0 0 12px rgba(59,130,246,0.3)" } : { background: "rgba(255,255,255,0.05)" }}>
             {TAB_LABELS[t]}
+            {/* Badge merah untuk tab Deposit jika ada yang perlu dikonfirmasi */}
+            {t === "deposits" && depositPaidCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 rounded-full text-[9px] font-black bg-red-500 text-white flex items-center justify-center px-1">
+                {depositPaidCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -1131,7 +1207,7 @@ export default function AdminDashboardV2() {
       {tab === "dashboard" && <DashboardPanel />}
       {tab === "users" && <UsersPanel />}
       {tab === "transactions" && <TransactionsPanel />}
-      {tab === "deposits" && <DepositsPanel />}
+      {tab === "deposits" && <DepositsPanel onPaidCount={setDepositPaidCount} />}
       {tab === "products" && <ProductsPanel />}
       {tab === "audit" && <AuditPanel />}
       {tab === "monitoring" && <MonitoringPanel />}
