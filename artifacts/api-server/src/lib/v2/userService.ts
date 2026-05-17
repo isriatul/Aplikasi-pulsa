@@ -26,8 +26,16 @@ export async function verifyPassword(plain: string, hash: string): Promise<boole
 
 /* ─── Users ─── */
 
+/** Normalisasi nomor HP Indonesia: hapus non-digit, hapus awalan 0, hapus kode negara 62.
+ *  Hasil: "081288080752" → "81288080752", "6281288080752" → "81288080752" */
+function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("62")) return digits.slice(2);
+  return digits.replace(/^0/, "");
+}
+
 export async function findUserByPhone(phone: string): Promise<User | undefined> {
-  const clean = phone.replace(/\D/g, "").replace(/^0/, "");
+  const clean = normalizePhone(phone);
   return db.query.usersTable.findFirst({
     where: and(eq(usersTable.phone, clean), isNull(usersTable.deletedAt)),
   });
@@ -52,7 +60,7 @@ export async function createUser(data: {
   password: string;
   role?: UserRole;
 }): Promise<User> {
-  const clean = data.phone.replace(/\D/g, "").replace(/^0/, "");
+  const clean = normalizePhone(data.phone);
   const passwordHash = await hashPassword(data.password);
   const [user] = await db
     .insert(usersTable)
