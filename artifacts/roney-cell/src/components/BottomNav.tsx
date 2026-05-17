@@ -9,106 +9,93 @@ interface BottomNavProps {
   pendingMemberCount?: number;
 }
 
-export default function BottomNav({ active, onChange, member, pendingMemberCount = 0 }: BottomNavProps) {
-  const TABS: {
-    id: Tab;
-    label: string;
-    activeColor: string;
-    activeBg: string;
-    icon: (active: boolean) => React.ReactElement;
-    badge?: number | string;
-  }[] = [
-    {
-      id: "home",
-      label: "Transaksi",
-      activeColor: "#60A5FA",
-      activeBg: "rgba(59,130,246,0.12)",
-      icon: (a) => (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-          style={{ color: a ? "#60A5FA" : "rgba(255,255,255,0.4)", strokeWidth: a ? 2.5 : 2 }}>
-          <path strokeLinecap="round" strokeLinejoin="round"
-            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-        </svg>
-      ),
-    },
-    {
-      id: "deposit",
-      label: "Isi Saldo",
-      activeColor: "#FBBF24",
-      activeBg: "rgba(251,191,36,0.12)",
-      icon: (a) => (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-          style={{ color: a ? "#FBBF24" : "rgba(255,255,255,0.4)", strokeWidth: a ? 2.5 : 2 }}>
-          <path strokeLinecap="round" strokeLinejoin="round"
-            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-        </svg>
-      ),
-    },
-    {
-      id: "member",
-      label: member ? member.name.split(" ")[0] : "Member",
-      activeColor: "#34D399",
-      activeBg: "rgba(52,211,153,0.12)",
-      icon: (a) => (
-        <div className="relative">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-            style={{ color: a ? "#34D399" : "rgba(255,255,255,0.4)", strokeWidth: a ? 2.5 : 2 }}>
-            <path strokeLinecap="round" strokeLinejoin="round"
-              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-          {member && (
-            <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400" />
-          )}
-        </div>
-      ),
-    },
-    {
-      id: "admin",
-      label: "Owner",
-      activeColor: "#A78BFA",
-      activeBg: "rgba(139,92,246,0.12)",
-      badge: pendingMemberCount > 0 ? pendingMemberCount : undefined,
-      icon: (a) => (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-          style={{ color: a ? "#A78BFA" : "rgba(255,255,255,0.4)", strokeWidth: a ? 2.5 : 2 }}>
-          <path strokeLinecap="round" strokeLinejoin="round"
-            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-        </svg>
-      ),
-    },
-  ];
+const TABS: {
+  id: Tab;
+  label: string;
+  color: string;
+  icon: (active: boolean) => React.ReactElement;
+}[] = [
+  {
+    id: "home",
+    label: "Beranda",
+    color: "#3B82F6",
+    icon: (a) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill={a ? "#3B82F6" : "none"} stroke={a ? "#3B82F6" : "rgba(255,255,255,0.38)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/>
+        <path d="M9 21V12h6v9"/>
+      </svg>
+    ),
+  },
+  {
+    id: "deposit",
+    label: "Top Up",
+    color: "#F59E0B",
+    icon: (a) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? "#F59E0B" : "rgba(255,255,255,0.38)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="6" width="20" height="14" rx="3"/>
+        <path d="M2 10h20"/>
+        <circle cx="7" cy="15" r="1" fill={a ? "#F59E0B" : "rgba(255,255,255,0.38)"} stroke="none"/>
+        <path d="M11 15h6"/>
+      </svg>
+    ),
+  },
+  {
+    id: "member",
+    label: "Akun",
+    color: "#10B981",
+    icon: (a) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? "#10B981" : "rgba(255,255,255,0.38)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="8" r="4"/>
+        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+      </svg>
+    ),
+  },
+  {
+    id: "admin",
+    label: "Owner",
+    color: "#8B5CF6",
+    icon: (a) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? "#8B5CF6" : "rgba(255,255,255,0.38)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+      </svg>
+    ),
+  },
+];
 
+export default function BottomNav({ active, onChange, member, pendingMemberCount = 0 }: BottomNavProps) {
   return (
-    <div
-      className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto"
-      style={{
-        background: "linear-gradient(to top, hsl(220 45% 5%) 0%, hsl(220 40% 7% / 0.96) 100%)",
-        borderTop: "1px solid rgba(100,160,255,0.08)",
-        backdropFilter: "blur(20px)",
-      }}
-    >
-      <div className="flex items-center justify-around px-1 pt-2 pb-3">
+    <div className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto bottom-nav-bar pb-safe">
+      <div className="flex items-center justify-around px-2 pt-2 pb-3">
         {TABS.map((tab) => {
           const isActive = active === tab.id;
+          const showBadge = tab.id === "admin" && pendingMemberCount > 0;
+          const showOnlineDot = tab.id === "member" && !!member;
+
           return (
             <button
               key={tab.id}
               onClick={() => onChange(tab.id)}
-              className="relative flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-200 min-w-0"
-              style={isActive ? { background: tab.activeBg } : {}}
+              className="relative flex flex-col items-center gap-1 px-5 py-1.5 rounded-2xl transition-all duration-200 select-none"
+              style={isActive ? { background: `${tab.color}18` } : {}}
             >
-              {tab.icon(isActive)}
+              <div className="relative">
+                {tab.icon(isActive)}
+                {showOnlineDot && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#0B0F1A]" />
+                )}
+                {showBadge && (
+                  <span className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center">
+                    {pendingMemberCount}
+                  </span>
+                )}
+              </div>
               <span
-                className="text-[10px] font-semibold tracking-wide transition-colors truncate max-w-[60px]"
-                style={{ color: isActive ? tab.activeColor : "rgba(255,255,255,0.4)" }}
+                className="text-[10px] font-semibold tracking-wide transition-colors leading-none"
+                style={{ color: isActive ? tab.color : "rgba(255,255,255,0.38)" }}
               >
-                {tab.label}
+                {tab.id === "member" && member ? member.name.split(" ")[0] : tab.label}
               </span>
-              {tab.badge !== undefined && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-yellow-400 text-gray-900 text-[9px] font-black flex items-center justify-center">
-                  {tab.badge}
-                </span>
-              )}
+              {isActive && <span className="tab-active-indicator" style={{ background: tab.color }} />}
             </button>
           );
         })}

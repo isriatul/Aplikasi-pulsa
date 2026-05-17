@@ -313,353 +313,338 @@ export default function Home({ member, onMemberUpdate }: HomeProps) {
   const trendingProducts = getTrendingProducts(memberType);
 
   return (
-    <div className="min-h-dvh flex flex-col max-w-md mx-auto px-4 pb-32">
+    <div className="min-h-dvh flex flex-col max-w-md mx-auto pb-32">
       {/* ── Header ── */}
-      <header className="sticky top-0 z-40 pt-safe">
-        <div className="flex items-center justify-between py-4"
-          style={{ background: "linear-gradient(to bottom,hsl(220 40% 5%) 80%,transparent)" }}>
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ background: "linear-gradient(135deg,hsl(210 90% 55%) 0%,hsl(230 80% 40%) 100%)", boxShadow: "0 0 16px rgba(59,130,246,0.4)" }}>
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 7V5z" />
+      <header className="sticky top-0 z-40 pt-safe px-4"
+        style={{ background: "rgba(11,15,26,0.9)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+        <div className="flex items-center justify-between h-14">
+          {/* Logo */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: "linear-gradient(135deg,#1A56DB 0%,#1C3FAA 100%)", boxShadow: "0 0 12px rgba(26,86,219,0.5)" }}>
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="1.8">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 7V5z"/>
               </svg>
             </div>
-            <div>
-              <h1 className="font-black text-lg leading-none tracking-tight"
-                style={{ background: "linear-gradient(135deg,#60A5FA 0%,#A78BFA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                RoneyCell
-              </h1>
-              <p className="text-[10px] text-muted-foreground tracking-widest">
-                {t("greeting", lang)}, <span className="font-bold text-foreground/70">{member.name.split(" ")[0]}</span> 👋
-              </p>
-            </div>
+            <span className="font-black text-base gradient-text-brand">RoneyCell</span>
           </div>
-          <div className="flex items-center gap-1.5">
+
+          {/* Right actions */}
+          <div className="flex items-center gap-2">
             <button onClick={toggleLang}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-xl border border-white/10 bg-white/5 text-xs font-bold transition-all hover:bg-white/10"
-              style={{ color: "rgba(255,255,255,0.7)" }}>
-              {lang === "id" ? "🇮🇩" : "🇬🇧"} {lang.toUpperCase()}
+              className="px-2.5 py-1.5 rounded-lg border border-white/10 bg-white/5 text-[11px] font-bold text-white/55 hover:text-white/80 hover:bg-white/8 transition-all">
+              {lang === "id" ? "🇮🇩" : "🇬🇧"}
             </button>
             <button onClick={() => setShowHelp(true)}
-              className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 bg-white/5 transition-all hover:bg-white/10"
-              title="Bantuan">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: "#A78BFA" }}>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/10 bg-white/5 hover:bg-white/8 transition-all">
+              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="rgba(167,139,250,0.8)" strokeWidth="1.8">
+                <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 16v-4M12 8h.01"/>
               </svg>
             </button>
-            <div className="flex flex-col items-end gap-0.5">
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg border"
-                style={{ background: `${TYPE_COLORS[member.type]}15`, borderColor: `${TYPE_COLORS[member.type]}30` }}>
-                <div className="w-1.5 h-1.5 rounded-full" style={{ background: TYPE_COLORS[member.type] }} />
-                <span className="text-[10px] font-bold" style={{ color: TYPE_COLORS[member.type] }}>
-                  {TYPE_LABELS[member.type]}
-                </span>
-              </div>
-              <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/5 border border-white/8">
-                <span className="text-[9px] text-muted-foreground">{t("balance_label", lang)}:</span>
-                <span className="text-[11px] font-black"
-                  style={{ background: "linear-gradient(135deg,#FBBF24 0%,#F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                  {formatRupiah(memberBalance)}
-                </span>
-              </div>
+            {/* Badge saldo kecil di header */}
+            <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-white/10 bg-white/5">
+              <span className="text-[9px] text-white/35 font-medium">Saldo</span>
+              <span className="text-[11px] font-black gradient-text-gold">{formatRupiah(memberBalance)}</span>
             </div>
           </div>
         </div>
       </header>
 
-      {/* ── Store Balance Card ── */}
-      <div className="mb-5">
-        <BalanceCard onBalanceChange={handleStoreBalanceChange} />
-      </div>
-
-      {/* ── Icon Menu Grid ── */}
-      <div className="glass-card rounded-2xl p-4 mb-5">
-        <p className="text-xs text-muted-foreground tracking-widest uppercase font-semibold mb-4">
-          {t("choose_service", lang)}
-        </p>
-        <div className="grid grid-cols-5 gap-x-1 gap-y-4">
-          {MENU_ITEMS.map((id) => {
-            const m = CATEGORY_META[id];
-            const isActive = selectedCategory === id;
-            return (
-              <button key={id} onClick={() => handleSelectCategory(id)} className="relative flex flex-col items-center gap-1.5">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl transition-all duration-200"
-                  style={isActive
-                    ? { background: `${m.color}30`, border: `2px solid ${m.color}`, boxShadow: `0 0 14px ${m.color}40` }
-                    : { background: `${m.color}12`, border: `1.5px solid ${m.color}20` }
-                  }>
-                  {m.icon}
-                </div>
-                <span className="text-[9px] font-bold text-center leading-tight"
-                  style={{ color: isActive ? m.color : "rgba(255,255,255,0.55)" }}>
-                  {m.label}
-                </span>
-                {isActive && (
-                  <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full border-2"
-                    style={{ background: m.color, borderColor: "hsl(220 40% 5%)" }} />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Smart Product Panel ── */}
-      {selectedCategory && meta && (
-        <div className="mb-4 space-y-3" style={{ animation: "fadeSlideIn 0.25s ease" }}>
-          {/* Category header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">{meta.icon}</span>
-              <p className="text-sm font-black" style={{ color: meta.color }}>{meta.label}</p>
-              {selectedCategory === "intl" && (
-                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black text-white"
-                  style={{ background: "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)" }}>GLOBAL</span>
-              )}
-              {/* Country pill when intl/intl-pulsa detected */}
-              {!isIndonesian && (
-                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border"
-                  style={{ background: countryInfo.bgColor, borderColor: countryInfo.color + "40", color: countryInfo.color }}>
-                  {countryInfo.flag} {countryInfo.name}
-                </span>
-              )}
-            </div>
-            <button onClick={() => { setSelectedCategory(null); setSelectedProduct(null); setPhone(""); setCountryCode("+62"); }}
-              className="text-xs text-muted-foreground px-2 py-1 rounded-lg border border-white/8 hover:bg-white/5 transition-all">
-              {t("btn_close", lang)}
-            </button>
-          </div>
-
-          {/* Phone Input */}
-          <PhoneInput
-            value={phone}
-            onChange={(v) => { setPhone(v); setSelectedProduct(null); }}
-            countryCode={countryCode}
-            onCountryCodeChange={(c) => { setCountryCode(c); setSelectedProduct(null); setPhone(""); }}
-            showCountryCode={true}
-            label={
-              selectedCategory === "game" ? (lang === "en" ? "Game ID / User ID" : "ID Game / User ID") :
-              selectedCategory === "pascabayar" || selectedCategory === "tv" ? "No. ID Pelanggan" :
-              selectedCategory === "intl" || !isIndonesian ? (lang === "en" ? "International Number" : "Nomor Internasional") :
-              t("phone_label", lang)
-            }
-            placeholder={
-              selectedCategory === "pln" || selectedCategory === "pascabayar" ? "Contoh: 530000012345" :
-              selectedCategory === "game" ? "Contoh: 12345678 (1234)" :
-              !isIndonesian ? "Contoh: 0123456789" :
-              "Contoh: 08123456789"
-            }
+      <div className="px-4">
+        {/* ── Balance Hero Card ── */}
+        <div className="mt-4 mb-5">
+          <BalanceCard
+            onBalanceChange={handleStoreBalanceChange}
+            memberName={member.name}
+            memberRole={member.notes === "__superadmin__" ? "superadmin" : member.type}
           />
+        </div>
 
-          {/* Country detected badge (for non-ID) */}
-          {!isIndonesian && phone.length >= 3 && (
-            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border"
-              style={{ background: countryInfo.bgColor, borderColor: countryInfo.color + "40" }}>
-              <span className="text-lg">{countryInfo.flag}</span>
-              <div>
-                <p className="text-xs font-bold" style={{ color: countryInfo.color }}>
-                  {lang === "en" ? "Country Detected" : "Negara Terdeteksi"}: {countryInfo.name}
-                </p>
-                <p className="text-[10px] text-muted-foreground">
-                  {lang === "en" ? "Showing products for this country" : "Menampilkan produk untuk negara ini"}
-                </p>
-              </div>
-            </div>
-          )}
+        {/* ── Quick Actions ── */}
+        <div className="grid grid-cols-4 gap-3 mb-5">
+          {[
+            { label: "Top Up", icon: "💰", color: "#F59E0B", tab: "deposit" },
+            { label: "Pulsa", icon: "📱", color: "#3B82F6", cat: "pulsa" },
+            { label: "Listrik", icon: "⚡", color: "#F59E0B", cat: "pln" },
+            { label: "Data", icon: "📶", color: "#10B981", cat: "data" },
+          ].map((a) => (
+            <button key={a.label}
+              onClick={() => { if (a.cat) handleSelectCategory(a.cat as ProductCategory); }}
+              className="flex flex-col items-center gap-1.5 py-3 rounded-2xl transition-all active:scale-95"
+              style={{ background: `${a.color}12`, border: `1px solid ${a.color}22` }}>
+              <span className="text-xl leading-none">{a.icon}</span>
+              <span className="text-[10px] font-bold" style={{ color: a.color }}>{a.label}</span>
+            </button>
+          ))}
+        </div>
 
-          {/* Phone validation warning */}
-          {phoneReady === false && phone.length > 0 && (
-            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-yellow-500/20 bg-yellow-500/8">
-              <svg className="w-4 h-4 text-yellow-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-xs text-yellow-300">
-                {!isIndonesian
-                  ? `${lang === "en" ? "Min" : "Min"} ${countryInfo.minLen} ${lang === "en" ? "digits for" : "digit untuk"} ${countryInfo.name}`
-                  : selectedCategory === "pulsa" || selectedCategory === "data"
-                  ? (lang === "en" ? "Enter valid number to detect operator" : "Masukkan nomor valid agar operator terdeteksi")
-                  : (lang === "en" ? "Enter complete number/ID" : "Masukkan nomor/ID pelanggan lengkap")}
-              </p>
-            </div>
-          )}
+        {/* ── Icon Menu Grid ── */}
+        <div className="surface p-4 mb-5">
+          <p className="text-[10px] text-white/35 tracking-widest uppercase font-bold mb-4">
+            {t("choose_service", lang)}
+          </p>
+          <div className="grid grid-cols-5 gap-x-1 gap-y-4">
+            {MENU_ITEMS.map((id) => {
+              const m = CATEGORY_META[id];
+              const isActive = selectedCategory === id;
+              return (
+                <button key={id} onClick={() => handleSelectCategory(id)} className="relative flex flex-col items-center gap-1.5 transition-all active:scale-90">
+                  <div className="menu-icon-wrap"
+                    style={isActive
+                      ? { background: `${m.color}28`, border: `2px solid ${m.color}80`, boxShadow: `0 4px 16px ${m.color}40` }
+                      : { background: `${m.color}10`, border: `1.5px solid ${m.color}18` }
+                    }>
+                    <span className="text-2xl leading-none">{m.icon}</span>
+                  </div>
+                  <span className="text-[9px] font-bold text-center leading-tight"
+                    style={{ color: isActive ? m.color : "rgba(255,255,255,0.45)" }}>
+                    {m.label}
+                  </span>
+                  {isActive && (
+                    <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0B0F1A]"
+                      style={{ background: m.color }} />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-          {/* ── Products (always shown, popular first if no phone) ── */}
-          <div className="glass-card rounded-2xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="text-xs text-muted-foreground tracking-widest uppercase font-semibold">
-                  {phone.length < 3 && products.length > 6
-                    ? (lang === "en" ? "Popular Products" : "Produk Populer")
-                    : (isFiltered
-                      ? `${lang === "en" ? "Filtered for" : "Filter untuk"} ${countryInfo.flag} ${countryInfo.name}`
-                      : t("choose_product", lang))}
-                </p>
-                {phone.length < 3 && products.length > 6 && (
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    {lang === "en" ? "Enter number to see all products" : "Masukkan nomor untuk lihat semua produk"}
-                  </p>
+        {/* ── Smart Product Panel ── */}
+        {selectedCategory && meta && (
+          <div className="mb-4 space-y-3 anim-fade-in">
+            {/* Category header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{meta.icon}</span>
+                <p className="text-sm font-black" style={{ color: meta.color }}>{meta.label}</p>
+                {selectedCategory === "intl" && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black text-white"
+                    style={{ background: "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)" }}>GLOBAL</span>
+                )}
+                {!isIndonesian && (
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border"
+                    style={{ background: countryInfo.bgColor, borderColor: countryInfo.color + "40", color: countryInfo.color }}>
+                    {countryInfo.flag} {countryInfo.name}
+                  </span>
                 )}
               </div>
-              <span className="text-xs text-muted-foreground">{displayProducts.length} {t("products_count", lang)}</span>
+              <button onClick={() => { setSelectedCategory(null); setSelectedProduct(null); setPhone(""); setCountryCode("+62"); }}
+                className="text-xs text-white/40 px-2.5 py-1.5 rounded-lg border border-white/10 hover:bg-white/6 hover:text-white/65 transition-all">
+                {t("btn_close", lang)}
+              </button>
             </div>
-            <div className="grid grid-cols-2 gap-2.5">
-              {displayProducts.map((p) => (
-                <ProductCard
-                  key={p.id}
-                  product={p}
-                  selected={selectedProduct?.id === p.id}
-                  onSelect={(prod) => {
-                    setSelectedProduct(prod);
-                    if (phoneReady) setModalPhase("quick");
-                  }}
-                  color={meta.color}
-                  lang={lang}
-                  dimmed={!phoneReady && phone.length === 0}
-                />
-              ))}
-            </div>
-            {phone.length < 3 && products.length > displayProducts.length && (
-              <p className="text-center text-xs text-muted-foreground mt-3">
-                +{products.length - displayProducts.length} {lang === "en" ? "more products after entering number" : "produk lagi setelah input nomor"}
-              </p>
-            )}
-          </div>
 
-          {/* Order Summary */}
-          {selectedProduct && phoneReady && (
-            <div className="glass-card rounded-2xl p-4 border border-cyan-500/15" style={{ animation: "fadeSlideIn 0.2s ease" }}>
-              <p className="text-xs text-muted-foreground tracking-widest uppercase font-semibold mb-3">
-                {t("order_summary", lang)}
-              </p>
-              <div className="flex items-center justify-between">
+            {/* Phone Input */}
+            <PhoneInput
+              value={phone}
+              onChange={(v) => { setPhone(v); setSelectedProduct(null); }}
+              countryCode={countryCode}
+              onCountryCodeChange={(c) => { setCountryCode(c); setSelectedProduct(null); setPhone(""); }}
+              showCountryCode={true}
+              label={
+                selectedCategory === "game" ? (lang === "en" ? "Game ID / User ID" : "ID Game / User ID") :
+                selectedCategory === "pascabayar" || selectedCategory === "tv" ? "No. ID Pelanggan" :
+                selectedCategory === "intl" || !isIndonesian ? (lang === "en" ? "International Number" : "Nomor Internasional") :
+                t("phone_label", lang)
+              }
+              placeholder={
+                selectedCategory === "pln" || selectedCategory === "pascabayar" ? "Contoh: 530000012345" :
+                selectedCategory === "game" ? "Contoh: 12345678 (1234)" :
+                !isIndonesian ? "Contoh: 0123456789" :
+                "Contoh: 08123456789"
+              }
+            />
+
+            {/* Country detected badge */}
+            {!isIndonesian && phone.length >= 3 && (
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border"
+                style={{ background: countryInfo.bgColor, borderColor: countryInfo.color + "40" }}>
+                <span className="text-lg">{countryInfo.flag}</span>
                 <div>
-                  <p className="text-sm font-semibold text-foreground">{selectedProduct.name}</p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    {!isIndonesian && <span>{countryInfo.flag}</span>}
-                    <p className="text-xs text-muted-foreground">
-                      {countryCode !== "+62" ? `${countryCode} ${phone}` : phone}
+                  <p className="text-xs font-bold" style={{ color: countryInfo.color }}>
+                    {lang === "en" ? "Country Detected" : "Negara Terdeteksi"}: {countryInfo.name}
+                  </p>
+                  <p className="text-[10px] text-white/40">
+                    {lang === "en" ? "Showing products for this country" : "Menampilkan produk untuk negara ini"}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Phone validation warning */}
+            {phoneReady === false && phone.length > 0 && (
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-amber-500/20 bg-amber-500/8">
+                <svg width="14" height="14" className="flex-shrink-0 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-xs text-amber-300">
+                  {!isIndonesian
+                    ? `Min ${countryInfo.minLen} digit untuk ${countryInfo.name}`
+                    : selectedCategory === "pulsa" || selectedCategory === "data"
+                    ? (lang === "en" ? "Enter valid number to detect operator" : "Masukkan nomor valid agar operator terdeteksi")
+                    : (lang === "en" ? "Enter complete number/ID" : "Masukkan nomor/ID pelanggan lengkap")}
+                </p>
+              </div>
+            )}
+
+            {/* Products */}
+            <div className="surface p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-[10px] text-white/35 tracking-widest uppercase font-bold">
+                    {phone.length < 3 && products.length > 6
+                      ? (lang === "en" ? "Popular Products" : "Produk Populer")
+                      : (isFiltered
+                        ? `Filter untuk ${countryInfo.flag} ${countryInfo.name}`
+                        : t("choose_product", lang))}
+                  </p>
+                  {phone.length < 3 && products.length > 6 && (
+                    <p className="text-[10px] text-white/30 mt-0.5">
+                      {lang === "en" ? "Enter number to see all products" : "Input nomor untuk lihat semua produk"}
                     </p>
-                  </div>
-                  {member.type !== "retail" && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: TYPE_COLORS[member.type] }} />
-                      <p className="text-[10px] font-semibold" style={{ color: TYPE_COLORS[member.type] }}>
-                        Harga {TYPE_LABELS[member.type]}
-                      </p>
-                    </div>
                   )}
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-black"
-                    style={{ background: "linear-gradient(135deg,#FBBF24 0%,#F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                    {formatRupiah(selectedProduct.price)}
-                  </p>
-                  <p className="text-[10px] mt-0.5" style={{ color: memberBalance >= selectedProduct.price ? "#34D399" : "#F87171" }}>
-                    {t("balance_label", lang)}: {formatRupiah(memberBalance)}
-                  </p>
+                <span className="text-[11px] text-white/35 font-medium">{displayProducts.length} produk</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                {displayProducts.map((p) => (
+                  <ProductCard
+                    key={p.id}
+                    product={p}
+                    selected={selectedProduct?.id === p.id}
+                    onSelect={(prod) => {
+                      setSelectedProduct(prod);
+                      if (phoneReady) setModalPhase("quick");
+                    }}
+                    color={meta.color}
+                    lang={lang}
+                    dimmed={!phoneReady && phone.length === 0}
+                  />
+                ))}
+              </div>
+              {phone.length < 3 && products.length > displayProducts.length && (
+                <p className="text-center text-xs text-white/30 mt-3">
+                  +{products.length - displayProducts.length} produk lagi setelah input nomor
+                </p>
+              )}
+            </div>
+
+            {/* Order Summary */}
+            {selectedProduct && phoneReady && (
+              <div className="surface p-4 border border-blue-500/15 anim-scale-in">
+                <p className="text-[10px] text-white/35 tracking-widest uppercase font-bold mb-3">
+                  {t("order_summary", lang)}
+                </p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-white/90">{selectedProduct.name}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      {!isIndonesian && <span>{countryInfo.flag}</span>}
+                      <p className="text-xs text-white/45">
+                        {countryCode !== "+62" ? `${countryCode} ${phone}` : phone}
+                      </p>
+                    </div>
+                    {member.type !== "retail" && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <div className="w-1.5 h-1.5 rounded-full" style={{ background: TYPE_COLORS[member.type] }} />
+                        <p className="text-[10px] font-bold" style={{ color: TYPE_COLORS[member.type] }}>
+                          Harga {TYPE_LABELS[member.type]}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-black gradient-text-gold">{formatRupiah(selectedProduct.price)}</p>
+                    <p className="text-[10px] mt-0.5 font-medium"
+                      style={{ color: memberBalance >= selectedProduct.price ? "#10B981" : "#F87171" }}>
+                      Saldo: {formatRupiah(memberBalance)}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Submit Button */}
-          <button onClick={handleSubmit} disabled={!isFormValid}
-            className="w-full py-4 rounded-2xl text-base font-black tracking-wide transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed"
-            style={isFormValid ? {
-              background: "linear-gradient(135deg,hsl(210 90% 55%) 0%,hsl(230 75% 45%) 100%)",
-              color: "white", boxShadow: "0 6px 24px rgba(59,130,246,0.4),0 2px 8px rgba(0,0,0,0.3)",
-            } : undefined}>
-            {!phoneReady
-              ? (selectedProduct ? t("btn_enter_phone", lang) : t("btn_choose_prod", lang))
-              : !selectedProduct
-              ? t("btn_choose_prod", lang)
-              : t("btn_process", lang)}
-          </button>
-        </div>
-      )}
-
-      {/* ── Home: No category selected ── */}
-      {!selectedCategory && (
-        <div className="space-y-4">
-          {/* Trending products */}
-          <div className="glass-card rounded-2xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-base">🔥</span>
-              <p className="text-xs text-muted-foreground tracking-widest uppercase font-semibold">
-                {lang === "en" ? "Trending Products" : "Produk Terlaris"}
-              </p>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {trendingProducts.map((p) => {
-                const m = CATEGORY_META[p.category];
-                return (
-                  <button key={p.id}
-                    onClick={() => {
-                      setSelectedCategory(p.category);
-                      setSelectedProduct(null);
-                      setPhone("");
-                    }}
-                    className="flex flex-col items-center gap-1 p-2.5 rounded-xl border border-white/8 bg-white/3 hover:bg-white/6 transition-all text-center">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base"
-                      style={{ background: `${m.color}15`, border: `1px solid ${m.color}25` }}>
-                      {p.icon}
-                    </div>
-                    <p className="text-[9px] font-black text-foreground leading-tight line-clamp-2">{p.name}</p>
-                    <p className="text-[9px] font-bold" style={{ color: m.color }}>{formatRupiah(p.price)}</p>
-                    {p.badge && (
-                      <span className="px-1.5 py-0.5 rounded text-[8px] font-black"
-                        style={{ background: BADGE_STYLES[p.badge]?.bg ?? "#F59E0B", color: BADGE_STYLES[p.badge]?.text ?? "#fff" }}>
-                        {p.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+            {/* Submit Button */}
+            <button onClick={handleSubmit} disabled={!isFormValid}
+              className="w-full py-4 rounded-2xl text-sm font-black tracking-wide transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed btn-brand">
+              {!phoneReady
+                ? (selectedProduct ? t("btn_enter_phone", lang) : t("btn_choose_prod", lang))
+                : !selectedProduct
+                ? t("btn_choose_prod", lang)
+                : t("btn_process", lang)}
+            </button>
           </div>
+        )}
 
-          {/* ── Riwayat Mutasi Saldo (v2 only) ── */}
-          {!!getV2Token() && <MutationHistoryPanel />}
+        {/* ── Home: No category selected ── */}
+        {!selectedCategory && (
+          <div className="space-y-4">
+            {/* Trending */}
+            <div className="surface p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm">🔥</span>
+                <p className="text-[10px] text-white/35 tracking-widest uppercase font-bold">
+                  {lang === "en" ? "Trending Products" : "Produk Terlaris"}
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {trendingProducts.map((p) => {
+                  const m = CATEGORY_META[p.category];
+                  return (
+                    <button key={p.id}
+                      onClick={() => { setSelectedCategory(p.category); setSelectedProduct(null); setPhone(""); }}
+                      className="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/7 bg-white/3 hover:bg-white/6 active:scale-95 transition-all text-center">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl"
+                        style={{ background: `${m.color}15`, border: `1px solid ${m.color}22` }}>
+                        {p.icon}
+                      </div>
+                      <p className="text-[9px] font-bold text-white/80 leading-tight line-clamp-2">{p.name}</p>
+                      <p className="text-[9px] font-black gradient-text-gold">{formatRupiah(p.price)}</p>
+                      {p.badge && (
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-black"
+                          style={{ background: BADGE_STYLES[p.badge]?.bg ?? "#F59E0B", color: BADGE_STYLES[p.badge]?.text ?? "#fff" }}>
+                          {p.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-          {/* CS Quick Access */}
-          <button onClick={() => setShowHelp(true)}
-            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all hover:scale-[1.01]"
-            style={{ background: "rgba(167,139,250,0.06)", borderColor: "rgba(167,139,250,0.2)" }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-              style={{ background: "rgba(167,139,250,0.15)", border: "1.5px solid rgba(167,139,250,0.3)" }}>
-              🎧
-            </div>
-            <div className="flex-1 text-left">
-              <p className="text-sm font-black" style={{ color: "#A78BFA" }}>
-                {lang === "en" ? "Need Help?" : "Butuh Bantuan?"}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {lang === "en" ? "WhatsApp & Email support" : "Hubungi CS via WhatsApp atau Email"}
-              </p>
-            </div>
-            <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
+            {/* Riwayat Mutasi */}
+            {!!getV2Token() && <MutationHistoryPanel />}
+
+            {/* Bantuan */}
+            <button onClick={() => setShowHelp(true)}
+              className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl border transition-all active:scale-[0.99]"
+              style={{ background: "rgba(139,92,246,0.06)", borderColor: "rgba(139,92,246,0.18)" }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-xl"
+                style={{ background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.28)" }}>
+                🎧
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-bold" style={{ color: "#A78BFA" }}>
+                  {lang === "en" ? "Need Help?" : "Butuh Bantuan?"}
+                </p>
+                <p className="text-xs text-white/40">
+                  {lang === "en" ? "WhatsApp & Email support" : "Hubungi CS via WhatsApp atau Email"}
+                </p>
+              </div>
+              <svg width="16" height="16" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="mt-8 pb-2 text-center space-y-1.5">
+          <div className="h-px bg-white/5 mb-3" />
+          <p className="text-[10px] gradient-text-brand font-bold tracking-wider">Solusi Pulsa Terpercaya • Lombok</p>
+          <p className="text-[10px] text-white/25">© 2025 RoneyCell</p>
         </div>
-      )}
-
-      {/* ── Footer ── */}
-      <div className="mt-8 pb-2 text-center space-y-1">
-        <div className="h-px bg-gradient-to-r from-transparent via-white/8 to-transparent mb-3" />
-        <p className="text-[11px] font-bold"
-          style={{ background: "linear-gradient(135deg,#60A5FA 0%,#A78BFA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-          Solusi Pulsa Terpercaya di Lombok
-        </p>
-        <p className="text-[10px] text-muted-foreground">
-          {t("powered_by", lang)}{" "}
-          <span style={{ background: "linear-gradient(135deg,#FBBF24 0%,#F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 }}>
-            RoneyCell
-          </span>
-        </p>
       </div>
 
       {/* Modals */}
@@ -688,40 +673,37 @@ function ProductCard({ product, selected, onSelect, color, lang, dimmed }: {
   const badgeStyle = product.badge ? BADGE_STYLES[product.badge] : null;
   return (
     <button onClick={() => onSelect(product)}
-      className="relative rounded-2xl p-3.5 text-left transition-all duration-200 border"
+      className="relative rounded-2xl p-3.5 text-left transition-all duration-200 active:scale-[0.97]"
       style={{
-        opacity: dimmed ? 0.6 : 1,
-        borderColor: selected ? color : "rgba(255,255,255,0.08)",
-        background: selected ? `${color}10` : "rgba(255,255,255,0.03)",
-        boxShadow: selected ? `0 0 0 1px ${color},0 0 20px ${color}30` : undefined,
+        opacity: dimmed ? 0.55 : 1,
+        border: selected ? `2px solid ${color}` : "1px solid rgba(255,255,255,0.08)",
+        background: selected ? `${color}12` : "rgba(255,255,255,0.03)",
+        boxShadow: selected ? `0 0 0 1px ${color}40, 0 4px 16px ${color}25` : undefined,
       }}>
       {badgeStyle && product.badge && (
         <div className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full text-[8px] font-black z-10"
-          style={{ background: badgeStyle.bg, color: badgeStyle.text, boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
+          style={{ background: badgeStyle.bg, color: badgeStyle.text, boxShadow: "0 2px 8px rgba(0,0,0,0.4)" }}>
           {product.badge}
         </div>
       )}
-      <div className="flex items-start justify-between mb-2">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
-          style={{ background: `${color}18`, border: `1.5px solid ${color}25` }}>
+      <div className="flex items-start justify-between mb-2.5">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+          style={{ background: `${color}15`, border: `1.5px solid ${color}22` }}>
           {product.icon}
         </div>
         {selected && (
-          <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: color }}>
-            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+          <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: color }}>
+            <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="3">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
             </svg>
           </div>
         )}
       </div>
-      <p className="text-xs font-black text-foreground leading-snug mb-0.5 line-clamp-2">{product.name}</p>
-      <p className="text-[10px] text-muted-foreground leading-tight mb-2 line-clamp-1">{product.description}</p>
-      <div className="pt-2 border-t border-white/5">
-        <p className="text-[9px] text-muted-foreground">{lang === "en" ? "Price" : "Harga Jual"}</p>
-        <p className="text-sm font-black mt-0.5"
-          style={{ background: "linear-gradient(135deg,#FBBF24 0%,#F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-          {formatRupiah(product.price)}
-        </p>
+      <p className="text-xs font-bold text-white/90 leading-snug mb-0.5 line-clamp-2">{product.name}</p>
+      <p className="text-[10px] text-white/40 leading-tight mb-2.5 line-clamp-1">{product.description}</p>
+      <div className="pt-2 border-t border-white/6">
+        <p className="text-[9px] text-white/30 mb-0.5">{lang === "en" ? "Price" : "Harga Jual"}</p>
+        <p className="text-sm font-black gradient-text-gold">{formatRupiah(product.price)}</p>
       </div>
     </button>
   );

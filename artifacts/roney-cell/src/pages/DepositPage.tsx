@@ -1064,51 +1064,56 @@ export default function DepositPage() {
   const stepperActive = step === "payment" ? "payment" : "form";
 
   return (
-    <div className="min-h-dvh flex flex-col max-w-md mx-auto px-4 pb-28">
-      {/* Header */}
-      <div className="py-6 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: "linear-gradient(135deg,#FBBF24,#F59E0B)", boxShadow: "0 0 20px rgba(251,191,36,0.35)" }}>
-          <svg className="w-5 h-5 text-gray-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-          </svg>
+    <div className="min-h-dvh flex flex-col max-w-md mx-auto pb-28">
+      {/* Header sticky */}
+      <header className="sticky top-0 z-40 pt-safe px-4"
+        style={{ background: "rgba(11,15,26,0.92)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+        <div className="flex items-center justify-between h-14">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: "linear-gradient(135deg,#F59E0B,#D97706)", boxShadow: "0 0 12px rgba(245,158,11,0.45)" }}>
+              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#111" strokeWidth="2.2">
+                <rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 10h20"/><circle cx="7" cy="15" r="1" fill="#111" stroke="none"/>
+              </svg>
+            </div>
+            <div>
+              <h1 className="font-black text-base gradient-text-gold leading-none">Top Up Saldo</h1>
+              <p className="text-[9px] text-white/30 tracking-widest mt-0.5">QRIS · TRANSFER · AUTO-CREDIT</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {step === "payment" && !credited && (
+              <button onClick={handleReset}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/10 text-white/45 hover:bg-white/6 hover:text-white/70 transition-all">
+                ← Baru
+              </button>
+            )}
+            {step === "existing" && (
+              <button onClick={() => setStep("form")}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/10 text-white/45 hover:bg-white/6 hover:text-white/70 transition-all">
+                ← Kembali
+              </button>
+            )}
+          </div>
         </div>
-        <div className="flex-1">
-          <h1 className="font-black text-xl leading-none tracking-wide"
-            style={{ background: "linear-gradient(135deg,#FBBF24,#F59E0B)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-            ISI SALDO
-          </h1>
-          <p className="text-[10px] text-muted-foreground tracking-widest mt-0.5">QRIS · TRANSFER · AUTO-CREDIT</p>
-        </div>
-        {step === "payment" && !credited && (
-          <button onClick={handleReset}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/10 text-white/50 hover:bg-white/5">
-            ← Baru
-          </button>
-        )}
-        {step === "existing" && (
-          <button onClick={() => setStep("form")}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/10 text-white/50 hover:bg-white/5">
-            ← Kembali
-          </button>
-        )}
-      </div>
+      </header>
 
+      <div className="px-4 pt-4">
       {/* Stepper — hanya tampil saat belum sukses */}
       {!credited && (
         <div className="flex items-center gap-2 mb-5">
           {[
-            { id: "form",    label: "1 · Pilih Nominal" },
-            { id: "payment", label: "2 · Bayar & Upload" },
+            { id: "form",    label: "1. Pilih Nominal" },
+            { id: "payment", label: "2. Bayar & Upload" },
           ].map((s, i) => (
             <div key={s.id} className="flex items-center gap-2 flex-1">
-              <div className="flex-1 px-3 py-1 rounded-full text-xs font-semibold text-center transition-all"
+              <div className="flex-1 px-3 py-2 rounded-xl text-xs font-bold text-center transition-all"
                 style={stepperActive === s.id
-                  ? { background: "rgba(251,191,36,0.18)", color: "#FBBF24", border: "1px solid rgba(251,191,36,0.4)" }
-                  : { background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.3)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  ? { background: "rgba(245,158,11,0.15)", color: "#FBBF24", border: "1px solid rgba(245,158,11,0.35)" }
+                  : { background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.28)", border: "1px solid rgba(255,255,255,0.07)" }}>
                 {s.label}
               </div>
-              {i === 0 && <div className="w-3 h-px shrink-0" style={{ background: stepperActive === "payment" ? "rgba(251,191,36,0.4)" : "rgba(255,255,255,0.1)" }} />}
+              {i === 0 && <div className="w-4 h-px shrink-0" style={{ background: stepperActive === "payment" ? "rgba(245,158,11,0.4)" : "rgba(255,255,255,0.1)" }} />}
             </div>
           ))}
         </div>
@@ -1138,17 +1143,23 @@ export default function DepositPage() {
         <div className="mt-6">
           <button
             onClick={() => setShowHistory((p) => !p)}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-            <span className="text-xs font-semibold text-white/60 uppercase tracking-wider">Riwayat Deposit</span>
-            <svg className="w-4 h-4 text-white/35 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-              style={{ transform: showHistory ? "rotate(180deg)" : "none" }}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl transition-all"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div className="flex items-center gap-2.5">
+              <svg width="14" height="14" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="1.8" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4l3 3"/>
+              </svg>
+              <span className="text-xs font-bold text-white/50 uppercase tracking-wider">Riwayat Deposit</span>
+            </div>
+            <svg width="14" height="14" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" viewBox="0 0 24 24"
+              style={{ transform: showHistory ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
             </svg>
           </button>
           {showHistory && <div className="mt-2"><DepositHistory refreshKey={historyRefresh} /></div>}
         </div>
       )}
+      </div>
     </div>
   );
 }
