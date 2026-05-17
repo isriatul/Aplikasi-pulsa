@@ -204,6 +204,22 @@ export async function v2AdminRejectDeposit(id: number, reason: string) {
 export async function v2AdminAuditLog(page = 1) {
   return apiFetch<{ page: number; limit: number; data: AuditLog[] }>(`/admin/audit-log?page=${page}`);
 }
+export interface SyncReport {
+  added: number;
+  updated: number;
+  skipped: number;
+  total: number;
+  errors: string[];
+}
+
+export async function v2AdminSyncProducts() {
+  return apiFetch<SyncReport>("/admin/products/sync", { method: "POST" });
+}
+
+export async function v2AdminToggleProduct(id: number, isActive: boolean) {
+  return apiFetch<V2Product>(`/admin/products/${id}`, { method: "PUT", body: JSON.stringify({ isActive }) });
+}
+
 export async function v2AdminProducts(params?: { page?: number; q?: string }) {
   const qs = new URLSearchParams(params as Record<string,string>).toString();
   return apiFetch<{ page: number; limit: number; data: V2Product[] }>(`/admin/products?${qs}`);

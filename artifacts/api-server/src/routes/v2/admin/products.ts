@@ -3,20 +3,190 @@
  * POST   /api/v2/admin/products        — tambah produk
  * PUT    /api/v2/admin/products/:id    — update produk/harga
  * DELETE /api/v2/admin/products/:id    — nonaktifkan produk
+ * POST   /api/v2/admin/products/sync   — sync pricelist dari Digiflazz
  * GET    /api/v2/admin/providers       — list provider
  * POST   /api/v2/admin/providers       — tambah provider
  * PUT    /api/v2/admin/providers/:id   — update provider
  */
 import { Router, type IRouter, type Request } from "express";
+import { createHash } from "crypto";
 import { z } from "zod";
-import { eq, ilike, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { productsTable, providersTable } from "@workspace/db";
 import { requireRole } from "../../../middlewares/requireRole.js";
 import { safeZodErrors } from "../../../lib/sanitize.js";
 import { audit } from "../../../lib/v2/auditService.js";
 
+/* ─── Digiflazz sync helpers ─── */
+const DG_BASE = "https://api.digiflazz.com/v1";
+const DG_TIMEOUT_MS = 30_000;
+
+function md5(str: string): string {
+  return createHash("md5").update(str).digest("hex");
+}
+
+type DgProduct = {
+  buyer_sku_code: string;
+  product_name: string;
+  category: string;
+  brand: string;
+  type: string;
+  price: number;
+  buyer_product_status: boolean;
+  seller_product_status: boolean;
+  unlimited_stock: boolean;
+  stock: number;
+  desc?: string;
+};
+
+function mapCategory(raw: string): "pulsa" | "data" | "pln" | "ewallet" | "pascabayar" | "game" | "tv" | "voucher" | "international" | "other" {
+  const c = raw.toLowerCase();
+  if (c.includes("pulsa")) return "pulsa";
+  if (c.includes("data") || c.includes("paket")) return "data";
+  if (c.includes("pln") || c.includes("listrik") || c.includes("token")) return "pln";
+  if (c.includes("e-wallet") || c.includes("ewallet") || c.includes("e-money") || c.includes("dompet")) return "ewallet";
+  if (c.includes("pasca") || c.includes("tagihan") || c.includes("postpaid")) return "pascabayar";
+  if (c.includes("game") || c.includes("gaming") || c.includes("voucher game")) return "game";
+  if (c.includes("tv") || c.includes("streaming") || c.includes("internet")) return "tv";
+  if (c.includes("voucher")) return "voucher";
+  if (c.includes("internasional") || c.includes("international")) return "international";
+  return "other";
+}
+
+function markupPrice(base: number, pct: number, minMarkup: number): number {
+  const markup = Math.max(Math.ceil(base * pct), minMarkup);
+  return Math.ceil((base + markup) / 100) * 100;
+}
+
+async function fetchDigiflazzPricelist(cmd: "prepaid" | "pasca"): Promise<DgProduct[]> {
+  const username = process.env["DIGIFLAZZ_USERNAME"] ?? "";
+  const apiKey = process.env["DIGIFLAZZ_KEY"] ?? "";
+  if (!username || !apiKey) throw new Error("Kredensial Digiflazz belum dikonfigurasi");
+  const sign = md5(username + apiKey + "pricelist");
+  const res = await fetch(`${DG_BASE}/price-list`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cmd, username, sign }),
+    signal: AbortSignal.timeout(DG_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`Digiflazz HTTP error: ${res.status}`);
+  const json = await res.json() as { data?: DgProduct[] | { rc?: string; message?: string } };
+  if (!Array.isArray(json.data)) {
+    const msg = (json.data as { message?: string })?.message ?? "Response tidak valid dari Digiflazz";
+    throw new Error(msg);
+  }
+  return json.data;
+}
+
 const router: IRouter = Router();
+
+/* ── POST /api/v2/admin/products/sync — Sync pricelist Digiflazz → DB ── */
+router.post("/v2/admin/products/sync", requireRole("admin"), async (req, res) => {
+  try {
+    /* 1. Ambil pricelist prepaid & pasca secara berurutan agar tidak kena rate limit */
+    const fetchErrors: string[] = [];
+
+    const prepaid = await fetchDigiflazzPricelist("prepaid").catch((e: Error) => {
+      fetchErrors.push(`Prepaid: ${e.message}`);
+      return [] as DgProduct[];
+    });
+    /* Jeda singkat antar request agar tidak trigger rate limit Digiflazz */
+    await new Promise((r) => setTimeout(r, 1500));
+    const pasca = await fetchDigiflazzPricelist("pasca").catch((e: Error) => {
+      fetchErrors.push(`Pasca: ${e.message}`);
+      return [] as DgProduct[];
+    });
+
+    const allProducts = [...prepaid, ...pasca];
+
+    if (allProducts.length === 0) {
+      res.status(502).json({
+        error: fetchErrors.length > 0
+          ? fetchErrors.join(" | ")
+          : "Pricelist Digiflazz kosong / tidak bisa diakses",
+      });
+      return;
+    }
+
+    /* 2. Ambil kode produk yang sudah ada di DB (untuk laporan added vs updated) */
+    const existingRows = await db.select({ code: productsTable.code }).from(productsTable);
+    const existingCodes = new Set(existingRows.map((r) => r.code));
+
+    /* 3. Normalisasi & upsert per batch */
+    const BATCH = 200;
+    const errors: string[] = [];
+    let processed = 0;
+
+    for (let i = 0; i < allProducts.length; i += BATCH) {
+      const batch = allProducts.slice(i, i + BATCH);
+      const rows = batch.map((p) => {
+        const base = p.price;
+        const active = p.buyer_product_status && p.seller_product_status;
+        const stockVal = !p.seller_product_status ? "empty" : (p.unlimited_stock || p.stock > 0) ? "available" : "empty";
+        return {
+          code: p.buyer_sku_code,
+          name: p.product_name,
+          category: mapCategory(p.category),
+          provider: p.brand || null,
+          basePrice: base,
+          memberPrice: markupPrice(base, 0.05, 500),
+          resellerPrice: markupPrice(base, 0.03, 300),
+          adminPrice: markupPrice(base, 0.01, 200),
+          description: p.desc ?? null,
+          isActive: active,
+          stock: stockVal,
+        };
+      });
+
+      try {
+        await db
+          .insert(productsTable)
+          .values(rows)
+          .onConflictDoUpdate({
+            target: productsTable.code,
+            set: {
+              name: sql`excluded.name`,
+              provider: sql`excluded.provider`,
+              basePrice: sql`excluded.base_price`,
+              memberPrice: sql`excluded.member_price`,
+              resellerPrice: sql`excluded.reseller_price`,
+              adminPrice: sql`excluded.admin_price`,
+              stock: sql`excluded.stock`,
+              updatedAt: sql`now()`,
+            },
+          });
+        processed += rows.length;
+      } catch (err) {
+        errors.push(`Batch ${Math.floor(i / BATCH) + 1}: ${(err as Error).message}`);
+      }
+    }
+
+    /* 4. Hitung laporan */
+    const added = allProducts.filter((p) => !existingCodes.has(p.buyer_sku_code)).length;
+    const updated = allProducts.filter((p) => existingCodes.has(p.buyer_sku_code)).length;
+
+    await audit({
+      userId: req.member!.userId,
+      action: "admin_sync_products",
+      entity: "product",
+      ip: getIp(req),
+      data: { total: processed, added, updated, errors: errors.length },
+    });
+
+    req.log.info({ processed, added, updated }, "Product sync completed");
+    res.json({
+      added,
+      updated,
+      skipped: allProducts.length - processed,
+      total: processed,
+      errors,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Product sync failed");
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
 
 const ProductSchema = z.object({
   code: z.string().min(1).max(60).regex(/^[A-Za-z0-9_\-]+$/),

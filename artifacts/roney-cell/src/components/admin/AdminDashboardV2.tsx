@@ -16,6 +16,9 @@ import {
   v2AdminUpdateUser,
   v2AdminAuditLog,
   v2MonitoringHealth,
+  v2AdminProducts,
+  v2AdminSyncProducts,
+  v2AdminToggleProduct,
   formatRp,
   type AdminDashboard,
   type V2User,
@@ -23,16 +26,19 @@ import {
   type V2Deposit,
   type AuditLog,
   type MonitoringHealth,
+  type SyncReport,
+  type V2Product,
 } from "@/lib/apiV2";
 import StatCard from "./StatCard";
 
-type PanelTab = "dashboard" | "users" | "transactions" | "deposits" | "audit" | "monitoring";
+type PanelTab = "dashboard" | "users" | "transactions" | "deposits" | "products" | "audit" | "monitoring";
 
 const TAB_LABELS: Record<PanelTab, string> = {
   dashboard: "Dasbor",
   users: "Users",
   transactions: "Transaksi",
   deposits: "Deposit",
+  products: "Produk",
   audit: "Audit Log",
   monitoring: "Monitoring",
 };
@@ -600,7 +606,187 @@ function AuditPanel() {
   );
 }
 
-/* ─── Monitoring Panel ─── */
+/* ─── Products Panel ─── */
+const CATEGORY_LABELS: Record<string, string> = {
+  pulsa: "Pulsa",
+  data: "Data",
+  pln: "PLN",
+  ewallet: "E-Wallet",
+  pascabayar: "Pascabayar",
+  game: "Game",
+  tv: "TV",
+  voucher: "Voucher",
+  international: "Internasional",
+  other: "Lainnya",
+};
+
+function ProductsPanel() {
+  const [products, setProducts] = useState<V2Product[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [q, setQ] = useState("");
+  const [category, setCategory] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [syncReport, setSyncReport] = useState<SyncReport | null>(null);
+  const [syncError, setSyncError] = useState("");
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+
+  const load = useCallback(async (p = page) => {
+    setLoading(true); setError("");
+    try {
+      const params: Record<string, string> = { page: String(p) };
+      if (q) params["q"] = q;
+      const res = await v2AdminProducts(params as { page?: number; q?: string });
+      setProducts(res.data);
+      setHasMore(res.data.length === res.limit);
+    } catch (e) { setError((e as Error).message); }
+    finally { setLoading(false); }
+  }, [page, q]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const filtered = category ? products.filter((p) => p.category === category) : products;
+
+  async function doSync() {
+    setSyncing(true); setSyncReport(null); setSyncError("");
+    try {
+      const report = await v2AdminSyncProducts();
+      setSyncReport(report);
+      void load(1);
+      setPage(1);
+    } catch (e) {
+      setSyncError((e as Error).message);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function doToggle(p: V2Product) {
+    setTogglingId(p.id);
+    try {
+      await v2AdminToggleProduct(p.id, !p.isActive);
+      setProducts((prev) => prev.map((x) => x.id === p.id ? { ...x, isActive: !p.isActive } : x));
+    } catch { /* abaikan */ }
+    finally { setTogglingId(null); }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Sync button */}
+      <div className="rounded-xl p-4 border border-white/8 space-y-3" style={{ background: "rgba(255,255,255,0.03)" }}>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div>
+            <div className="text-sm font-bold text-white">Sinkronisasi Produk Digiflazz</div>
+            <div className="text-xs text-white/50 mt-0.5">Ambil semua pricelist terbaru (prepaid + pasca) dan simpan ke database</div>
+          </div>
+          <button
+            onClick={() => { void doSync(); }}
+            disabled={syncing}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg,#3B82F6,#8B5CF6)", boxShadow: "0 2px 12px rgba(59,130,246,0.3)" }}>
+            {syncing ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                Sinkronisasi...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Sync Produk
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Laporan hasil sync */}
+        {syncReport && (
+          <div className="rounded-xl p-3 bg-emerald-500/10 border border-emerald-500/20 space-y-1">
+            <div className="text-xs font-bold text-emerald-400">Sync selesai!</div>
+            <div className="grid grid-cols-3 gap-2 text-center mt-2">
+              <div className="rounded-lg p-2 bg-white/5">
+                <div className="text-lg font-black text-emerald-400">{syncReport.added.toLocaleString("id-ID")}</div>
+                <div className="text-[10px] text-white/50">Produk Baru</div>
+              </div>
+              <div className="rounded-lg p-2 bg-white/5">
+                <div className="text-lg font-black text-blue-400">{syncReport.updated.toLocaleString("id-ID")}</div>
+                <div className="text-[10px] text-white/50">Diperbarui</div>
+              </div>
+              <div className="rounded-lg p-2 bg-white/5">
+                <div className="text-lg font-black text-white">{syncReport.total.toLocaleString("id-ID")}</div>
+                <div className="text-[10px] text-white/50">Total</div>
+              </div>
+            </div>
+            {syncReport.errors.length > 0 && (
+              <div className="text-[10px] text-red-400 mt-1">{syncReport.errors.length} batch gagal: {syncReport.errors[0]}</div>
+            )}
+          </div>
+        )}
+        {syncError && <div className="text-xs text-red-400 rounded-lg p-2 bg-red-500/10 border border-red-500/20">{syncError}</div>}
+      </div>
+
+      {/* Filter & Search */}
+      <div className="flex gap-2 flex-wrap">
+        <input
+          value={q}
+          onChange={(e) => { setQ(e.target.value); setPage(1); }}
+          placeholder="Cari kode / nama..."
+          className="flex-1 min-w-0 px-3 py-2 rounded-xl text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:border-blue-500/60 placeholder-white/30"
+        />
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="px-3 py-2 rounded-xl text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:border-blue-500/60">
+          <option value="">Semua Kategori</option>
+          {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
+            <option key={k} value={k}>{v}</option>
+          ))}
+        </select>
+        <button onClick={() => { void load(); }} className="px-3 py-2 rounded-xl text-sm bg-white/10 text-white hover:bg-white/20">↻</button>
+      </div>
+
+      {/* Product list */}
+      {loading ? <LoadingSpinner /> : error ? <ErrorBox msg={error} /> : (
+        <div className="space-y-2">
+          {filtered.length === 0 ? (
+            <div className="text-center py-8 text-sm text-white/40">
+              {products.length === 0 ? "Belum ada produk — klik Sync Produk untuk mengisi database" : "Tidak ada produk sesuai filter"}
+            </div>
+          ) : filtered.map((p) => (
+            <div key={p.id} className={`rounded-xl p-3 border transition-all ${p.isActive ? "border-white/8 bg-white/3" : "border-white/4 bg-white/1 opacity-60"}`}>
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">{p.code}</span>
+                    <span className="text-[10px] text-white/50 bg-white/5 px-1.5 py-0.5 rounded">{CATEGORY_LABELS[p.category] ?? p.category}</span>
+                    {p.stock === "empty" && <span className="text-[10px] text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded">Stok kosong</span>}
+                  </div>
+                  <div className="text-sm text-white/90 font-medium mt-1 leading-tight">{p.name}</div>
+                  {p.provider && <div className="text-[10px] text-white/40 mt-0.5">{p.provider}</div>}
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-sm font-bold text-white">{formatRp(p.memberPrice)}</div>
+                  <div className="text-[10px] text-white/40">Modal: {formatRp(p.basePrice)}</div>
+                  <button
+                    onClick={() => { void doToggle(p); }}
+                    disabled={togglingId === p.id}
+                    className={`mt-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors disabled:opacity-50 ${p.isActive ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25" : "bg-white/8 text-white/40 hover:bg-white/15"}`}>
+                    {togglingId === p.id ? "..." : p.isActive ? "Aktif" : "Nonaktif"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+          <Pagination page={page} onChange={(p) => { setPage(p); void load(p); }} hasMore={hasMore} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MonitoringPanel() {
   const [health, setHealth] = useState<MonitoringHealth | null>(null);
   const [loading, setLoading] = useState(true);
@@ -812,6 +998,7 @@ export default function AdminDashboardV2() {
       {tab === "users" && <UsersPanel />}
       {tab === "transactions" && <TransactionsPanel />}
       {tab === "deposits" && <DepositsPanel />}
+      {tab === "products" && <ProductsPanel />}
       {tab === "audit" && <AuditPanel />}
       {tab === "monitoring" && <MonitoringPanel />}
     </div>
