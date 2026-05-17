@@ -138,11 +138,11 @@ function CopyBtn({ text }: { text: string }) {
 /* ─── Badge status deposit ─── */
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, [string, string, string]> = {
-    pending:   ["rgba(245,158,11,0.15)",  "#FCD34D", "⏳ Menunggu Bayar"],
-    paid:      ["rgba(59,130,246,0.15)",  "#93C5FD", "📸 Bukti Terkirim"],
-    confirmed: ["rgba(16,185,129,0.15)", "#6EE7B7", "✅ Saldo Masuk"],
-    failed:    ["rgba(239,68,68,0.15)",  "#FCA5A5", "❌ Ditolak"],
-    expired:   ["rgba(107,114,128,0.15)","#9CA3AF", "🕐 Kedaluwarsa"],
+    pending:   ["rgba(245,158,11,0.12)",  "#B45309", "⏳ Menunggu Bayar"],
+    paid:      ["rgba(59,130,246,0.12)",  "#1D4ED8", "📸 Bukti Terkirim"],
+    confirmed: ["rgba(16,185,129,0.12)", "#047857", "✅ Saldo Masuk"],
+    failed:    ["rgba(239,68,68,0.12)",  "#B91C1C", "❌ Ditolak"],
+    expired:   ["rgba(107,114,128,0.12)","#4B5563", "🕐 Kedaluwarsa"],
   };
   const [bg, color, label] = map[status] ?? map["pending"]!;
   return <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ background: bg, color }}>{label}</span>;
@@ -163,7 +163,7 @@ function Countdown({ expiredAt }: { expiredAt: string }) {
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
   }, [expiredAt]);
-  return <span className="font-mono font-bold text-amber-400">{sisa}</span>;
+  return <span className="font-mono font-bold text-amber-700">{sisa}</span>;
 }
 
 /* ─── Form Upload Bukti ─── */
@@ -322,39 +322,39 @@ function PaymentInstructions({
   return (
     <div className="space-y-4">
       {/* Header tiket */}
-      <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(251,191,36,0.3)", background: "rgba(251,191,36,0.04)" }}>
-        <div className="px-4 py-3 flex items-center justify-between" style={{ background: "rgba(251,191,36,0.08)", borderBottom: "1px solid rgba(251,191,36,0.15)" }}>
+      <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid #DDE3EE", background: "#FFFFFF" }}>
+        <div className="px-4 py-3 flex items-center justify-between" style={{ background: "#F5F7FB", borderBottom: "1px solid #DDE3EE" }}>
           <div>
-            <p className="text-[10px] text-amber-400/70 uppercase tracking-widest font-semibold">Tiket Deposit Aktif</p>
-            <p className="font-mono text-xs text-white/50">{deposit.paymentRef}</p>
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Tiket Deposit Aktif</p>
+            <p className="font-mono text-xs text-slate-400">{deposit.paymentRef}</p>
           </div>
           <StatusBadge status={deposit.status} />
         </div>
 
         {/* Nominal bayar — tampilan besar */}
         <div className="px-4 pt-4 pb-3">
-          <p className="text-xs text-muted-foreground mb-1">Nominal asli</p>
-          <p className="text-sm font-semibold text-white">{rp(deposit.amount)}</p>
-          <p className="text-xs text-muted-foreground mt-2 mb-1">Kode unik</p>
-          <p className="text-sm font-semibold text-amber-400">+{uniqueCode}</p>
+          <p className="text-xs text-slate-500 mb-1">Nominal asli</p>
+          <p className="text-sm font-semibold text-slate-800">{rp(deposit.amount)}</p>
+          <p className="text-xs text-slate-500 mt-2 mb-1">Kode unik</p>
+          <p className="text-sm font-semibold text-orange-600">+{uniqueCode}</p>
 
           {/* Total — warna merah supaya menonjol */}
-          <div className="mt-3 rounded-xl px-4 py-3" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)" }}>
-            <p className="text-xs font-bold text-red-300 uppercase tracking-wider mb-1">⚠️ BAYAR TEPAT NOMINAL INI</p>
+          <div className="mt-3 rounded-xl px-4 py-3" style={{ background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)" }}>
+            <p className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">⚠️ BAYAR TEPAT NOMINAL INI</p>
             <div className="flex items-center justify-between gap-3">
-              <p className="text-2xl font-black text-white">{rp(totalAmount)}</p>
+              <p className="text-2xl font-black text-slate-900">{rp(totalAmount)}</p>
               <CopyBtn text={String(totalAmount)} />
             </div>
-            <p className="text-xs text-red-300/80 mt-1">Nominal berbeda = tidak terdeteksi otomatis</p>
+            <p className="text-xs text-red-500 mt-1">Nominal berbeda = tidak terdeteksi otomatis</p>
           </div>
 
           {/* Timer */}
           {deposit.expiredAt && !isExpired && (
-            <div className="flex items-center gap-2 mt-3 px-3 py-2 rounded-lg" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)" }}>
-              <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="flex items-center gap-2 mt-3 px-3 py-2 rounded-lg" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)" }}>
+              <svg className="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span className="text-xs text-amber-300">Berlaku </span>
+              <span className="text-xs text-amber-700">Berlaku </span>
               <Countdown expiredAt={deposit.expiredAt} />
             </div>
           )}
@@ -364,11 +364,11 @@ function PaymentInstructions({
       {/* Instruksi pembayaran — beda tampilan sesuai metode */}
       {!isExpired && deposit.status === "pending" && deposit.method === "qris" && (
         <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(168,85,247,0.3)", background: "rgba(168,85,247,0.04)" }}>
-          <div className="px-4 py-3 text-center" style={{ background: "linear-gradient(135deg, rgba(168,85,247,0.2), rgba(59,130,246,0.2))", borderBottom: "1px solid rgba(168,85,247,0.2)" }}>
-            <p className="text-xs font-black tracking-widest uppercase text-purple-300 mb-0.5">Cara Bayar QRIS</p>
-            <p className="text-base font-black text-white leading-snug">
+          <div className="px-4 py-3 text-center" style={{ background: "linear-gradient(135deg, rgba(168,85,247,0.08), rgba(59,130,246,0.08))", borderBottom: "1px solid #DDE3EE" }}>
+            <p className="text-xs font-black tracking-widest uppercase text-purple-700 mb-0.5">Cara Bayar QRIS</p>
+            <p className="text-base font-black text-slate-800 leading-snug">
               SCAN QR & BAYAR TEPAT<br />
-              <span style={{ color: "#FBBF24" }}>NOMINAL + KODE UNIK</span>
+              <span className="text-purple-700">NOMINAL + KODE UNIK</span>
             </p>
           </div>
 
@@ -413,50 +413,50 @@ function PaymentInstructions({
       {/* Instruksi Transfer BCA */}
       {!isExpired && deposit.status === "pending" && deposit.method === "transfer" && (
         <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(59,130,246,0.35)", background: "rgba(59,130,246,0.04)" }}>
-          <div className="px-4 py-3 text-center" style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.2), rgba(6,182,212,0.15))", borderBottom: "1px solid rgba(59,130,246,0.2)" }}>
-            <p className="text-xs font-black tracking-widest uppercase text-blue-300 mb-0.5">Transfer Bank BCA</p>
-            <p className="text-base font-black text-white leading-snug">
+          <div className="px-4 py-3 text-center" style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.08), rgba(6,182,212,0.06))", borderBottom: "1px solid #DDE3EE" }}>
+            <p className="text-xs font-black tracking-widest uppercase text-blue-700 mb-0.5">Transfer Bank BCA</p>
+            <p className="text-base font-black text-slate-800 leading-snug">
               TRANSFER TEPAT NOMINAL<br />
-              <span style={{ color: "#FBBF24" }}>TERMASUK KODE UNIK</span>
+              <span className="text-blue-700">TERMASUK KODE UNIK</span>
             </p>
           </div>
 
           {/* Info rekening BCA */}
           <div className="px-4 py-4 space-y-3">
-            <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(59,130,246,0.25)", background: "rgba(59,130,246,0.06)" }}>
+            <div className="rounded-xl overflow-hidden" style={{ border: "1px solid #DDE3EE", background: "#F5F7FB" }}>
               {/* Logo BCA */}
-              <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid rgba(59,130,246,0.15)", background: "rgba(59,130,246,0.1)" }}>
+              <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid #DDE3EE", background: "#EBEEF5" }}>
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs text-white"
                   style={{ background: "linear-gradient(135deg,#005DAA,#0071CE)" }}>BCA</div>
                 <div>
-                  <p className="text-xs font-black text-white">Bank BCA</p>
-                  <p className="text-[10px] text-blue-300/80">Bank Central Asia</p>
+                  <p className="text-xs font-black text-slate-800">Bank BCA</p>
+                  <p className="text-[10px] text-slate-500">Bank Central Asia</p>
                 </div>
               </div>
               <div className="px-4 py-3 space-y-3">
                 <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Nomor Rekening</p>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Nomor Rekening</p>
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xl font-black text-white tracking-widest">{BCA_INFO.noRek}</p>
+                    <p className="text-xl font-black text-slate-900 tracking-widest">{BCA_INFO.noRek}</p>
                     <CopyBtn text={BCA_INFO.noRek} />
                   </div>
                 </div>
-                <div className="h-px bg-white/8" />
+                <div className="h-px bg-slate-200" />
                 <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Atas Nama</p>
-                  <p className="text-sm font-semibold text-white">{BCA_INFO.atasNama}</p>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Atas Nama</p>
+                  <p className="text-sm font-semibold text-slate-800">{BCA_INFO.atasNama}</p>
                 </div>
               </div>
             </div>
 
             {/* Nominal transfer */}
-            <div className="rounded-xl px-4 py-3 space-y-2" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)" }}>
-              <p className="text-xs font-black text-red-300 uppercase tracking-wider">⚠️ Transfer TEPAT nominal ini</p>
+            <div className="rounded-xl px-4 py-3 space-y-2" style={{ background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)" }}>
+              <p className="text-xs font-black text-red-600 uppercase tracking-wider">⚠️ Transfer TEPAT nominal ini</p>
               <div className="flex items-center justify-between gap-3">
-                <p className="text-2xl font-black text-white">{rp(totalAmount)}</p>
+                <p className="text-2xl font-black text-slate-900">{rp(totalAmount)}</p>
                 <CopyBtn text={String(totalAmount)} />
               </div>
-              <p className="text-xs text-red-300/80">Nominal berbeda = tidak terdeteksi otomatis</p>
+              <p className="text-xs text-red-500">Nominal berbeda = tidak terdeteksi otomatis</p>
             </div>
 
             {/* Langkah */}
@@ -470,8 +470,8 @@ function PaymentInstructions({
               ].map((s) => (
                 <div key={s.no} className="flex items-start gap-3">
                   <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs font-black mt-0.5"
-                    style={{ background: "rgba(59,130,246,0.25)", color: "#60A5FA" }}>{s.no}</div>
-                  <p className="text-xs text-white/70 leading-relaxed">{s.text}</p>
+                    style={{ background: "rgba(59,130,246,0.15)", color: "#1D4ED8" }}>{s.no}</div>
+                  <p className="text-xs text-slate-600 leading-relaxed">{s.text}</p>
                 </div>
               ))}
             </div>
