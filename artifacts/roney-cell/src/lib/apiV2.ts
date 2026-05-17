@@ -60,7 +60,12 @@ async function apiFetch<T>(path: string, init?: RequestInit, retry = true): Prom
     ...init,
     headers: { ...headers(), ...(init?.headers as Record<string, string> ?? {}) },
   });
-  if (res.status === 401 && retry) {
+
+  /* Jangan retry/refresh untuk endpoint auth — 401 di sana berarti credentials salah,
+     bukan sesi habis. Biarkan error server asli diteruskan ke caller. */
+  const isAuthEndpoint = path.startsWith("/auth/");
+
+  if (res.status === 401 && retry && !isAuthEndpoint) {
     const ok = await tryV2Refresh();
     if (ok) return apiFetch<T>(path, init, false);
     clearV2Tokens();
