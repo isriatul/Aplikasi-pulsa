@@ -411,41 +411,72 @@ function SheetsPendingSection({ onRefreshed }: { onRefreshed?: (count: number) =
 }
 
 /* ─── V2 Pending Section ─── */
+const POLL_INTERVAL_MS = 30_000; /* auto-refresh setiap 30 detik */
+
 function V2PendingSection({ onCountChange }: { onCountChange?: (n: number) => void }) {
+  /* hasToken sebagai state reaktif agar re-render saat token tersedia setelah auto-refresh */
+  const [hasToken, setHasToken] = useState(false);
   const [users, setUsers] = useState<V2User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [actionState, setActionState] = useState<Record<number, "loading" | "ok" | "err">>({});
   const [msgs, setMsgs] = useState<Record<number, string>>({});
-  const hasToken = !!getV2Token();
 
-  const load = useCallback(async () => {
-    if (!hasToken) { setLoading(false); return; }
-    setLoading(true);
+  /* Cek ketersediaan token setiap 1 detik sampai tersedia, lalu hentikan */
+  useEffect(() => {
+    const id = setInterval(() => {
+      const ok = !!getV2Token();
+      setHasToken(ok);
+      if (ok) clearInterval(id);
+    }, 1000);
+    setHasToken(!!getV2Token()); /* cek langsung saat mount */
+    return () => clearInterval(id);
+  }, []);
+
+  const load = useCallback(async (silent = false) => {
+    if (!getV2Token()) { setLoading(false); return; }
+    if (!silent) setLoading(true);
     try {
       const res = await v2AdminUsers({ status: "pending" });
       setUsers(res.data);
+      setLastRefresh(new Date());
       onCountChange?.(res.data.length);
-    } catch { setUsers([]); }
+    } catch { /* abaikan error polling */ }
     finally { setLoading(false); }
-  }, [hasToken, onCountChange]);
+  }, [onCountChange]);
 
-  useEffect(() => { void load(); }, [load]);
+  /* Load pertama kali saat token tersedia */
+  useEffect(() => {
+    if (hasToken) void load();
+  }, [hasToken, load]);
+
+  /* Auto-poll setiap 30 detik — silent (tanpa spinner) */
+  useEffect(() => {
+    if (!hasToken) return;
+    const id = setInterval(() => void load(true), POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [hasToken, load]);
 
   async function doActivate(u: V2User) {
     setActionState((p) => ({ ...p, [u.id]: "loading" }));
     try {
       await v2AdminActivateUser(u.id);
       setActionState((p) => ({ ...p, [u.id]: "ok" }));
-      setMsgs((p) => ({ ...p, [u.id]: "✅ Berhasil diaktifkan" }));
+      setMsgs((p) => ({ ...p, [u.id]: "Berhasil diaktifkan" }));
       setUsers((prev) => prev.filter((x) => x.id !== u.id));
-      onCountChange?.(users.length - 1);
+      onCountChange?.(Math.max(0, users.length - 1));
     } catch (e) {
       setActionState((p) => ({ ...p, [u.id]: "err" }));
       setMsgs((p) => ({ ...p, [u.id]: (e as Error).message }));
     }
   }
 
-  if (!hasToken) return null;
+  /* Belum ada token sama sekali — sembunyikan, bukan error */
+  if (!hasToken) return (
+    <div className="glass-card rounded-2xl p-4 border border-white/6 text-center py-3">
+      <p className="text-xs text-muted-foreground">Login sebagai admin untuk melihat pendaftar database.</p>
+    </div>
+  );
 
   if (loading) return (
     <div className="glass-card rounded-2xl p-4 border border-blue-500/20">
@@ -456,15 +487,22 @@ function V2PendingSection({ onCountChange }: { onCountChange?: (n: number) => vo
     </div>
   );
 
+  const refreshLabel = lastRefresh
+    ? `Update ${lastRefresh.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
+    : "Refresh";
+
   if (users.length === 0) return (
     <div className="glass-card rounded-2xl p-4 border border-white/6">
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Pendaftar Baru (Database)</p>
-        <button onClick={load} className="text-xs text-muted-foreground hover:text-foreground transition-colors">🔄 Refresh</button>
+        <button onClick={() => void load()} className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1">
+          🔄 <span>{refreshLabel}</span>
+        </button>
       </div>
       <div className="text-center py-3">
         <p className="text-2xl mb-1">🎉</p>
         <p className="text-sm text-muted-foreground">Tidak ada pendaftar yang menunggu.</p>
+        <p className="text-[10px] text-muted-foreground mt-1">Auto-refresh setiap 30 detik</p>
       </div>
     </div>
   );
@@ -473,20 +511,26 @@ function V2PendingSection({ onCountChange }: { onCountChange?: (n: number) => vo
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-        <p className="text-sm font-black text-blue-300">Pendaftar Database Menunggu</p>
+        <p className="text-sm font-black text-blue-300">Menunggu Persetujuan</p>
         <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-500/20 text-blue-400">{users.length}</span>
-        <button onClick={load} className="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors">🔄</button>
+        <button onClick={() => void load()} className="ml-auto text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1">
+          🔄 <span>{refreshLabel}</span>
+        </button>
       </div>
       {users.map((u) => (
         <div key={u.id} className="glass-card rounded-2xl p-4 border border-blue-500/25"
-          style={{ background: "rgba(59,130,246,0.03)" }}>
-          <div className="flex items-start justify-between mb-3">
+          style={{ background: "rgba(59,130,246,0.04)" }}>
+          <div className="flex items-start gap-3 mb-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-sm text-white"
+              style={{ background: "linear-gradient(135deg,#3B82F6,#6366F1)" }}>
+              {u.name.charAt(0).toUpperCase()}
+            </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
                 <p className="font-black text-foreground truncate">{u.name}</p>
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/20 text-blue-400 shrink-0">DB</span>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-400 shrink-0">PENDING</span>
               </div>
-              <p className="text-xs text-muted-foreground">📱 +62{u.phone}</p>
+              <p className="text-xs text-muted-foreground">📱 0{u.phone}</p>
               {u.email && <p className="text-xs text-muted-foreground">✉️ {u.email}</p>}
               <p className="text-[10px] text-muted-foreground mt-0.5">
                 Daftar: {new Date(u.createdAt).toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" })}
@@ -494,17 +538,19 @@ function V2PendingSection({ onCountChange }: { onCountChange?: (n: number) => vo
             </div>
           </div>
           {msgs[u.id] && (
-            <p className={`text-xs font-semibold mb-2 px-2 py-1 rounded-lg ${actionState[u.id] === "ok" ? "text-emerald-400 bg-emerald-500/10" : "text-red-400 bg-red-500/10"}`}>
-              {msgs[u.id]}
+            <p className={`text-xs font-semibold mb-2 px-3 py-1.5 rounded-lg ${actionState[u.id] === "ok" ? "text-emerald-400 bg-emerald-500/10" : "text-red-400 bg-red-500/10"}`}>
+              {actionState[u.id] === "ok" ? "✓ " : "⚠ "}{msgs[u.id]}
             </p>
           )}
-          <button
-            onClick={() => doActivate(u)}
-            disabled={actionState[u.id] === "loading" || actionState[u.id] === "ok"}
-            className="w-full py-2 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50"
-            style={{ background: "linear-gradient(135deg,#3B82F6,#2563EB)" }}>
-            {actionState[u.id] === "loading" ? "Mengaktifkan..." : actionState[u.id] === "ok" ? "✓ Aktif" : "✅ Aktifkan User"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => doActivate(u)}
+              disabled={actionState[u.id] === "loading" || actionState[u.id] === "ok"}
+              className="flex-1 py-2 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50"
+              style={{ background: "linear-gradient(135deg,#10B981,#059669)" }}>
+              {actionState[u.id] === "loading" ? "Memproses..." : actionState[u.id] === "ok" ? "✓ Aktif" : "✅ Setujui & Aktifkan"}
+            </button>
+          </div>
         </div>
       ))}
     </div>
