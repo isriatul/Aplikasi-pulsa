@@ -25,7 +25,7 @@ const DEPOSIT_TTL_MS = 60 * 60_000; /* 1 jam */
 
 const DepositSchema = z.object({
   amount: z.number().int().min(10_000).max(50_000_000),
-  method: z.enum(["qris", "transfer", "manual"]),
+  method: z.enum(["qris", "transfer", "va_dana", "alfamart", "manual"]),
   note: z.string().max(200).optional(),
 });
 
@@ -358,13 +358,49 @@ function buildInstructions(
       ],
     };
   }
+  if (method === "transfer") {
+    return {
+      ...base,
+      langkah: [
+        "Buka m-banking atau ATM BCA / bank lain",
+        `Transfer ke BCA 7255211277 a.n. Isriatul Bahroni`,
+        `Nominal TEPAT Rp${totalAmount.toLocaleString("id-ID")}`,
+        "Screenshot bukti transfer",
+        "Upload foto struk → saldo langsung masuk",
+      ],
+    };
+  }
+  if (method === "va_dana") {
+    return {
+      ...base,
+      langkah: [
+        "Buka m-banking atau ATM bank manapun",
+        "Pilih Transfer → Virtual Account → masukkan 88810081288080752",
+        `Nominal TEPAT Rp${totalAmount.toLocaleString("id-ID")}`,
+        "Screenshot bukti transfer",
+        "Upload foto struk → saldo langsung masuk",
+      ],
+    };
+  }
+  if (method === "alfamart") {
+    return {
+      ...base,
+      langkah: [
+        "Pergi ke Alfamart atau Indomaret terdekat",
+        `Ke kasir: mau kirim DANA ke nomor 081288080752`,
+        `Sebutkan nominal TEPAT Rp${totalAmount.toLocaleString("id-ID")}`,
+        "Bayar tunai dan minta struk",
+        "Foto struk fisik dari kasir",
+        "Upload foto struk → saldo langsung masuk",
+      ],
+    };
+  }
   return {
     ...base,
     langkah: [
-      "Transfer ke rekening yang tertera",
-      `Nominal TEPAT Rp${totalAmount.toLocaleString("id-ID")}`,
-      "Screenshot bukti transfer",
-      "Upload foto struk → saldo langsung masuk",
+      "Hubungi admin RoneyCell via WhatsApp",
+      `Sertakan nominal ${totalAmount.toLocaleString("id-ID")} dan nomor tiket ${ref}`,
+      "Admin akan konfirmasi dan kreditkan saldo",
     ],
   };
 }

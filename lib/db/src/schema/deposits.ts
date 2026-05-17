@@ -1,7 +1,7 @@
 import { pgTable, serial, integer, bigint, varchar, text, timestamp, pgEnum, jsonb, index, smallint } from "drizzle-orm/pg-core";
 import { usersTable } from "./users.js";
 
-export const depositMethodEnum = pgEnum("deposit_method", ["qris", "va_bca", "va_mandiri", "va_bni", "transfer", "manual"]);
+export const depositMethodEnum = pgEnum("deposit_method", ["qris", "va_bca", "va_mandiri", "va_bni", "transfer", "va_dana", "alfamart", "manual"]);
 export const depositStatusEnum = pgEnum("deposit_status", ["pending", "paid", "confirmed", "failed", "expired"]);
 
 export const depositsTable = pgTable(
