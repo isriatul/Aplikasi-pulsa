@@ -314,7 +314,7 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
   ];
 
   return (
-    <div className="min-h-dvh flex flex-col max-w-md mx-auto" style={{ background: "#F7F8FA" }}>
+    <div className="min-h-dvh flex flex-col max-w-md mx-auto" style={{ background: "#E8EDF5" }}>
 
       {/* ─── Sidebar Overlay ─── */}
       {showSidebar && (
@@ -322,27 +322,33 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
           {/* backdrop */}
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowSidebar(false)} />
           {/* drawer */}
-          <div className="relative w-72 h-full flex flex-col z-10"
-            style={{ background: "#FFFFFF", borderRight: "1px solid #E2E8F0" }}>
-            {/* Profile section */}
-            <div className="px-5 pt-10 pb-5" style={{ borderBottom: "1px solid #F1F5F9" }}>
-              <div className="flex flex-col items-start gap-1">
-                <span className="text-2xl font-black gradient-text-brand">RoneyCell</span>
-                <span className="text-xs" style={{ color: "#94A3B8" }}>Sistem Jualan Pulsa Profesional</span>
+          <div className="relative w-56 h-full flex flex-col z-10"
+            style={{ background: "#FFFFFF", borderRight: "1px solid #E2E8F0", boxShadow: "4px 0 24px rgba(0,0,0,0.10)" }}>
+            {/* Profile section + close button */}
+            <div className="px-4 pt-safe pb-4" style={{ borderBottom: "1px solid #F1F5F9" }}>
+              <div className="flex items-center justify-between mb-3 pt-3">
+                <span className="text-lg font-black gradient-text-brand">RoneyCell</span>
+                <button onClick={() => setShowSidebar(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-100 transition-colors">
+                  <svg width="16" height="16" fill="none" stroke="#334155" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
               </div>
-              <div className="mt-4 space-y-0.5">
-                <p className="text-sm font-bold" style={{ color: "#0F172A" }}>{member.name}</p>
-                <p className="text-xs" style={{ color: "#64748B" }}>CS WA: +{ADMIN_WA}</p>
-                <p className="text-xs" style={{ color: "#94A3B8" }}>roneycell.id</p>
+              <p className="text-[11px] text-slate-400 mb-3">Sistem Jualan Pulsa Profesional</p>
+              <div className="space-y-0.5">
+                <p className="text-sm font-bold text-slate-900">{member.name}</p>
+                <p className="text-xs text-slate-600">CS WA: +{ADMIN_WA}</p>
+                <p className="text-xs text-slate-400">roneycell.id</p>
               </div>
             </div>
             {/* Menu items */}
-            <div className="flex-1 overflow-y-auto py-2">
+            <div className="flex-1 overflow-y-auto py-1">
               {SIDEBAR_ITEMS.map((item) => (
                 <button key={item.label} onClick={item.action}
-                  className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50 transition-colors text-left">
-                  <span className="text-xl w-6 text-center flex-shrink-0">{item.icon}</span>
-                  <span className="text-sm font-medium" style={{ color: "#334155" }}>{item.label}</span>
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left">
+                  <span className="text-lg w-6 text-center flex-shrink-0">{item.icon}</span>
+                  <span className="text-sm font-semibold text-slate-800">{item.label}</span>
                 </button>
               ))}
 
@@ -387,8 +393,8 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
                 </div>
               </div>
             </div>
-            <div className="px-5 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-              <p className="text-[10px] text-white/20">© 2025 RoneyCell • Lombok</p>
+            <div className="px-4 py-4" style={{ borderTop: "1px solid #F1F5F9" }}>
+              <p className="text-[10px] text-slate-400">© 2025 RoneyCell • Lombok</p>
             </div>
           </div>
         </div>

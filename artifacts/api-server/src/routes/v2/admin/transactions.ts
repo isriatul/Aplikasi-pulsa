@@ -8,7 +8,7 @@
  */
 import { Router, type IRouter, type Request } from "express";
 import { z } from "zod";
-import { eq, desc, and, gte, lte, ne } from "drizzle-orm";
+import { eq, desc, and, gte, lte, ne, count } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { transactionsTable, depositsTable } from "@workspace/db";
 import { requireRole } from "../../../middlewares/requireRole.js";
@@ -54,15 +54,17 @@ router.get("/v2/admin/transactions", requireRole("admin"), async (req, res) => {
   if (from) conditions.push(gte(transactionsTable.createdAt, from));
   if (to) conditions.push(lte(transactionsTable.createdAt, to));
 
+  const where = conditions.length ? and(...(conditions as [ReturnType<typeof eq>])) : undefined;
+  const [{ total }] = await db.select({ total: count() }).from(transactionsTable).where(where);
   const rows = await db
     .select()
     .from(transactionsTable)
-    .where(conditions.length ? and(...(conditions as [ReturnType<typeof eq>])) : undefined)
+    .where(where)
     .orderBy(desc(transactionsTable.createdAt))
     .limit(PAGE_LIMIT)
     .offset((page - 1) * PAGE_LIMIT);
 
-  res.json({ page, limit: PAGE_LIMIT, data: rows });
+  res.json({ page, limit: PAGE_LIMIT, total, data: rows });
 });
 
 /* ── GET /api/v2/admin/transactions/:id ── */
@@ -112,14 +114,16 @@ router.get("/v2/admin/deposits", requireRole("admin"), async (req, res) => {
   if (status === "pending" || status === "paid" || status === "confirmed" || status === "failed") {
     conditions.push(eq(depositsTable.status, status));
   }
+  const depWhere = conditions.length ? and(...(conditions as [ReturnType<typeof eq>])) : undefined;
+  const [{ total: depTotal }] = await db.select({ total: count() }).from(depositsTable).where(depWhere);
   const rows = await db
     .select()
     .from(depositsTable)
-    .where(conditions.length ? and(...(conditions as [ReturnType<typeof eq>])) : undefined)
+    .where(depWhere)
     .orderBy(desc(depositsTable.createdAt))
     .limit(PAGE_LIMIT)
     .offset((page - 1) * PAGE_LIMIT);
-  res.json({ page, limit: PAGE_LIMIT, data: rows });
+  res.json({ page, limit: PAGE_LIMIT, total: depTotal, data: rows });
 });
 
 /* ── PUT /api/v2/admin/deposits/:id/confirm ── */

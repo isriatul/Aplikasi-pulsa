@@ -9,7 +9,7 @@
  */
 import { Router, type IRouter, type Request } from "express";
 import { z } from "zod";
-import { eq, ilike, or, desc, isNull, and } from "drizzle-orm";
+import { eq, ilike, or, desc, isNull, and, count } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { usersTable, ROLE_HIERARCHY, type UserRole } from "@workspace/db";
 import { requireRole } from "../../../middlewares/requireRole.js";
@@ -87,6 +87,7 @@ router.get("/v2/admin/users", requireRole("admin"), async (req, res) => {
     conditions.push(eq(usersTable.role, role as UserRole));
   }
 
+  const [{ total }] = await db.select({ total: count() }).from(usersTable).where(and(...conditions));
   const rows = await db
     .select()
     .from(usersTable)
@@ -95,7 +96,7 @@ router.get("/v2/admin/users", requireRole("admin"), async (req, res) => {
     .limit(limit)
     .offset((page - 1) * limit);
 
-  res.json({ page, limit, data: rows.map(safeUser) });
+  res.json({ page, limit, total, data: rows.map(safeUser) });
 });
 
 /* ── GET /api/v2/admin/users/:id ── */

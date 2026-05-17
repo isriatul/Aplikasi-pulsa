@@ -11,7 +11,7 @@
 import { Router, type IRouter, type Request } from "express";
 import { createHash } from "crypto";
 import { z } from "zod";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, count, ilike, and } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { productsTable, providersTable, settingsTable } from "@workspace/db";
 import { requireRole } from "../../../middlewares/requireRole.js";
@@ -333,11 +333,19 @@ router.get("/v2/admin/products", requireRole("admin"), async (req, res) => {
   const page = Math.max(1, Number(req.query["page"] ?? 1));
   const limit = 50;
 
-  let rows = await db.select().from(productsTable).orderBy(desc(productsTable.updatedAt)).limit(limit).offset((page - 1) * limit);
-  if (q) rows = rows.filter((p) => p.code.includes(q) || p.name.toLowerCase().includes(q.toLowerCase()));
-  if (category) rows = rows.filter((p) => p.category === category);
+  const conditions: Parameters<typeof and> = [];
+  if (q) conditions.push(ilike(productsTable.name, `%${q}%`));
+  const VALID_CATS = ["pulsa","data","pln","ewallet","pascabayar","game","tv","voucher","international","other"] as const;
+  type ProductCat = typeof VALID_CATS[number];
+  if (category && (VALID_CATS as readonly string[]).includes(category)) {
+    conditions.push(eq(productsTable.category, category as ProductCat));
+  }
 
-  res.json({ page, limit, data: rows });
+  const where = conditions.length ? and(...conditions) : undefined;
+  const [{ total }] = await db.select({ total: count() }).from(productsTable).where(where);
+  const rows = await db.select().from(productsTable).where(where).orderBy(desc(productsTable.updatedAt)).limit(limit).offset((page - 1) * limit);
+
+  res.json({ page, limit, total, data: rows });
 });
 
 /* ── POST /api/v2/admin/products ── */
