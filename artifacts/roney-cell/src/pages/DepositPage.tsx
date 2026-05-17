@@ -779,9 +779,9 @@ function MethodTile({
       onClick={onSelect}
       className="relative flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-2xl transition-all active:scale-95"
       style={{
-        background: active ? `${accent}18` : "rgba(255,255,255,0.06)",
-        border: active ? `2px solid ${accent}80` : "1.5px solid rgba(255,255,255,0.09)",
-        boxShadow: active ? `0 4px 16px ${accent}25` : "none",
+        background: active ? `${accent}15` : "#F5F7FB",
+        border: active ? `2px solid ${accent}` : "1.5px solid #DDE3EE",
+        boxShadow: active ? `0 4px 16px ${accent}30` : "none",
       }}
     >
       {isBaru && (
@@ -789,11 +789,11 @@ function MethodTile({
           style={{ background: "#1A56DB" }}>BARU</span>
       )}
       <div className="w-11 h-11 rounded-xl overflow-hidden flex items-center justify-center"
-        style={{ background: "white", boxShadow: "0 1px 6px rgba(0,0,0,0.25)" }}>
+        style={{ background: "white", boxShadow: "0 1px 6px rgba(0,0,0,0.12)" }}>
         {logo}
       </div>
       <span className="text-[10px] font-semibold leading-tight text-center w-full px-0.5 truncate"
-        style={{ color: active ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.65)" }}>
+        style={{ color: active ? accent : "#475569" }}>
         {label}
       </span>
       {active && (
@@ -987,8 +987,8 @@ function NewDepositForm({
         <svg className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          Sistem menambahkan <span className="text-blue-300 font-semibold">kode unik 3 digit</span> ke nominal agar pembayaran mudah diverifikasi admin.
+        <p className="text-xs text-slate-600 leading-relaxed">
+          Sistem menambahkan <span className="text-blue-600 font-semibold">kode unik 3 digit</span> ke nominal agar pembayaran mudah diverifikasi admin.
           Setelah upload struk, admin akan mengkonfirmasi dan saldo masuk dalam 1–15 menit.
         </p>
       </div>
