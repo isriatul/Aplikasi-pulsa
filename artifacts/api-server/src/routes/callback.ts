@@ -4,6 +4,10 @@
 import { Router, type IRouter } from "express";
 import { createHash } from "crypto";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
+import { db } from "@workspace/db";
+import { transactionsTable } from "@workspace/db";
+import { creditBalance } from "../lib/v2/balanceService.js";
 import { appendTxLog } from "../lib/txLog.js";
 import { saveIdempotentResult } from "../lib/idempotency.js";
 import { cancelPendingRetry } from "../lib/pendingRetry.js";
@@ -40,8 +44,68 @@ function verifyCallbackSignature(sign: string, refId: string): boolean {
   return diff === 0;
 }
 
+/**
+ * Update v2 transactionsTable berdasarkan callback Digiflazz.
+ * Hanya memproses transaksi yang masih "pending" untuk menghindari double-processing.
+ * Refund saldo otomatis jika transaksi gagal dan saldo sudah didebit.
+ */
+async function processV2Callback(
+  refId: string,
+  isSuccess: boolean,
+  isFailed: boolean,
+  message: string | undefined,
+  sn: string | undefined,
+): Promise<void> {
+  /* Hanya proses ref_id milik v2 (prefix "RC-") */
+  if (!refId.startsWith("RC-")) return;
+
+  const [tx] = await db
+    .select()
+    .from(transactionsTable)
+    .where(eq(transactionsTable.refId, refId))
+    .limit(1);
+
+  if (!tx) {
+    logger.warn({ refId }, "Callback v2: transaksi tidak ditemukan di DB");
+    return;
+  }
+
+  /* Hanya proses jika masih pending — hindari double-processing */
+  if (tx.status !== "pending") {
+    logger.info({ refId, currentStatus: tx.status }, "Callback v2: transaksi sudah final, skip");
+    return;
+  }
+
+  const finalStatus = isSuccess ? "success" : isFailed ? "failed" : "pending";
+
+  await db.update(transactionsTable).set({
+    status: finalStatus,
+    message: message ?? tx.message,
+    sn: sn ?? tx.sn,
+    updatedAt: new Date(),
+  }).where(eq(transactionsTable.id, tx.id));
+
+  logger.info({ refId, finalStatus }, "Callback v2: status transaksi diperbarui");
+
+  /* Refund saldo jika gagal dan saldo sudah didebit sebelumnya */
+  if (isFailed && tx.amount > 0) {
+    try {
+      await creditBalance({
+        userId: tx.userId,
+        type: "refund",
+        amount: tx.amount,
+        refId: tx.refId,
+        note: `Refund callback — ${tx.productCode} gagal`,
+      });
+      logger.info({ refId, userId: tx.userId, amount: tx.amount }, "Callback v2: saldo berhasil di-refund");
+    } catch (err) {
+      logger.error({ err, refId, userId: tx.userId }, "Callback v2: GAGAL refund saldo");
+    }
+  }
+}
+
 /* POST /api/callback/digiflazz — Webhook dari Digiflazz */
-router.post("/callback/digiflazz", (req, res) => {
+router.post("/callback/digiflazz", async (req, res) => {
   const parsed = CallbackSchema.safeParse(req.body);
   if (!parsed.success) {
     logger.warn({ count: parsed.error.issues.length }, "Callback: invalid payload");
@@ -59,10 +123,13 @@ router.post("/callback/digiflazz", (req, res) => {
   }
 
   const statusLow = status.toLowerCase();
-  const isFinal = statusLow === "sukses" || statusLow === "success" || statusLow === "gagal" || statusLow === "failed";
+  const isSuccess = statusLow === "sukses" || statusLow === "success";
+  const isFailed = statusLow === "gagal" || statusLow === "failed";
+  const isFinal = isSuccess || isFailed;
 
   logger.info({ ref_id, status, buyer_sku_code, customer_no, sn }, "Callback received");
 
+  /* ── v1: Update txLog dan idempotency cache ── */
   appendTxLog({
     memberId: "CALLBACK",
     phone: "CALLBACK",
@@ -71,16 +138,24 @@ router.post("/callback/digiflazz", (req, res) => {
     refId: ref_id,
     productCode: buyer_sku_code,
     customerNo: customer_no,
-    status: statusLow === "sukses" || statusLow === "success" ? "success" : "failed",
+    status: isSuccess ? "success" : "failed",
     message: message ?? `Callback: ${status}`,
     ip: "digiflazz-server",
     userAgent: "Digiflazz-Callback",
   });
 
   if (isFinal) {
-    const txStatus = statusLow === "sukses" || statusLow === "success" ? "success" : "failed";
+    const txStatus = isSuccess ? "success" : "failed";
     saveIdempotentResult(ref_id, { data: { ref_id, buyer_sku_code, customer_no, status, message, sn } }, txStatus);
     cancelPendingRetry(ref_id);
+  }
+
+  /* ── v2: Update PostgreSQL transactionsTable ── */
+  try {
+    await processV2Callback(ref_id, isSuccess, isFailed, message, sn);
+  } catch (err) {
+    /* Jangan gagalkan response ke Digiflazz karena error DB internal */
+    logger.error({ err, ref_id }, "Callback v2: error update DB (non-fatal)");
   }
 
   res.json({ received: true, ref_id });
