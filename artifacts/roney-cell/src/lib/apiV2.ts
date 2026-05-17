@@ -142,7 +142,7 @@ export async function v2UploadDepositProof(
   imageBase64: string,
   mimeType: "image/jpeg" | "image/png" | "image/webp",
 ) {
-  return apiFetch<{ message: string; imageUrl: string }>(
+  return apiFetch<{ message: string; imageUrl?: string; autoConfirmed?: boolean; creditedAmount?: number }>(
     `/deposits/${depositId}/upload-proof`,
     { method: "POST", body: JSON.stringify({ imageBase64, mimeType }) },
   );

@@ -145,7 +145,34 @@ export function notifyDeposit(opts: {
   );
 }
 
-/** Notifikasi deposit dengan bukti pembayaran sudah diupload */
+/** Notifikasi deposit auto-confirmed (saldo langsung masuk) */
+export function notifyDepositAutoConfirmed(opts: {
+  userName: string;
+  amount: number;
+  uniqueCode: number;
+  totalAmount: number;
+  method: string;
+  paymentRef: string;
+  userId: number;
+}): void {
+  void notify(
+    {
+      title: "⚡ Deposit Auto-Confirmed",
+      message: [
+        `User: ${opts.userName} (#${opts.userId})`,
+        `Saldo +Rp${opts.amount.toLocaleString()} (kode unik: +${opts.uniqueCode})`,
+        `Total bayar: Rp${opts.totalAmount.toLocaleString()}`,
+        `Metode: ${opts.method.toUpperCase()}`,
+        `Ref: ${opts.paymentRef}`,
+        `\n✅ Saldo sudah dikreditkan otomatis`,
+      ].join("\n"),
+      level: "success",
+    },
+    ["telegram", "discord"],
+  );
+}
+
+/** Notifikasi deposit dengan bukti pembayaran sudah diupload (manual review) */
 export function notifyDepositWithProof(opts: {
   userName: string;
   amount: number;

@@ -2,22 +2,26 @@
  * POST /api/v2/deposits                    — ajukan deposit (kode unik otomatis)
  * GET  /api/v2/deposits                    — riwayat deposit user
  * GET  /api/v2/deposits/:id               — detail deposit
- * POST /api/v2/deposits/:id/upload-proof  — upload bukti pembayaran (base64)
+ * POST /api/v2/deposits/:id/upload-proof  — upload bukti → AUTO-CREDIT saldo
  */
 import { Router, type IRouter, type Request } from "express";
 import { z } from "zod";
-import { eq, and, desc, ne, gte } from "drizzle-orm";
+import { eq, and, desc, ne, gte, lt } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { depositsTable } from "@workspace/db";
 import { requireAuthV2 } from "../../middlewares/requireRole.js";
 import { readLimiter, depositLimiter } from "../../middlewares/rateLimiter.js";
 import { safeZodErrors } from "../../lib/sanitize.js";
 import { audit } from "../../lib/v2/auditService.js";
-import { notifyDepositWithProof } from "../../lib/v2/notificationService.js";
+import { notifyDepositWithProof, notifyDepositAutoConfirmed } from "../../lib/v2/notificationService.js";
 import { findUserById } from "../../lib/v2/userService.js";
 import { saveProofImage } from "../../lib/v2/proofStorage.js";
+import { creditBalance } from "../../lib/v2/balanceService.js";
 
 const router: IRouter = Router();
+
+/** TTL tiket deposit: 1 jam. Lebih dari ini dianggap abandoned dan di-expire otomatis. */
+const DEPOSIT_TTL_MS = 60 * 60_000; /* 1 jam */
 
 const DepositSchema = z.object({
   amount: z.number().int().min(10_000).max(50_000_000),
@@ -26,7 +30,6 @@ const DepositSchema = z.object({
 });
 
 const UploadProofSchema = z.object({
-  /* Base64 image — max ~3MB setelah decode (4MB base64) */
   imageBase64: z.string().min(100).max(5_000_000),
   mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
 });
@@ -37,11 +40,26 @@ function getIp(req: Request) {
   return req.ip ?? "unknown";
 }
 
-/** Generate kode unik 3 digit (100–999) yang tidak konflik dengan deposit pending user yang sama */
-async function generateUniqueCode(userId: number, amount: number): Promise<number> {
-  const windowStart = new Date(Date.now() - 3 * 60 * 60_000);
+/** Expire otomatis deposit pending yang sudah lebih dari 1 jam (abandoned) */
+async function autoExpireOldDeposits(userId: number): Promise<number> {
+  const cutoff = new Date(Date.now() - DEPOSIT_TTL_MS);
+  const expired = await db
+    .update(depositsTable)
+    .set({ status: "expired", updatedAt: new Date() })
+    .where(
+      and(
+        eq(depositsTable.userId, userId),
+        eq(depositsTable.status, "pending"),
+        lt(depositsTable.createdAt, cutoff),
+      ),
+    )
+    .returning({ id: depositsTable.id });
+  return expired.length;
+}
 
-  /* Ambil kode yang sedang aktif untuk user ini */
+/** Generate kode unik 3 digit (100–999) yang tidak konflik dengan deposit aktif user */
+async function generateUniqueCode(userId: number): Promise<number> {
+  const windowStart = new Date(Date.now() - 3 * 60 * 60_000);
   const active = await db
     .select({ uniqueCode: depositsTable.uniqueCode })
     .from(depositsTable)
@@ -54,21 +72,16 @@ async function generateUniqueCode(userId: number, amount: number): Promise<numbe
         gte(depositsTable.createdAt, windowStart),
       ),
     );
-
   const usedCodes = new Set(active.map((r) => r.uniqueCode));
-
-  /* Coba random sampai ketemu yang belum dipakai (max 20x) */
   for (let i = 0; i < 20; i++) {
     const code = 100 + Math.floor(Math.random() * 900);
     if (!usedCodes.has(code)) return code;
   }
-  /* Fallback: kode berbasis timestamp (dijamin unik) */
   return (Date.now() % 900) + 100;
 }
 
-/** TTL deposit: 2 jam */
 function buildExpiry(): Date {
-  return new Date(Date.now() + 2 * 60 * 60_000);
+  return new Date(Date.now() + DEPOSIT_TTL_MS);
 }
 
 function buildPaymentRef(userId: number): string {
@@ -89,29 +102,34 @@ router.post("/v2/deposits", requireAuthV2, depositLimiter, async (req, res) => {
   }
   const { amount, method, note } = parsed.data;
 
-  /* Cegah deposit pending ganda dalam 2 jam */
-  const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60_000);
+  /* Auto-expire tiket lama yang sudah lewat 1 jam — agar user tidak terbloking */
+  await autoExpireOldDeposits(userId);
+
+  /* Cek apakah masih ada deposit pending AKTIF (< 1 jam) */
+  const cutoff = new Date(Date.now() - DEPOSIT_TTL_MS);
   const [existing] = await db
-    .select({ id: depositsTable.id, paymentRef: depositsTable.paymentRef })
+    .select({ id: depositsTable.id, paymentRef: depositsTable.paymentRef, totalAmount: depositsTable.totalAmount, uniqueCode: depositsTable.uniqueCode, createdAt: depositsTable.createdAt })
     .from(depositsTable)
     .where(
       and(
         eq(depositsTable.userId, userId),
         eq(depositsTable.status, "pending"),
-        gte(depositsTable.createdAt, twoHoursAgo),
+        gte(depositsTable.createdAt, cutoff),
       ),
     )
     .limit(1);
 
   if (existing) {
+    /* Kembalikan tiket yang masih aktif — user bisa langsung lanjut bayar */
+    const [fullDep] = await db.select().from(depositsTable).where(eq(depositsTable.id, existing.id));
     res.status(409).json({
-      error: "Masih ada deposit pending. Selesaikan atau tunggu kedaluwarsa sebelum membuat yang baru.",
-      existingRef: existing.paymentRef,
+      error: "Masih ada tiket deposit aktif. Gunakan tiket yang sudah ada atau tunggu 1 jam.",
+      existingDeposit: fullDep,
     });
     return;
   }
 
-  const uniqueCode = await generateUniqueCode(userId, amount);
+  const uniqueCode = await generateUniqueCode(userId);
   const totalAmount = amount + uniqueCode;
   const paymentRef = buildPaymentRef(userId);
   const expiredAt = buildExpiry();
@@ -141,6 +159,7 @@ router.post("/v2/deposits", requireAuthV2, depositLimiter, async (req, res) => {
 });
 
 /* ── POST /api/v2/deposits/:id/upload-proof ── */
+/* AUTO-CREDIT: saldo langsung dikreditkan setelah bukti diupload */
 router.post("/v2/deposits/:id/upload-proof", requireAuthV2, async (req, res) => {
   const userId = req.member!.userId!;
   const id = Number(req.params["id"]);
@@ -159,7 +178,12 @@ router.post("/v2/deposits/:id/upload-proof", requireAuthV2, async (req, res) => 
     return;
   }
   if (dep.status !== "pending") {
-    res.status(400).json({ error: "Hanya deposit pending yang bisa upload bukti" });
+    /* Jika sudah confirmed, kembalikan sukses agar idempoten */
+    if (dep.status === "confirmed") {
+      res.json({ message: "Deposit sudah dikonfirmasi.", autoConfirmed: true });
+      return;
+    }
+    res.status(400).json({ error: `Status deposit saat ini: ${dep.status}. Hanya pending yang bisa upload bukti.` });
     return;
   }
 
@@ -169,21 +193,45 @@ router.post("/v2/deposits/:id/upload-proof", requireAuthV2, async (req, res) => 
     return;
   }
 
-  /* Simpan gambar ke disk, return URL relatif */
+  /* Simpan gambar ke disk */
   const imageUrl = await saveProofImage(id, parsed.data.imageBase64, parsed.data.mimeType);
 
-  await db.update(depositsTable).set({
-    proofImageUrl: imageUrl,
-    proofUploadedAt: new Date(),
-    status: "paid",
-    paidAt: new Date(),
-    updatedAt: new Date(),
-  }).where(eq(depositsTable.id, id));
+  /* ─── AUTO-CONFIRM: kredit saldo secara atomik ─── */
+  const now = new Date();
 
-  /* Notifikasi ke admin */
+  /* Atomic update: hanya berhasil jika status masih "pending" — cegah double-credit */
+  const updated = await db
+    .update(depositsTable)
+    .set({
+      proofImageUrl: imageUrl,
+      proofUploadedAt: now,
+      status: "confirmed",
+      paidAt: now,
+      confirmedAt: now,
+      updatedAt: now,
+    })
+    .where(and(eq(depositsTable.id, id), eq(depositsTable.status, "pending")))
+    .returning();
+
+  if (updated.length === 0) {
+    /* Race condition: deposit sudah diproses bersamaan */
+    res.json({ message: "Deposit sudah dikonfirmasi sebelumnya.", autoConfirmed: true });
+    return;
+  }
+
+  /* Kredit saldo user */
+  await creditBalance({
+    userId,
+    type: "credit",
+    amount: dep.amount, /* Kredit hanya nominal asli (tanpa kode unik) */
+    refId: `DEP-AUTO-${id}`,
+    note: `Auto-credit deposit ${dep.paymentRef ?? `#${id}`}`,
+  });
+
+  /* Notifikasi admin via Telegram/Discord */
   const user = await findUserById(userId);
   if (user) {
-    notifyDepositWithProof({
+    notifyDepositAutoConfirmed({
       userName: user.name,
       amount: dep.amount,
       uniqueCode: dep.uniqueCode,
@@ -194,9 +242,21 @@ router.post("/v2/deposits/:id/upload-proof", requireAuthV2, async (req, res) => 
     });
   }
 
-  await audit({ userId, action: "deposit_proof_uploaded", entity: "deposit", entityId: id, ip: getIp(req) });
+  await audit({
+    userId,
+    action: "deposit_auto_confirmed",
+    entity: "deposit",
+    entityId: id,
+    ip: getIp(req),
+    data: { amount: dep.amount, uniqueCode: dep.uniqueCode, totalAmount: dep.totalAmount },
+  });
 
-  res.json({ message: "Bukti pembayaran berhasil diupload. Menunggu konfirmasi admin.", imageUrl });
+  res.json({
+    message: `Bukti diterima! Saldo Rp${dep.amount.toLocaleString("id-ID")} langsung ditambahkan.`,
+    autoConfirmed: true,
+    creditedAmount: dep.amount,
+    imageUrl,
+  });
 });
 
 /* ── GET /api/v2/deposits ── */
@@ -254,10 +314,10 @@ function buildInstructions(
       ...base,
       langkah: [
         "Buka DANA / GoPay / OVO / m-banking",
-        "Scan QRIS yang ditampilkan",
+        "Scan QRIS di bawah ini",
         `Masukkan nominal TEPAT Rp${totalAmount.toLocaleString("id-ID")}`,
-        "Bayar dan screenshot struk",
-        "Upload foto struk di halaman ini",
+        "Bayar → screenshot struk",
+        "Upload foto struk → saldo langsung masuk",
       ],
     };
   }
@@ -267,7 +327,7 @@ function buildInstructions(
       "Transfer ke rekening yang tertera",
       `Nominal TEPAT Rp${totalAmount.toLocaleString("id-ID")}`,
       "Screenshot bukti transfer",
-      "Upload foto struk di halaman ini",
+      "Upload foto struk → saldo langsung masuk",
     ],
   };
 }
