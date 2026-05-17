@@ -5,6 +5,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { formatRupiah } from "@/lib/products";
 import {
   v2CreateDeposit,
+  v2CancelDeposit,
   v2GetDeposits,
   v2UploadDepositProof,
   type V2Deposit,
@@ -328,8 +329,113 @@ function PaymentInstructions({
   );
 }
 
+/* ─── Card: tiket lama ditemukan — lanjutkan atau batalkan ─── */
+function ExistingTicketCard({
+  deposit,
+  onContinue,
+  onCancelled,
+}: {
+  deposit: V2Deposit;
+  onContinue: () => void;
+  onCancelled: () => void;
+}) {
+  const [cancelling, setCancelling] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleCancel() {
+    setCancelling(true);
+    setError("");
+    try {
+      await v2CancelDeposit(deposit.id);
+      onCancelled();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  const totalAmount = deposit.totalAmount;
+  const expiredAt = deposit.expiredAt ? new Date(deposit.expiredAt) : null;
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(251,191,36,0.4)", background: "rgba(251,191,36,0.04)" }}>
+      {/* Header */}
+      <div className="px-4 py-3 flex items-center gap-3" style={{ background: "rgba(251,191,36,0.1)", borderBottom: "1px solid rgba(251,191,36,0.15)" }}>
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base" style={{ background: "rgba(251,191,36,0.2)" }}>
+          🎫
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-black text-amber-400 uppercase tracking-wide">Tiket Aktif Ditemukan</p>
+          <p className="text-[10px] text-white/50 font-mono truncate">{deposit.paymentRef}</p>
+        </div>
+        <StatusBadge status="pending" />
+      </div>
+
+      {/* Info tiket */}
+      <div className="px-4 py-4 space-y-3">
+        <div className="rounded-xl px-4 py-3 space-y-1.5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Nominal asli</span>
+            <span className="text-white font-semibold">{rp(deposit.amount)}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Kode unik</span>
+            <span className="text-amber-400 font-semibold">+{deposit.uniqueCode}</span>
+          </div>
+          <div className="h-px bg-white/10 my-1" />
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-white">Total bayar</span>
+            <span className="text-lg font-black text-amber-400">{rp(totalAmount)}</span>
+          </div>
+        </div>
+
+        {expiredAt && (
+          <div className="flex items-center gap-2 text-xs text-amber-300/80">
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Berlaku sampai <Countdown expiredAt={deposit.expiredAt!} /></span>
+          </div>
+        )}
+
+        {error && <p className="text-xs text-red-400 px-1">{error}</p>}
+
+        {/* Dua tombol pilihan */}
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={handleCancel}
+            disabled={cancelling}
+            className="flex-1 py-3 rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+            style={{ background: "rgba(239,68,68,0.1)", color: "#F87171", border: "1px solid rgba(239,68,68,0.25)" }}>
+            {cancelling
+              ? <><div className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />Membatalkan...</>
+              : <>✕ Batalkan Tiket</>}
+          </button>
+          <button
+            onClick={onContinue}
+            className="flex-1 py-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5"
+            style={{ background: "linear-gradient(135deg,#FBBF24,#F59E0B)", color: "#1a1a1a", boxShadow: "0 2px 16px rgba(251,191,36,0.35)" }}>
+            ▶ Lanjutkan Bayar
+          </button>
+        </div>
+
+        <p className="text-[10px] text-center text-muted-foreground">
+          Batalkan untuk buat tiket dengan nominal berbeda
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Form pilih nominal & metode ─── */
-function NewDepositForm({ onCreated }: { onCreated: (d: V2Deposit) => void }) {
+function NewDepositForm({
+  onCreated,
+  onExisting,
+}: {
+  onCreated: (d: V2Deposit) => void;
+  onExisting: (d: V2Deposit) => void;
+}) {
   const [amount, setAmount] = useState("");
   const [preset, setPreset] = useState<number | null>(null);
   const [method, setMethod] = useState<"qris" | "transfer" | "manual">("qris");
@@ -345,17 +451,16 @@ function NewDepositForm({ onCreated }: { onCreated: (d: V2Deposit) => void }) {
     setLoading(true); setError("");
     try {
       const res = await v2CreateDeposit({ amount: num, method });
-      onCreated(res.deposit);
-    } catch (err) {
-      const msg = (err as Error).message;
-      /* Jika masih ada tiket aktif, tampilkan opsi pakai tiket lama */
-      if (msg.includes("existingDeposit") || msg.includes("aktif")) {
-        setError(msg);
+      if (res.isExisting) {
+        onExisting(res.deposit);
       } else {
-        setError(msg);
+        onCreated(res.deposit);
       }
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
-      setLoading(false); }
+      setLoading(false);
+    }
   }
 
   return (
@@ -486,15 +591,36 @@ function DepositHistory({ refreshKey }: { refreshKey: number }) {
 /* ─── Main Page ─── */
 export default function DepositPage() {
   const [activeDeposit, setActiveDeposit] = useState<V2Deposit | null>(null);
-  const [step, setStep] = useState<"form" | "payment">("form");
+  const [existingDeposit, setExistingDeposit] = useState<V2Deposit | null>(null);
+  const [step, setStep] = useState<"form" | "existing" | "payment">("form");
   const [credited, setCredited] = useState<number | null>(null);
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
 
   function handleCreated(deposit: V2Deposit) {
     setActiveDeposit(deposit);
+    setExistingDeposit(null);
     setStep("payment");
     setCredited(null);
+  }
+
+  function handleExisting(deposit: V2Deposit) {
+    setExistingDeposit(deposit);
+    setStep("existing");
+  }
+
+  function handleContinueExisting() {
+    if (existingDeposit) {
+      setActiveDeposit(existingDeposit);
+      setExistingDeposit(null);
+      setStep("payment");
+    }
+  }
+
+  function handleExistingCancelled() {
+    setExistingDeposit(null);
+    setStep("form");
+    setHistoryRefresh((p) => p + 1);
   }
 
   function handleProofUploaded(amount: number) {
@@ -504,10 +630,14 @@ export default function DepositPage() {
 
   function handleReset() {
     setActiveDeposit(null);
+    setExistingDeposit(null);
     setStep("form");
     setCredited(null);
     setHistoryRefresh((p) => p + 1);
   }
+
+  /* Stepper: form=1, existing=1.5, payment=2 */
+  const stepperActive = step === "payment" ? "payment" : "form";
 
   return (
     <div className="min-h-dvh flex flex-col max-w-md mx-auto px-4 pb-28">
@@ -532,6 +662,12 @@ export default function DepositPage() {
             ← Baru
           </button>
         )}
+        {step === "existing" && (
+          <button onClick={() => setStep("form")}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/10 text-white/50 hover:bg-white/5">
+            ← Kembali
+          </button>
+        )}
       </div>
 
       {/* Stepper — hanya tampil saat belum sukses */}
@@ -543,12 +679,12 @@ export default function DepositPage() {
           ].map((s, i) => (
             <div key={s.id} className="flex items-center gap-2 flex-1">
               <div className="flex-1 px-3 py-1 rounded-full text-xs font-semibold text-center transition-all"
-                style={step === s.id
+                style={stepperActive === s.id
                   ? { background: "rgba(251,191,36,0.18)", color: "#FBBF24", border: "1px solid rgba(251,191,36,0.4)" }
                   : { background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.3)", border: "1px solid rgba(255,255,255,0.07)" }}>
                 {s.label}
               </div>
-              {i === 0 && <div className="w-3 h-px shrink-0" style={{ background: step === "payment" ? "rgba(251,191,36,0.4)" : "rgba(255,255,255,0.1)" }} />}
+              {i === 0 && <div className="w-3 h-px shrink-0" style={{ background: stepperActive === "payment" ? "rgba(251,191,36,0.4)" : "rgba(255,255,255,0.1)" }} />}
             </div>
           ))}
         </div>
@@ -558,14 +694,20 @@ export default function DepositPage() {
       {credited !== null
         ? <SuccessScreen amount={credited} onReset={handleReset} />
         : step === "form"
-          ? <NewDepositForm onCreated={handleCreated} />
-          : activeDeposit
-            ? <PaymentInstructions
-                deposit={activeDeposit}
-                onProofUploaded={handleProofUploaded}
-                onNewTicket={handleReset}
+          ? <NewDepositForm onCreated={handleCreated} onExisting={handleExisting} />
+          : step === "existing" && existingDeposit
+            ? <ExistingTicketCard
+                deposit={existingDeposit}
+                onContinue={handleContinueExisting}
+                onCancelled={handleExistingCancelled}
               />
-            : null}
+            : step === "payment" && activeDeposit
+              ? <PaymentInstructions
+                  deposit={activeDeposit}
+                  onProofUploaded={handleProofUploaded}
+                  onNewTicket={handleReset}
+                />
+              : null}
 
       {/* Riwayat */}
       {credited === null && (

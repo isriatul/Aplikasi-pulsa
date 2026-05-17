@@ -259,6 +259,43 @@ router.post("/v2/deposits/:id/upload-proof", requireAuthV2, async (req, res) => 
   });
 });
 
+/* ── DELETE /api/v2/deposits/:id — user batalkan tiket sendiri ── */
+router.delete("/v2/deposits/:id", requireAuthV2, async (req, res) => {
+  const userId = req.member!.userId!;
+  const id = Number(req.params["id"]);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "ID tidak valid" });
+    return;
+  }
+
+  /* Hanya bisa batalkan milik sendiri dan masih pending */
+  const updated = await db
+    .update(depositsTable)
+    .set({ status: "failed", updatedAt: new Date() })
+    .where(
+      and(
+        eq(depositsTable.id, id),
+        eq(depositsTable.userId, userId),
+        eq(depositsTable.status, "pending"),
+      ),
+    )
+    .returning({ id: depositsTable.id });
+
+  if (updated.length === 0) {
+    const [dep] = await db.select({ status: depositsTable.status }).from(depositsTable)
+      .where(and(eq(depositsTable.id, id), eq(depositsTable.userId, userId)));
+    if (!dep) {
+      res.status(404).json({ error: "Tiket tidak ditemukan" });
+    } else {
+      res.status(409).json({ error: `Tiket tidak bisa dibatalkan (status: ${dep.status})` });
+    }
+    return;
+  }
+
+  await audit({ userId, action: "deposit_cancelled", entity: "deposit", entityId: id, ip: getIp(req) });
+  res.json({ message: "Tiket dibatalkan. Silakan buat tiket baru." });
+});
+
 /* ── GET /api/v2/deposits ── */
 router.get("/v2/deposits", requireAuthV2, readLimiter, async (req, res) => {
   const userId = req.member!.userId!;

@@ -131,8 +131,24 @@ export async function v2BuyProduct(data: {
 }
 
 /* ─── Deposits ─── */
-export async function v2CreateDeposit(data: { amount: number; method: string; note?: string }) {
-  return apiFetch<{ deposit: V2Deposit; instructions: DepositInstructions }>("/deposits", { method: "POST", body: JSON.stringify(data) });
+/** Buat deposit baru. Jika ada tiket aktif (409), kembalikan {deposit, isExisting:true} */
+export async function v2CreateDeposit(data: { amount: number; method: string; note?: string }): Promise<{ deposit: V2Deposit; instructions?: DepositInstructions; isExisting?: boolean }> {
+  const BASE = (import.meta.env.BASE_URL ?? "/roney-cell/").replace(/\/$/, "");
+  const token = getV2Token();
+  const res = await fetch(`${BASE}/api/v2/deposits`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(data),
+  });
+  const body = await res.json() as { deposit?: V2Deposit; instructions?: DepositInstructions; existingDeposit?: V2Deposit; error?: string };
+  if (res.status === 409 && body.existingDeposit) {
+    return { deposit: body.existingDeposit, isExisting: true };
+  }
+  if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+  return { deposit: body.deposit!, instructions: body.instructions };
+}
+export async function v2CancelDeposit(id: number) {
+  return apiFetch<{ message: string }>(`/deposits/${id}`, { method: "DELETE" });
 }
 export async function v2GetDeposits(page = 1) {
   return apiFetch<{ page: number; limit: number; data: V2Deposit[] }>(`/deposits?page=${page}`);
