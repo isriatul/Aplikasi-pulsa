@@ -18,7 +18,7 @@ import {
 } from "@/lib/sheetsApi";
 import { getV2Token, v2GetBalance, v2BuyProduct } from "@/lib/apiV2";
 import { Member, TYPE_LABELS, TYPE_COLORS } from "@/lib/members";
-import { t, getLang, setLang, Lang } from "@/lib/i18n";
+import { t, getLang, setLang, Lang, LANG_OPTIONS } from "@/lib/i18n";
 
 type ModalPhase = "quick" | "pin" | "confirm" | "loading" | "success" | "failed" | "insufficient" | null;
 type SubTab = "transaksi" | "menu" | "history";
@@ -32,43 +32,43 @@ interface HomeProps {
 }
 
 /* ─── Product grid items ─── */
-interface GridItem { key: string; label: string; icon: string; cat: ProductCategory; color: string; }
+interface GridItem { key: string; label: string; icon: string; cat: ProductCategory; grad: string; glow: string; }
 
 const MAIN_GRID: GridItem[] = [
-  { key: "pulsa",    label: "Pulsa",       icon: "📱", cat: "pulsa",      color: "#3B82F6" },
-  { key: "data",     label: "Paket Data",  icon: "📡", cat: "data",       color: "#10B981" },
-  { key: "pln",      label: "Token PLN",   icon: "⚡", cat: "pln",        color: "#F59E0B" },
-  { key: "ewallet",  label: "E-Wallet",    icon: "💳", cat: "ewallet",    color: "#8B5CF6" },
-  { key: "pasca1",   label: "Telp & SMS",  icon: "☎️", cat: "pascabayar", color: "#EC4899" },
-  { key: "voucher",  label: "Voucher",     icon: "🎟️", cat: "voucher",    color: "#F97316" },
-  { key: "tv",       label: "TV Prabayar", icon: "📺", cat: "tv",         color: "#06B6D4" },
-  { key: "game",     label: "Game",        icon: "🎮", cat: "game",       color: "#7C3AED" },
-  { key: "intl",     label: "Internasional", icon: "🌍", cat: "intl",     color: "#0EA5E9" },
-  { key: "pasca2",   label: "HP Pascabayar", icon: "📲", cat: "pascabayar", color: "#F43F5E" },
-  { key: "hiburan",  label: "Hiburan",     icon: "🎵", cat: "game",       color: "#A78BFA" },
-  { key: "lainlain", label: "Lain-Lain",   icon: "⚙️", cat: "voucher",    color: "#6B7280" },
+  { key: "pulsa",    label: "Pulsa",          icon: "📱", cat: "pulsa",      grad: "linear-gradient(145deg,#1e3a8a,#3b82f6)",    glow: "#3b82f6" },
+  { key: "data",     label: "Paket Data",     icon: "📡", cat: "data",       grad: "linear-gradient(145deg,#064e3b,#059669)",    glow: "#10b981" },
+  { key: "pln",      label: "Token PLN",      icon: "⚡", cat: "pln",        grad: "linear-gradient(145deg,#78350f,#f59e0b)",    glow: "#f59e0b" },
+  { key: "ewallet",  label: "E-Wallet",       icon: "💳", cat: "ewallet",    grad: "linear-gradient(145deg,#4c1d95,#8b5cf6)",    glow: "#8b5cf6" },
+  { key: "pasca1",   label: "Telp & SMS",     icon: "☎️", cat: "pascabayar", grad: "linear-gradient(145deg,#9d174d,#ec4899)",    glow: "#ec4899" },
+  { key: "voucher",  label: "Voucher",        icon: "🎟️", cat: "voucher",    grad: "linear-gradient(145deg,#7c2d12,#f97316)",    glow: "#f97316" },
+  { key: "tv",       label: "TV Prabayar",    icon: "📺", cat: "tv",         grad: "linear-gradient(145deg,#164e63,#06b6d4)",    glow: "#06b6d4" },
+  { key: "game",     label: "Game",           icon: "🎮", cat: "game",       grad: "linear-gradient(145deg,#312e81,#6d28d9)",    glow: "#7c3aed" },
+  { key: "intl",     label: "Internasional",  icon: "🌍", cat: "intl",       grad: "linear-gradient(145deg,#0c4a6e,#0ea5e9)",    glow: "#0ea5e9" },
+  { key: "pasca2",   label: "HP Pascabayar",  icon: "📲", cat: "pascabayar", grad: "linear-gradient(145deg,#881337,#f43f5e)",    glow: "#f43f5e" },
+  { key: "hiburan",  label: "Hiburan",        icon: "🎵", cat: "game",       grad: "linear-gradient(145deg,#4c1d95,#a78bfa)",    glow: "#a78bfa" },
+  { key: "lainlain", label: "Lain-Lain",      icon: "⚙️", cat: "voucher",    grad: "linear-gradient(145deg,#1e293b,#64748b)",    glow: "#64748b" },
 ];
 
 const VOUCHER_GRID: GridItem[] = [
-  { key: "axis",    label: "Axis",       icon: "🅰",  cat: "pulsa",   color: "#DC2626" },
-  { key: "xl",      label: "XL",         icon: "✖",  cat: "data",    color: "#1D4ED8" },
-  { key: "indosat", label: "Indosat",    icon: "🔴", cat: "data",    color: "#FF4500" },
-  { key: "tri",     label: "Tri 3",      icon: "3️⃣", cat: "pulsa",   color: "#1E3A5F" },
-  { key: "tsel",    label: "Telkomsel",  icon: "🔴", cat: "pulsa",   color: "#CC0000" },
-  { key: "smartfren",label:"Smartfren", icon: "🌐", cat: "data",    color: "#7C3AED" },
-  { key: "perdana", label: "Perdana SP", icon: "📋", cat: "voucher", color: "#059669" },
-  { key: "cek-v",   label: "Cek Voucher",icon: "🔍", cat: "voucher", color: "#D97706" },
+  { key: "axis",      label: "Axis",        icon: "🅰",  cat: "pulsa",   grad: "linear-gradient(145deg,#7f1d1d,#dc2626)",  glow: "#dc2626" },
+  { key: "xl",        label: "XL",          icon: "✖",  cat: "data",    grad: "linear-gradient(145deg,#1e3a8a,#2563eb)",  glow: "#3b82f6" },
+  { key: "indosat",   label: "Indosat",     icon: "🔴", cat: "data",    grad: "linear-gradient(145deg,#7c2d12,#ea580c)",  glow: "#f97316" },
+  { key: "tri",       label: "Tri 3",       icon: "3️⃣", cat: "pulsa",   grad: "linear-gradient(145deg,#172554,#1d4ed8)",  glow: "#3b82f6" },
+  { key: "tsel",      label: "Telkomsel",   icon: "🔴", cat: "pulsa",   grad: "linear-gradient(145deg,#7f1d1d,#b91c1c)",  glow: "#ef4444" },
+  { key: "smartfren", label: "Smartfren",   icon: "🌐", cat: "data",    grad: "linear-gradient(145deg,#3b0764,#7c3aed)",  glow: "#8b5cf6" },
+  { key: "perdana",   label: "Perdana SP",  icon: "📋", cat: "voucher", grad: "linear-gradient(145deg,#064e3b,#059669)",  glow: "#10b981" },
+  { key: "cek-v",     label: "Cek Voucher", icon: "🔍", cat: "voucher", grad: "linear-gradient(145deg,#78350f,#d97706)",  glow: "#f59e0b" },
 ];
 
 const TAGIHAN_GRID: GridItem[] = [
-  { key: "pln-t",   label: "Tagihan PLN",   icon: "⚡", cat: "pascabayar", color: "#F59E0B" },
-  { key: "telkom",  label: "Telkom",         icon: "☎️", cat: "pascabayar", color: "#3B82F6" },
-  { key: "pdam",    label: "PDAM",           icon: "💧", cat: "pascabayar", color: "#06B6D4" },
-  { key: "bpjs",    label: "BPJS",           icon: "🏥", cat: "pascabayar", color: "#10B981" },
-  { key: "tv-k",    label: "TV & Internet",  icon: "📺", cat: "tv",         color: "#8B5CF6" },
-  { key: "hp-p",    label: "HP Pasca",       icon: "📱", cat: "pascabayar", color: "#EC4899" },
-  { key: "angsuran",label: "Angsuran",       icon: "💰", cat: "pascabayar", color: "#F97316" },
-  { key: "lainnya", label: "Lainnya",        icon: "📋", cat: "pascabayar", color: "#6B7280" },
+  { key: "pln-t",    label: "Tagihan PLN",  icon: "⚡", cat: "pascabayar", grad: "linear-gradient(145deg,#78350f,#f59e0b)", glow: "#f59e0b" },
+  { key: "telkom",   label: "Telkom",       icon: "☎️", cat: "pascabayar", grad: "linear-gradient(145deg,#1e3a8a,#3b82f6)", glow: "#3b82f6" },
+  { key: "pdam",     label: "PDAM",         icon: "💧", cat: "pascabayar", grad: "linear-gradient(145deg,#164e63,#0891b2)", glow: "#06b6d4" },
+  { key: "bpjs",     label: "BPJS",         icon: "🏥", cat: "pascabayar", grad: "linear-gradient(145deg,#064e3b,#059669)", glow: "#10b981" },
+  { key: "tv-k",     label: "TV & Internet",icon: "📺", cat: "tv",          grad: "linear-gradient(145deg,#4c1d95,#8b5cf6)", glow: "#8b5cf6" },
+  { key: "hp-p",     label: "HP Pasca",     icon: "📱", cat: "pascabayar", grad: "linear-gradient(145deg,#9d174d,#ec4899)", glow: "#ec4899" },
+  { key: "angsuran", label: "Angsuran",     icon: "💰", cat: "pascabayar", grad: "linear-gradient(145deg,#7c2d12,#f97316)", glow: "#f97316" },
+  { key: "lainnya",  label: "Lainnya",      icon: "📋", cat: "pascabayar", grad: "linear-gradient(145deg,#1e293b,#64748b)", glow: "#6b7280" },
 ];
 
 /* ─── Popular products ─── */
@@ -140,12 +140,17 @@ function GridIcon({ item, onPress }: { item: GridItem; onPress: (cat: ProductCat
       onClick={() => onPress(item.cat)}
       className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform"
     >
-      <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl"
-        style={{ background: `${item.color}18`, border: `1.5px solid ${item.color}30` }}>
+      <div
+        className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl"
+        style={{
+          background: item.grad,
+          boxShadow: `0 4px 14px ${item.glow}40, 0 1px 3px rgba(0,0,0,0.4)`,
+        }}
+      >
         {item.icon}
       </div>
       <span className="text-[10px] font-semibold text-center leading-tight w-14"
-        style={{ color: "rgba(255,255,255,0.70)" }}>
+        style={{ color: "rgba(255,255,255,0.75)" }}>
         {item.label}
       </span>
     </button>
@@ -204,9 +209,8 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
     return () => { if (v2BalanceIntervalRef.current) clearInterval(v2BalanceIntervalRef.current); };
   }, [member.id]);
 
-  function toggleLang() {
-    const newLang: Lang = lang === "id" ? "en" : "id";
-    setLang(newLang); setLangState(newLang);
+  function switchLang(l: Lang) {
+    setLang(l); setLangState(l);
   }
 
   const products = selectedCategory ? getSmartProducts(selectedCategory, countryCode, memberType, phone) : [];
@@ -299,13 +303,12 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
 
   /* ─── Sidebar menu items ─── */
   const SIDEBAR_ITEMS = [
-    { icon: "🎧", label: "Customer Service",    action: () => { window.open(`https://wa.me/${ADMIN_WA}`, "_blank"); setShowSidebar(false); } },
-    { icon: "💳", label: "Tambah Saldo",        action: () => { onNavigate("deposit"); setShowSidebar(false); } },
-    { icon: "📋", label: "Riwayat Transaksi",   action: () => { onNavigate("history"); setShowSidebar(false); } },
-    { icon: "👤", label: "Akun Saya",           action: () => { onNavigate("member"); setShowSidebar(false); } },
-    { icon: "⭐", label: "Panel Admin",         action: () => { onNavigate("admin"); setShowSidebar(false); } },
-    { icon: "🌐", label: "Ubah Bahasa",         action: () => { toggleLang(); setShowSidebar(false); } },
-    { icon: "🆘", label: "Bantuan",             action: () => { setShowHelp(true); setShowSidebar(false); } },
+    { icon: "🎧", label: t("sidebar_cs", lang),      action: () => { window.open(`https://wa.me/${ADMIN_WA}`, "_blank"); setShowSidebar(false); } },
+    { icon: "💳", label: t("sidebar_topup", lang),   action: () => { onNavigate("deposit"); setShowSidebar(false); } },
+    { icon: "📋", label: t("sidebar_history", lang), action: () => { onNavigate("history"); setShowSidebar(false); } },
+    { icon: "👤", label: t("sidebar_account", lang), action: () => { onNavigate("member"); setShowSidebar(false); } },
+    { icon: "⭐", label: t("sidebar_admin", lang),   action: () => { onNavigate("admin"); setShowSidebar(false); } },
+    { icon: "🆘", label: t("sidebar_help", lang),    action: () => { setShowHelp(true); setShowSidebar(false); } },
   ];
 
   return (
@@ -340,6 +343,47 @@ export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) 
                   <span className="text-sm font-medium text-white/75">{item.label}</span>
                 </button>
               ))}
+
+              {/* ─── Language picker ─── */}
+              <div className="px-5 pt-4 pb-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-2.5"
+                  style={{ color: "rgba(255,255,255,0.30)" }}>
+                  🌐 {t("sidebar_lang", lang)}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {LANG_OPTIONS.map((opt) => {
+                    const active = lang === opt.code;
+                    return (
+                      <button
+                        key={opt.code}
+                        onClick={() => switchLang(opt.code)}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-left"
+                        style={{
+                          background: active
+                            ? "linear-gradient(135deg,#1e3a8a,#1A56DB)"
+                            : "rgba(255,255,255,0.05)",
+                          border: active
+                            ? "1px solid #3b82f640"
+                            : "1px solid rgba(255,255,255,0.07)",
+                          boxShadow: active ? "0 2px 10px #1A56DB40" : "none",
+                        }}
+                      >
+                        <span className="text-lg leading-none">{opt.flag}</span>
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-bold leading-none"
+                            style={{ color: active ? "#fff" : "rgba(255,255,255,0.6)" }}>
+                            {opt.nativeLabel}
+                          </p>
+                        </div>
+                        {active && (
+                          <span className="ml-auto text-[9px] font-black"
+                            style={{ color: "#60a5fa" }}>✓</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
             <div className="px-5 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
               <p className="text-[10px] text-white/20">© 2025 RoneyCell • Lombok</p>
