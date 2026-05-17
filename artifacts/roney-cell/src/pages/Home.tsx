@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import BalanceCard from "@/components/BalanceCard";
+import MutationHistoryPanel from "@/components/MutationHistoryPanel";
 import PhoneInput from "@/components/PhoneInput";
 import TransactionModal from "@/components/TransactionModal";
 import TransactionPinModal from "@/components/TransactionPinModal";
@@ -17,6 +18,7 @@ import {
   getMemberBalance, updateMemberBalance,
   addTransactionToSheets, refundTransaction, verifyTxPin,
 } from "@/lib/sheetsApi";
+import { getV2Token, v2GetBalance, v2BuyProduct } from "@/lib/apiV2";
 import { Member, TYPE_LABELS, TYPE_COLORS } from "@/lib/members";
 import { t, getLang, setLang, Lang } from "@/lib/i18n";
 
@@ -134,13 +136,28 @@ export default function Home({ member, onMemberUpdate }: HomeProps) {
   const countryInfo = getCountryInfo(countryCode);
 
   const handleStoreBalanceChange = useCallback((val: number) => setStoreBalance(val), []);
+  const v2BalanceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (member.id) {
+    const isV2 = !!getV2Token();
+    if (isV2) {
+      /* ── v2: Saldo realtime dari PostgreSQL ── */
+      async function fetchV2Balance() {
+        try {
+          const res = await v2GetBalance();
+          setMemberBalance(res.balance);
+          onMemberUpdate({ ...member, balance: res.balance });
+        } catch { /* abaikan */ }
+      }
+      void fetchV2Balance();
+      v2BalanceIntervalRef.current = setInterval(() => { void fetchV2Balance(); }, 30_000);
+    } else if (member.id) {
+      /* ── v1: Saldo dari Firebase ── */
       getMemberBalance(member.id)
         .then((b) => { setMemberBalance(b); onMemberUpdate({ ...member, balance: b }); })
         .catch(() => {});
     }
+    return () => { if (v2BalanceIntervalRef.current) clearInterval(v2BalanceIntervalRef.current); };
   }, [member.id]);
 
   function toggleLang() {
@@ -204,6 +221,45 @@ export default function Home({ member, onMemberUpdate }: HomeProps) {
 
   async function handleConfirmTransaction() {
     if (!selectedProduct) return;
+    const isV2 = !!getV2Token();
+
+    if (isV2) {
+      /* ── v2: Transaksi melalui PostgreSQL ── */
+      setModalPhase("loading");
+      const txPhone = getFullPhone();
+      const sku = getOperatorSku(operator?.name, selectedProduct.sku);
+      try {
+        const res = await v2BuyProduct({
+          buyer_sku_code: sku,
+          customer_no: txPhone,
+          category: selectedProduct.category,
+        });
+        setLastRefId(res.refId);
+        /* Refresh saldo dari DB setelah transaksi */
+        try {
+          const bal = await v2GetBalance();
+          setMemberBalance(bal.balance);
+          onMemberUpdate({ ...member, balance: bal.balance });
+        } catch { /* abaikan */ }
+        if (res.status === "success") {
+          setModalPhase("success");
+        } else if (res.status === "pending") {
+          setModalPhase("success");
+        } else {
+          setFailureType(classifyFailure(res.message ?? ""));
+          setErrorMessage(res.message ?? "Transaksi gagal");
+          setModalPhase("failed");
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Transaksi gagal";
+        setFailureType(classifyFailure(msg));
+        setErrorMessage(msg);
+        setModalPhase("failed");
+      }
+      return;
+    }
+
+    /* ── v1: Transaksi via Google Sheets + Digiflazz ── */
     const latestBalance = await getMemberBalance(member.id).catch(() => memberBalance);
     if (latestBalance < selectedProduct.price) {
       setMemberBalance(latestBalance); setModalPhase("insufficient"); return;
@@ -564,6 +620,9 @@ export default function Home({ member, onMemberUpdate }: HomeProps) {
               })}
             </div>
           </div>
+
+          {/* ── Riwayat Mutasi Saldo (v2 only) ── */}
+          {!!getV2Token() && <MutationHistoryPanel />}
 
           {/* CS Quick Access */}
           <button onClick={() => setShowHelp(true)}

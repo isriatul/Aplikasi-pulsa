@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { subscribeBalance } from "@/lib/firebase";
 import { formatRupiah } from "@/lib/products";
 import { t, getLang } from "@/lib/i18n";
+import { getV2Token, v2GetBalance } from "@/lib/apiV2";
 
 interface BalanceCardProps {
   onBalanceChange?: (balance: number) => void;
@@ -12,22 +13,44 @@ export default function BalanceCard({ onBalanceChange }: BalanceCardProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const lang = getLang();
+  const isV2 = !!getV2Token();
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    const unsub = subscribeBalance(
-      (val) => {
-        setBalance(val);
-        setLoading(false);
-        setError(false);
-        onBalanceChange?.(val);
-      },
-      () => {
-        setError(true);
-        setLoading(false);
+    if (isV2) {
+      /* ── v2: Polling dari PostgreSQL ── */
+      async function fetchV2() {
+        try {
+          const res = await v2GetBalance();
+          setBalance(res.balance);
+          setLoading(false);
+          setError(false);
+          onBalanceChange?.(res.balance);
+        } catch {
+          setError(true);
+          setLoading(false);
+        }
       }
-    );
-    return unsub;
-  }, []);
+      void fetchV2();
+      intervalRef.current = setInterval(() => { void fetchV2(); }, 30_000);
+      return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    } else {
+      /* ── v1: Firebase Realtime DB ── */
+      const unsub = subscribeBalance(
+        (val) => {
+          setBalance(val);
+          setLoading(false);
+          setError(false);
+          onBalanceChange?.(val);
+        },
+        () => {
+          setError(true);
+          setLoading(false);
+        }
+      );
+      return unsub;
+    }
+  }, [isV2]);
 
   return (
     <div className="glass-card rounded-2xl p-5 relative overflow-hidden">
@@ -48,7 +71,9 @@ export default function BalanceCard({ onBalanceChange }: BalanceCardProps) {
           </div>
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span className="text-xs text-emerald-400 font-medium">{t("synced", lang)}</span>
+            <span className="text-xs text-emerald-400 font-medium">
+              {isV2 ? "DB" : t("synced", lang)}
+            </span>
           </div>
         </div>
 
@@ -73,7 +98,7 @@ export default function BalanceCard({ onBalanceChange }: BalanceCardProps) {
 
         <div className="mt-3 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <p className="text-xs text-muted-foreground mt-2">
-          {t("sync_info", lang)}
+          {isV2 ? "Saldo realtime dari database" : t("sync_info", lang)}
         </p>
       </div>
     </div>
