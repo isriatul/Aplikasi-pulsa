@@ -31,6 +31,7 @@ import {
   updateSheetUserStatus,
   SheetUser,
 } from "@/lib/sheetsApi";
+import { v2AdminUsers, v2AdminActivateUser, getV2Token, type V2User } from "@/lib/apiV2";
 import { getServerIp, checkDigiflazzBalance, sendTestTransaction, TestTransactionResult } from "@/lib/digiflazz";
 
 type AdminTab = "report" | "prices" | "members" | "settings" | "uji" | "v2";
@@ -409,6 +410,107 @@ function SheetsPendingSection({ onRefreshed }: { onRefreshed?: (count: number) =
   );
 }
 
+/* ─── V2 Pending Section ─── */
+function V2PendingSection({ onCountChange }: { onCountChange?: (n: number) => void }) {
+  const [users, setUsers] = useState<V2User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionState, setActionState] = useState<Record<number, "loading" | "ok" | "err">>({});
+  const [msgs, setMsgs] = useState<Record<number, string>>({});
+  const hasToken = !!getV2Token();
+
+  const load = useCallback(async () => {
+    if (!hasToken) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      const res = await v2AdminUsers({ status: "pending" });
+      setUsers(res.data);
+      onCountChange?.(res.data.length);
+    } catch { setUsers([]); }
+    finally { setLoading(false); }
+  }, [hasToken, onCountChange]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  async function doActivate(u: V2User) {
+    setActionState((p) => ({ ...p, [u.id]: "loading" }));
+    try {
+      await v2AdminActivateUser(u.id);
+      setActionState((p) => ({ ...p, [u.id]: "ok" }));
+      setMsgs((p) => ({ ...p, [u.id]: "✅ Berhasil diaktifkan" }));
+      setUsers((prev) => prev.filter((x) => x.id !== u.id));
+      onCountChange?.(users.length - 1);
+    } catch (e) {
+      setActionState((p) => ({ ...p, [u.id]: "err" }));
+      setMsgs((p) => ({ ...p, [u.id]: (e as Error).message }));
+    }
+  }
+
+  if (!hasToken) return null;
+
+  if (loading) return (
+    <div className="glass-card rounded-2xl p-4 border border-blue-500/20">
+      <div className="flex items-center gap-3">
+        <div className="w-4 h-4 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+        <p className="text-sm text-muted-foreground">Memuat pendaftar database...</p>
+      </div>
+    </div>
+  );
+
+  if (users.length === 0) return (
+    <div className="glass-card rounded-2xl p-4 border border-white/6">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Pendaftar Baru (Database)</p>
+        <button onClick={load} className="text-xs text-muted-foreground hover:text-foreground transition-colors">🔄 Refresh</button>
+      </div>
+      <div className="text-center py-3">
+        <p className="text-2xl mb-1">🎉</p>
+        <p className="text-sm text-muted-foreground">Tidak ada pendaftar yang menunggu.</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+        <p className="text-sm font-black text-blue-300">Pendaftar Database Menunggu</p>
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-500/20 text-blue-400">{users.length}</span>
+        <button onClick={load} className="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors">🔄</button>
+      </div>
+      {users.map((u) => (
+        <div key={u.id} className="glass-card rounded-2xl p-4 border border-blue-500/25"
+          style={{ background: "rgba(59,130,246,0.03)" }}>
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <p className="font-black text-foreground truncate">{u.name}</p>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/20 text-blue-400 shrink-0">DB</span>
+              </div>
+              <p className="text-xs text-muted-foreground">📱 +62{u.phone}</p>
+              {u.email && <p className="text-xs text-muted-foreground">✉️ {u.email}</p>}
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Daftar: {new Date(u.createdAt).toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" })}
+              </p>
+            </div>
+          </div>
+          {msgs[u.id] && (
+            <p className={`text-xs font-semibold mb-2 px-2 py-1 rounded-lg ${actionState[u.id] === "ok" ? "text-emerald-400 bg-emerald-500/10" : "text-red-400 bg-red-500/10"}`}>
+              {msgs[u.id]}
+            </p>
+          )}
+          <button
+            onClick={() => doActivate(u)}
+            disabled={actionState[u.id] === "loading" || actionState[u.id] === "ok"}
+            className="w-full py-2 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg,#3B82F6,#2563EB)" }}>
+            {actionState[u.id] === "loading" ? "Mengaktifkan..." : actionState[u.id] === "ok" ? "✓ Aktif" : "✅ Aktifkan User"}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function MembersSection({ onMemberChange }: { onMemberChange?: () => void }) {
   const [view, setView] = useState<MemberView>("list");
   const [members, setMembers] = useState<Member[]>(() => loadMembers());
@@ -416,6 +518,7 @@ function MembersSection({ onMemberChange }: { onMemberChange?: () => void }) {
   const [filterStatus, setFilterStatus] = useState<MemberStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [sheetsPendingCount, setSheetsPendingCount] = useState(0);
+  const [v2PendingCount, setV2PendingCount] = useState(0);
 
   function refresh() { setMembers(loadMembers()); }
 
@@ -436,7 +539,7 @@ function MembersSection({ onMemberChange }: { onMemberChange?: () => void }) {
   });
 
   const localPending = members.filter((m) => m.status === "pending").length;
-  const totalPending = localPending + sheetsPendingCount;
+  const totalPending = localPending + sheetsPendingCount + v2PendingCount;
 
   if (view === "add") return <AddMemberForm onDone={() => { refresh(); setView("list"); }} onBack={() => setView("list")} />;
   if (view === "transfer" && transferTarget) return (
@@ -461,12 +564,27 @@ function MembersSection({ onMemberChange }: { onMemberChange?: () => void }) {
         </button>
       </div>
 
-      {/* ─── SHEETS PENDING SECTION ─── */}
+      {/* ─── V2 PENDING SECTION (PostgreSQL) ─── */}
+      <div className="rounded-2xl border border-blue-500/20 overflow-hidden">
+        <div className="px-4 py-3 flex items-center gap-2 border-b border-blue-500/10"
+          style={{ background: "rgba(59,130,246,0.07)" }}>
+          <span className="text-base">🗄️</span>
+          <p className="text-xs font-black text-blue-200 uppercase tracking-widest">Pendaftar Baru (Database)</p>
+          {v2PendingCount > 0 && (
+            <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-500/30 text-blue-300">{v2PendingCount}</span>
+          )}
+        </div>
+        <div className="p-4">
+          <V2PendingSection onCountChange={setV2PendingCount} />
+        </div>
+      </div>
+
+      {/* ─── SHEETS PENDING SECTION (Google Sheets) ─── */}
       <div className="rounded-2xl border border-yellow-500/15 overflow-hidden">
         <div className="px-4 py-3 flex items-center gap-2 border-b border-yellow-500/10"
           style={{ background: "rgba(251,191,36,0.06)" }}>
           <span className="text-base">🕐</span>
-          <p className="text-xs font-black text-yellow-200 uppercase tracking-widest">Pending Members (via Pendaftaran App)</p>
+          <p className="text-xs font-black text-yellow-200 uppercase tracking-widest">Pendaftar (Google Sheets)</p>
         </div>
         <div className="p-4">
           <SheetsPendingSection onRefreshed={setSheetsPendingCount} />
