@@ -5,12 +5,13 @@ import DepositPage from "@/pages/DepositPage";
 import AdminPage from "@/pages/AdminPage";
 import MemberPortal from "@/pages/MemberPortal";
 import LoginPage from "@/pages/LoginPage";
+import HistoryPage from "@/pages/HistoryPage";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { Member, clearSession } from "@/lib/members";
 import { clearApiToken } from "@/lib/apiAuth";
 import { clearV2Tokens, getV2Token, getV2RefreshToken } from "@/lib/apiV2";
 
-type Tab = "home" | "deposit" | "member" | "admin";
+type Tab = "home" | "deposit" | "history" | "member" | "admin";
 type AppState = "checking" | "login" | "app";
 
 function isSuperAdmin(m: Member): boolean {
@@ -61,12 +62,9 @@ export default function App() {
       setAppState("app");
       if (isSuperAdmin(session)) setActiveTab("admin");
 
-      /* Jika ada refresh token tapi tidak ada access token (misal setelah buka tab baru
-         dari browser yang membersihkan sessionStorage), coba refresh diam-diam */
       if (!getV2Token() && getV2RefreshToken()) {
         import("@/lib/apiV2").then(({ tryV2Refresh }) => {
           tryV2Refresh().catch(() => {
-            /* Refresh gagal (token expired) — paksa logout */
             onSessionExpired();
           });
         });
@@ -109,6 +107,9 @@ export default function App() {
       </div>
       <div style={{ display: activeTab === "deposit" ? "block" : "none" }}>
         <DepositPage />
+      </div>
+      <div style={{ display: activeTab === "history" ? "block" : "none" }}>
+        <HistoryPage />
       </div>
       <div style={{ display: activeTab === "member" ? "block" : "none" }}>
         <MemberPortal member={member} onLogin={handleLogin} onLogout={handleLogout} />

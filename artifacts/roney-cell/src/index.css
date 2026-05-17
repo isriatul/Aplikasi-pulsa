@@ -263,3 +263,13 @@ input[type="number"] { -moz-appearance: textfield; }
   backdrop-filter: blur(24px) saturate(180%);
   border-top: 1px solid rgba(255,255,255,0.06);
 }
+
+/* ─── Sheet animations ─── */
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

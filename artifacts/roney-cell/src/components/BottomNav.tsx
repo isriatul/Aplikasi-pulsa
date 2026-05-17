@@ -1,6 +1,6 @@
 import { Member } from "@/lib/members";
 
-type Tab = "home" | "deposit" | "member" | "admin";
+type Tab = "home" | "deposit" | "history" | "member" | "admin";
 
 interface BottomNavProps {
   active: Tab;
@@ -40,11 +40,22 @@ const TABS: {
     ),
   },
   {
-    id: "member",
-    label: "Akun",
+    id: "history",
+    label: "Riwayat",
     color: "#10B981",
     icon: (a) => (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? "#10B981" : "rgba(255,255,255,0.38)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9"/>
+        <polyline points="12 7 12 12 15 15"/>
+      </svg>
+    ),
+  },
+  {
+    id: "member",
+    label: "Akun",
+    color: "#8B5CF6",
+    icon: (a) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? "#8B5CF6" : "rgba(255,255,255,0.38)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="8" r="4"/>
         <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
       </svg>
@@ -53,9 +64,9 @@ const TABS: {
   {
     id: "admin",
     label: "Owner",
-    color: "#8B5CF6",
+    color: "#EC4899",
     icon: (a) => (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? "#8B5CF6" : "rgba(255,255,255,0.38)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? "#EC4899" : "rgba(255,255,255,0.38)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
       </svg>
     ),
@@ -65,7 +76,7 @@ const TABS: {
 export default function BottomNav({ active, onChange, member, pendingMemberCount = 0 }: BottomNavProps) {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto bottom-nav-bar pb-safe">
-      <div className="flex items-center justify-around px-2 pt-2 pb-3">
+      <div className="flex items-center justify-around px-1 pt-2 pb-3">
         {TABS.map((tab) => {
           const isActive = active === tab.id;
           const showBadge = tab.id === "admin" && pendingMemberCount > 0;
@@ -75,7 +86,7 @@ export default function BottomNav({ active, onChange, member, pendingMemberCount
             <button
               key={tab.id}
               onClick={() => onChange(tab.id)}
-              className="relative flex flex-col items-center gap-1 px-5 py-1.5 rounded-2xl transition-all duration-200 select-none"
+              className="relative flex flex-col items-center gap-1 px-3 py-1.5 rounded-2xl transition-all duration-200 select-none"
               style={isActive ? { background: `${tab.color}18` } : {}}
             >
               <div className="relative">
