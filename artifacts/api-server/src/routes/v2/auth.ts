@@ -11,7 +11,7 @@
  */
 import { Router, type IRouter, type Request } from "express";
 import { z } from "zod";
-import { eq, isNull, and, desc } from "drizzle-orm";
+import { eq, isNull, and } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import {
@@ -30,7 +30,7 @@ import {
   safeUser,
 } from "../../lib/v2/userService.js";
 import { signToken } from "../../lib/jwt.js";
-import { authLimiter, readLimiter } from "../../middlewares/rateLimiter.js";
+import { loginLimiter, authLimiter, readLimiter } from "../../middlewares/rateLimiter.js";
 import { requireAuthV2 } from "../../middlewares/requireRole.js";
 import { audit } from "../../lib/v2/auditService.js";
 import { safeZodErrors } from "../../lib/sanitize.js";
@@ -41,35 +41,40 @@ const router: IRouter = Router();
 
 const RegisterSchema = z.object({
   phone: z.string().min(8).max(15).regex(/^[0-9]+$/),
-  email: z.string().email().optional(),
+  email: z.string().email().max(254).optional(),
   name: z.string().min(2).max(100),
   password: z.string().min(6).max(100),
 });
 
 const LoginSchema = z.object({
   phone: z.string().min(8).max(15).regex(/^[0-9]+$/).optional(),
-  email: z.string().email().optional(),
+  email: z.string().email().max(254).optional(),
   password: z.string().min(1).max(100),
 }).refine((d) => d.phone || d.email, { message: "Phone atau email harus diisi" });
 
+/* Refresh token: 80 hex chars (40 bytes), validasi ketat untuk cegah DoS saat hashing */
+const RefreshSchema = z.object({
+  refreshToken: z.string().min(40).max(128).regex(/^[a-f0-9]+$/, "Format token tidak valid"),
+});
+
 const ChangePasswordSchema = z.object({
-  currentPassword: z.string().min(1),
+  currentPassword: z.string().min(1).max(100),
   newPassword: z.string().min(6).max(100),
 });
 
 const ForgotPasswordSchema = z.object({
   phone: z.string().min(8).max(15).regex(/^[0-9]+$/).optional(),
-  email: z.string().email().optional(),
+  email: z.string().email().max(254).optional(),
 }).refine((d) => d.phone || d.email, { message: "Phone atau email harus diisi" });
 
 const ResetPasswordSchema = z.object({
-  token: z.string().min(1),
+  token: z.string().min(1).max(128),
   newPassword: z.string().min(6).max(100),
 });
 
 const UpdateProfileSchema = z.object({
   name: z.string().min(2).max(100).optional(),
-  email: z.string().email().optional(),
+  email: z.string().email().max(254).optional(),
 });
 
 function getIp(req: Request): string {
@@ -127,7 +132,7 @@ router.post("/v2/auth/register", authLimiter, async (req, res) => {
 });
 
 /* ── POST /api/v2/auth/login ── */
-router.post("/v2/auth/login", authLimiter, async (req, res) => {
+router.post("/v2/auth/login", loginLimiter, async (req, res) => {
   const parsed = LoginSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Data tidak valid", details: safeZodErrors(parsed.error.issues) });
@@ -138,6 +143,7 @@ router.post("/v2/auth/login", authLimiter, async (req, res) => {
   let user = phone ? await findUserByPhone(phone) : undefined;
   if (!user && email) user = await findUserByEmail(email);
 
+  /* Respons identik untuk user-not-found dan wrong-password — mencegah user enumeration */
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     res.status(401).json({ error: "Nomor/email atau password salah" });
     return;
@@ -162,12 +168,12 @@ router.post("/v2/auth/login", authLimiter, async (req, res) => {
 
 /* ── POST /api/v2/auth/refresh ── */
 router.post("/v2/auth/refresh", authLimiter, async (req, res) => {
-  const { refreshToken } = req.body as { refreshToken?: string };
-  if (!refreshToken) {
-    res.status(400).json({ error: "Refresh token diperlukan" });
+  const parsed = RefreshSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Refresh token tidak valid", details: safeZodErrors(parsed.error.issues) });
     return;
   }
-  const result = await rotateRefreshToken(refreshToken, getIp(req), getUa(req));
+  const result = await rotateRefreshToken(parsed.data.refreshToken, getIp(req), getUa(req));
   if (!result) {
     res.status(401).json({ error: "Refresh token tidak valid atau sudah kadaluarsa" });
     return;
@@ -205,7 +211,7 @@ router.get("/v2/auth/profile", requireAuthV2, readLimiter, async (req, res) => {
 });
 
 /* ── PUT /api/v2/auth/profile ── */
-router.put("/v2/auth/profile", requireAuthV2, async (req, res) => {
+router.put("/v2/auth/profile", requireAuthV2, readLimiter, async (req, res) => {
   const userId = req.member!.userId;
   if (!userId) {
     res.status(400).json({ error: "User ID tidak valid" });

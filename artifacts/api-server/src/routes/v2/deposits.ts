@@ -9,7 +9,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { depositsTable } from "@workspace/db";
 import { requireAuthV2 } from "../../middlewares/requireRole.js";
-import { readLimiter } from "../../middlewares/rateLimiter.js";
+import { readLimiter, depositLimiter } from "../../middlewares/rateLimiter.js";
 import { safeZodErrors } from "../../lib/sanitize.js";
 import { audit } from "../../lib/v2/auditService.js";
 import { notifyDeposit } from "../../lib/v2/notificationService.js";
@@ -42,7 +42,7 @@ function buildExpiry(method: string): Date {
 }
 
 /* ── POST /api/v2/deposits ── */
-router.post("/v2/deposits", requireAuthV2, async (req, res) => {
+router.post("/v2/deposits", requireAuthV2, depositLimiter, async (req, res) => {
   const userId = req.member!.userId;
   if (!userId) {
     res.status(400).json({ error: "Token tidak mendukung v2. Login ulang." });
@@ -100,7 +100,7 @@ router.get("/v2/deposits", requireAuthV2, readLimiter, async (req, res) => {
 router.get("/v2/deposits/:id", requireAuthV2, readLimiter, async (req, res) => {
   const userId = req.member!.userId!;
   const id = Number(req.params["id"]);
-  if (!Number.isInteger(id)) {
+  if (!Number.isInteger(id) || id <= 0) {
     res.status(400).json({ error: "ID tidak valid" });
     return;
   }
