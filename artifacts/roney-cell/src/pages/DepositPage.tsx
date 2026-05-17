@@ -241,33 +241,33 @@ function UploadProofForm({ deposit, onSuccess }: { deposit: V2Deposit; onSuccess
         className="rounded-2xl border-2 border-dashed cursor-pointer flex flex-col items-center justify-center py-5 gap-2 transition-all"
         style={preview
           ? { borderColor: "rgba(16,185,129,0.5)", background: "rgba(16,185,129,0.04)" }
-          : { borderColor: "rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.02)" }}>
+          : { borderColor: "#D1D9E8", background: "#F5F7FB" }}>
         {preview
           ? <img src={preview} alt="Preview struk" className="max-h-44 rounded-xl object-contain" />
           : <>
-              <svg className="w-9 h-9 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-9 h-9 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <p className="text-sm font-semibold text-white/50">Ketuk untuk pilih foto struk</p>
-              <p className="text-xs text-white/30">JPG / PNG / WebP · max 3MB</p>
+              <p className="text-sm font-semibold text-slate-600">Ketuk untuk pilih foto struk</p>
+              <p className="text-xs text-slate-400">JPG / PNG / WebP · max 3MB</p>
             </>}
       </div>
       <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFile} />
 
-      {error && <p className="text-xs text-red-400 px-1">{error}</p>}
+      {error && <p className="text-xs text-red-500 px-1">{error}</p>}
 
       <button
         onClick={() => void handleUpload()}
         disabled={!preview || loading}
         className="w-full py-4 rounded-2xl text-sm font-black tracking-wide disabled:opacity-40 transition-all flex items-center justify-center gap-2"
-        style={{ background: preview ? "linear-gradient(135deg,#10B981,#059669)" : "rgba(255,255,255,0.08)", color: preview ? "#fff" : "rgba(255,255,255,0.3)", boxShadow: preview ? "0 4px 20px rgba(16,185,129,0.35)" : "none" }}>
+        style={{ background: preview ? "linear-gradient(135deg,#10B981,#059669)" : "#E8EDF5", color: preview ? "#fff" : "#94A3B8", boxShadow: preview ? "0 4px 20px rgba(16,185,129,0.35)" : "none" }}>
         {loading
           ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Mengirim bukti...</>
           : <><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>Saya Sudah Bayar &amp; Upload Bukti</>}
       </button>
 
       {!preview && (
-        <p className="text-[11px] text-center text-white/30">
+        <p className="text-[11px] text-center text-slate-400">
           Screenshot struk pembayaran → pilih gambar → kirim → saldo otomatis masuk
         </p>
       )}
@@ -706,26 +706,26 @@ function ExistingTicketCard({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-black text-amber-400 uppercase tracking-wide">Tiket Aktif Ditemukan</p>
-          <p className="text-[10px] text-white/50 font-mono truncate">{deposit.paymentRef}</p>
+          <p className="text-[10px] text-slate-500 font-mono truncate">{deposit.paymentRef}</p>
         </div>
         <StatusBadge status="pending" />
       </div>
 
       {/* Info tiket */}
       <div className="px-4 py-4 space-y-3">
-        <div className="rounded-xl px-4 py-3 space-y-1.5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+        <div className="rounded-xl px-4 py-3 space-y-1.5" style={{ background: "#F5F7FB", border: "1px solid #DDE3EE" }}>
           <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Nominal asli</span>
-            <span className="text-white font-semibold">{rp(deposit.amount)}</span>
+            <span className="text-slate-500">Nominal asli</span>
+            <span className="text-slate-800 font-semibold">{rp(deposit.amount)}</span>
           </div>
           <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Kode unik</span>
-            <span className="text-amber-400 font-semibold">+{deposit.uniqueCode}</span>
+            <span className="text-slate-500">Kode unik</span>
+            <span className="text-amber-600 font-semibold">+{deposit.uniqueCode}</span>
           </div>
-          <div className="h-px bg-white/10 my-1" />
+          <div className="h-px bg-slate-200 my-1" />
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-white">Total bayar</span>
-            <span className="text-lg font-black text-amber-400">{rp(totalAmount)}</span>
+            <span className="text-xs font-bold text-slate-800">Total bayar</span>
+            <span className="text-lg font-black text-amber-600">{rp(totalAmount)}</span>
           </div>
         </div>
 
@@ -810,17 +810,16 @@ function MethodTile({
 
 function MethodTileDisabled({ label, logo }: { label: string; logo: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-2xl opacity-40"
-      style={{ background: "rgba(255,255,255,0.03)", border: "1.5px solid rgba(255,255,255,0.06)" }}>
+    <div className="flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-2xl opacity-50"
+      style={{ background: "#F5F7FB", border: "1.5px solid #DDE3EE" }}>
       <div className="w-11 h-11 rounded-xl overflow-hidden flex items-center justify-center"
-        style={{ background: "white", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>
+        style={{ background: "white", boxShadow: "0 1px 4px rgba(0,0,0,0.10)" }}>
         {logo}
       </div>
-      <span className="text-[10px] font-semibold text-center w-full px-0.5 truncate"
-        style={{ color: "rgba(255,255,255,0.40)" }}>
+      <span className="text-[10px] font-semibold text-center w-full px-0.5 truncate text-slate-500">
         {label}
       </span>
-      <span className="text-[8px] font-bold" style={{ color: "rgba(255,255,255,0.25)" }}>Segera</span>
+      <span className="text-[8px] font-bold text-slate-400">Segera</span>
     </div>
   );
 }
@@ -832,11 +831,11 @@ function MethodSection({
 }) {
   return (
     <div className="rounded-2xl overflow-hidden"
-      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+      style={{ background: "#FFFFFF", border: "1px solid #DDE3EE", boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
       {/* Section header */}
       <div className="flex items-center gap-2 px-4 pt-4 pb-3">
         <div className="w-1 h-4 rounded-full shrink-0" style={{ background: accent }} />
-        <span className="font-black text-sm" style={{ color: "rgba(255,255,255,0.88)" }}>{title}</span>
+        <span className="font-black text-sm text-slate-800">{title}</span>
       </div>
       {/* Logo grid */}
       <div className="grid grid-cols-3 gap-2.5 px-4 pb-4">
@@ -884,16 +883,16 @@ function NewDepositForm({
   return (
     <div className="space-y-5">
       {/* Nominal */}
-      <div className="rounded-2xl p-5 space-y-3" style={{ border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>
-        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Jumlah Deposit</p>
+      <div className="rounded-2xl p-5 space-y-3" style={{ border: "1px solid #DDE3EE", background: "#FFFFFF", boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Jumlah Deposit</p>
         <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-sm text-muted-foreground">Rp</span>
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-sm text-slate-500">Rp</span>
           <input
             type="number" inputMode="numeric"
             value={amount}
             onChange={(e) => { setAmount(e.target.value); setPreset(null); setError(""); }}
             placeholder="0"
-            className="w-full pl-10 pr-4 py-3.5 rounded-xl text-base font-black bg-white/5 border border-white/10 text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50 transition-all"
+            className="w-full pl-10 pr-4 py-3.5 rounded-xl text-base font-black bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-amber-500/70 transition-all"
           />
         </div>
         <div className="flex flex-wrap gap-2">
@@ -901,8 +900,8 @@ function NewDepositForm({
             <button key={p} onClick={() => selectPreset(p)}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border"
               style={preset === p
-                ? { borderColor: "#FBBF24", background: "rgba(251,191,36,0.12)", color: "#FBBF24" }
-                : { borderColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}>
+                ? { borderColor: "#D97706", background: "rgba(251,191,36,0.12)", color: "#B45309" }
+                : { borderColor: "#D1D9E8", color: "#64748B", background: "#F5F7FB" }}>
               {rp(p)}
             </button>
           ))}
@@ -911,8 +910,7 @@ function NewDepositForm({
 
       {/* Metode — Grouped logo grid */}
       <div className="space-y-3">
-        <p className="text-[10px] font-black uppercase tracking-widest px-1"
-          style={{ color: "rgba(255,255,255,0.35)" }}>Pilih Metode Bayar</p>
+        <p className="text-[10px] font-black uppercase tracking-widest px-1 text-slate-500">Pilih Metode Bayar</p>
 
         {/* ─ Transfer Bank ─ */}
         <MethodSection title="Transfer Bank" accent="#2563EB">

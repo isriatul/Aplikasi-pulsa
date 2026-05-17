@@ -43,38 +43,38 @@ function LoginForm({ onLogin, onRegister }: { onLogin: (m: Member) => void; onRe
       <div className="w-full anim-scale-in">
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-xl"
-            style={{ background: "linear-gradient(135deg,#1A56DB 0%,#1C3FAA 100%)", boxShadow: "0 0 36px rgba(26,86,219,0.45)" }}>
+            style={{ background: "linear-gradient(135deg,#C81E3A 0%,#9B1835 100%)", boxShadow: "0 0 36px rgba(200,30,58,0.35)" }}>
             <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="1.8">
               <circle cx="12" cy="8" r="4"/><path strokeLinecap="round" d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
             </svg>
           </div>
-          <h2 className="font-black text-2xl text-white mb-1">Portal Member</h2>
-          <p className="text-sm text-white/45 text-center">Masuk untuk akses harga member eksklusif</p>
+          <h2 className="font-black text-2xl text-slate-900 mb-1">Portal Member</h2>
+          <p className="text-sm text-slate-500 text-center">Masuk untuk akses harga member eksklusif</p>
         </div>
 
         <form onSubmit={handleSubmit} className="w-full space-y-4">
           <div>
-            <label className="text-[11px] text-white/40 tracking-widest uppercase font-bold block mb-1.5">Nomor HP</label>
+            <label className="text-[11px] text-slate-500 tracking-widest uppercase font-bold block mb-1.5">Nomor HP</label>
             <input type="tel" inputMode="numeric" value={phone}
               onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
               placeholder="08xxxxxxxxxx"
-              className="w-full px-4 py-3.5 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-white placeholder:text-white/25 focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/25 transition-all"
+              className="w-full px-4 py-3.5 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-ruby/50 focus:ring-1 focus:ring-ruby/20 transition-all"
             />
           </div>
           <div>
-            <label className="text-[11px] text-white/40 tracking-widest uppercase font-bold block mb-1.5">PIN</label>
+            <label className="text-[11px] text-slate-500 tracking-widest uppercase font-bold block mb-1.5">PIN</label>
             <input type="password" inputMode="numeric" value={pin} maxLength={6}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
               placeholder="• • • • • •"
-              className="w-full px-4 py-3.5 rounded-xl text-center text-xl tracking-[0.5em] font-bold bg-white/5 border border-white/10 text-white placeholder:text-white/25 focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/25 transition-all"
+              className="w-full px-4 py-3.5 rounded-xl text-center text-xl tracking-[0.5em] font-bold bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-ruby/50 focus:ring-1 focus:ring-ruby/20 transition-all"
             />
           </div>
           {error && (
-            <div className="flex items-start gap-3 px-4 py-3 rounded-xl border border-red-500/25 bg-red-500/8">
-              <svg width="14" height="14" className="flex-shrink-0 mt-0.5" fill="none" stroke="#F87171" strokeWidth="2" viewBox="0 0 24 24">
+            <div className="flex items-start gap-3 px-4 py-3 rounded-xl border border-red-300 bg-red-50">
+              <svg width="14" height="14" className="flex-shrink-0 mt-0.5" fill="none" stroke="#EF4444" strokeWidth="2" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4M12 16h.01"/>
               </svg>
-              <p className="text-xs text-red-300">{error}</p>
+              <p className="text-xs text-red-600">{error}</p>
             </div>
           )}
           <button type="submit" disabled={loading || !phone || !pin}
@@ -84,8 +84,8 @@ function LoginForm({ onLogin, onRegister }: { onLogin: (m: Member) => void; onRe
         </form>
 
         <div className="mt-6 text-center">
-          <p className="text-sm text-white/40">Belum ada akun member?</p>
-          <button onClick={onRegister} className="mt-1.5 text-sm font-bold text-blue-400 hover:text-blue-300 transition-colors">
+          <p className="text-sm text-slate-500">Belum ada akun member?</p>
+          <button onClick={onRegister} className="mt-1.5 text-sm font-bold text-ruby hover:opacity-80 transition-colors">
             Daftar Sekarang →
           </button>
         </div>
@@ -119,18 +119,18 @@ function RegisterForm({ onSuccess, onBack }: { onSuccess: (m: Member) => void; o
   return (
     <div className="min-h-dvh flex flex-col max-w-md mx-auto px-5 pb-28">
       <div className="py-5 pt-safe">
-        <button onClick={onBack} className="flex items-center gap-2 text-sm text-white/45 mb-5 hover:text-white/70 transition-colors">
+        <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-500 mb-5 hover:text-slate-700 transition-colors">
           <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
           </svg>
           Kembali
         </button>
-        <h2 className="font-black text-2xl text-white mb-1">Daftar Member</h2>
-        <p className="text-sm text-white/40">Dapatkan harga grosir eksklusif</p>
+        <h2 className="font-black text-2xl text-slate-900 mb-1">Daftar Member</h2>
+        <p className="text-sm text-slate-500">Dapatkan harga grosir eksklusif</p>
       </div>
 
-      <div className="surface p-4 mb-5 border border-emerald-500/15">
-        <p className="text-[10px] text-white/35 font-bold uppercase tracking-widest mb-3">Keuntungan Member</p>
+      <div className="surface p-4 mb-5">
+        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-3">Keuntungan Member</p>
         <div className="space-y-2">
           {["Harga grosir lebih murah dari retail","Akses ke harga reseller (hubungi admin)","Prioritas layanan pelanggan"].map((b) => (
             <div key={b} className="flex items-center gap-2.5">
@@ -139,7 +139,7 @@ function RegisterForm({ onSuccess, onBack }: { onSuccess: (m: Member) => void; o
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
                 </svg>
               </div>
-              <p className="text-xs text-white/55">{b}</p>
+              <p className="text-xs text-slate-600">{b}</p>
             </div>
           ))}
         </div>
@@ -152,11 +152,11 @@ function RegisterForm({ onSuccess, onBack }: { onSuccess: (m: Member) => void; o
           { key: "whatsapp", label: "Nomor WhatsApp (opsional)", placeholder: "Sama dengan HP jika kosong", type: "tel" },
         ].map((field) => (
           <div key={field.key}>
-            <label className="text-[11px] text-white/40 tracking-widest uppercase font-bold block mb-1.5">{field.label}</label>
+            <label className="text-[11px] text-slate-500 tracking-widest uppercase font-bold block mb-1.5">{field.label}</label>
             <input type={field.type} value={(form as Record<string, string>)[field.key]}
               onChange={(e) => handleChange(field.key, field.type === "tel" ? e.target.value.replace(/\D/g, "") : e.target.value)}
               placeholder={field.placeholder}
-              className="w-full px-4 py-3.5 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-white placeholder:text-white/25 focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/25 transition-all"
+              className="w-full px-4 py-3.5 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-ruby/50 focus:ring-1 focus:ring-ruby/20 transition-all"
             />
           </div>
         ))}
@@ -164,22 +164,22 @@ function RegisterForm({ onSuccess, onBack }: { onSuccess: (m: Member) => void; o
         <div className="grid grid-cols-2 gap-3">
           {[{key:"pin",label:"PIN (4-6 digit"},{key:"confirmPin",label:"Konfirmasi PIN"}].map((f) => (
             <div key={f.key}>
-              <label className="text-[11px] text-white/40 tracking-widest uppercase font-bold block mb-1.5">{f.label}</label>
+              <label className="text-[11px] text-slate-500 tracking-widest uppercase font-bold block mb-1.5">{f.label}</label>
               <input type="password" inputMode="numeric" value={(form as Record<string,string>)[f.key]} maxLength={6}
                 onChange={(e) => handleChange(f.key, e.target.value.replace(/\D/g, ""))}
                 placeholder="• • • •"
-                className="w-full px-4 py-3.5 rounded-xl text-center text-xl tracking-[0.4em] font-bold bg-white/5 border border-white/10 text-white placeholder:text-white/25 focus:outline-none focus:border-blue-500/60 transition-all"
+                className="w-full px-4 py-3.5 rounded-xl text-center text-xl tracking-[0.4em] font-bold bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-ruby/50 transition-all"
               />
             </div>
           ))}
         </div>
 
         {error && (
-          <div className="flex items-start gap-3 px-4 py-3 rounded-xl border border-red-500/25 bg-red-500/8">
-            <svg width="14" height="14" className="flex-shrink-0 mt-0.5" fill="none" stroke="#F87171" strokeWidth="2" viewBox="0 0 24 24">
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl border border-red-300 bg-red-50">
+            <svg width="14" height="14" className="flex-shrink-0 mt-0.5" fill="none" stroke="#EF4444" strokeWidth="2" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4M12 16h.01"/>
             </svg>
-            <p className="text-xs text-red-300">{error}</p>
+            <p className="text-xs text-red-600">{error}</p>
           </div>
         )}
 
@@ -209,11 +209,11 @@ function Dashboard({ member, onLogout }: { member: Member; onLogout: () => void 
       {/* Header */}
       <div className="py-5 flex items-center justify-between">
         <div>
-          <p className="text-xs text-white/40 font-medium mb-0.5">Portal Member</p>
-          <h1 className="font-black text-xl text-white">Halo, {member.name.split(" ")[0]}! 👋</h1>
+          <p className="text-xs text-slate-500 font-medium mb-0.5">Portal Member</p>
+          <h1 className="font-black text-xl text-slate-900">Halo, {member.name.split(" ")[0]}! 👋</h1>
         </div>
         <button onClick={onLogout}
-          className="px-3.5 py-2 rounded-xl text-xs font-bold border border-white/10 text-white/40 hover:bg-white/6 hover:text-white/65 transition-all">
+          className="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-all">
           Keluar
         </button>
       </div>
@@ -256,7 +256,7 @@ function Dashboard({ member, onLogout }: { member: Member; onLogout: () => void 
 
       {/* Info Akun */}
       <div className="surface p-4 mb-4">
-        <p className="text-[10px] text-white/35 uppercase tracking-widest font-bold mb-3">Informasi Akun</p>
+        <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-3">Informasi Akun</p>
         <div className="space-y-3">
           {[
             { label: "Nama", value: member.name },
@@ -265,26 +265,26 @@ function Dashboard({ member, onLogout }: { member: Member; onLogout: () => void 
             { label: "Bergabung", value: joinDate },
           ].map((item) => (
             <div key={item.label} className="flex justify-between items-center">
-              <span className="text-sm text-white/40">{item.label}</span>
-              <span className="text-sm font-semibold text-white/85">{item.value}</span>
+              <span className="text-sm text-slate-500">{item.label}</span>
+              <span className="text-sm font-semibold text-slate-800">{item.value}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* Keuntungan */}
-      <div className="surface p-4 mb-5 border border-emerald-500/12">
-        <p className="text-[10px] text-white/35 uppercase tracking-widest font-bold mb-3">Keuntungan Anda</p>
-        <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.15)" }}>
+      <div className="surface p-4 mb-5">
+        <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-3">Keuntungan Anda</p>
+        <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)" }}>
           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: "rgba(16,185,129,0.2)" }}>
-            <svg width="18" height="18" fill="none" stroke="#10B981" strokeWidth="2" viewBox="0 0 24 24">
+            style={{ background: "rgba(16,185,129,0.15)" }}>
+            <svg width="18" height="18" fill="none" stroke="#059669" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
           </div>
           <div>
-            <p className="text-sm font-bold text-emerald-300">Harga {TYPE_LABELS[member.type]} Aktif</p>
-            <p className="text-xs text-white/45">Harga lebih murah dari retail untuk semua produk</p>
+            <p className="text-sm font-bold text-emerald-700">Harga {TYPE_LABELS[member.type]} Aktif</p>
+            <p className="text-xs text-slate-500">Harga lebih murah dari retail untuk semua produk</p>
           </div>
         </div>
       </div>
@@ -300,7 +300,7 @@ function Dashboard({ member, onLogout }: { member: Member; onLogout: () => void 
           Hubungi Admin
         </button>
         <button onClick={onLogout}
-          className="w-full py-3.5 rounded-2xl text-sm font-semibold border border-white/10 text-white/40 hover:bg-white/5 hover:text-white/65 transition-all">
+          className="w-full py-3.5 rounded-2xl text-sm font-semibold border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-all">
           Log Keluar
         </button>
       </div>

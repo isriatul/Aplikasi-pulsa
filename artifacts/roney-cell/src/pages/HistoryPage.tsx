@@ -310,7 +310,7 @@ function TransactionsList() {
             className="px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all active:scale-95"
             style={filterStatus === c.val
               ? { background: `linear-gradient(135deg,${statusColor(c.val || "success")},${statusColor(c.val || "success")}99)`, color: "#fff", boxShadow: `0 2px 8px ${statusColor(c.val || "success")}40` }
-              : { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}
+              : { background: "#EEF1F7", border: "1px solid #D8E0ED", color: "#4B5563" }}
           >
             {c.label}
           </button>
@@ -319,14 +319,14 @@ function TransactionsList() {
 
       {/* Search */}
       <div className="relative mb-3">
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Cari nomor / produk / ref…"
-          className="w-full pl-9 pr-3 py-2.5 rounded-xl text-sm bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50"
+          className="w-full pl-9 pr-3 py-2.5 rounded-xl text-sm bg-white border border-slate-200 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-ruby/50"
         />
       </div>
 
@@ -335,7 +335,7 @@ function TransactionsList() {
         {filtered.length === 0 && (
           <div className="py-12 text-center">
             <div className="text-3xl mb-2">📭</div>
-            <p className="text-sm text-white/40">Tidak ada transaksi ditemukan</p>
+            <p className="text-sm text-slate-500">Tidak ada transaksi ditemukan</p>
           </div>
         )}
         {filtered.map((tx) => (
@@ -343,21 +343,21 @@ function TransactionsList() {
             key={tx.id}
             onClick={() => setSelected(tx)}
             className="w-full text-left rounded-xl p-3 transition-all active:scale-[0.98]"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+            style={{ background: "#FFFFFF", border: "1px solid #DDE3EE", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
           >
             <div className="flex items-center gap-3">
               {/* Category icon */}
               <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-                style={{ background: "rgba(255,255,255,0.06)" }}>
+                style={{ background: "#EEF1F7" }}>
                 {categoryIcon(tx.category)}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-bold text-sm text-white truncate">{tx.productCode}</span>
-                  <span className="font-black text-sm text-amber-400 shrink-0">{formatRp(tx.sellingPrice)}</span>
+                  <span className="font-bold text-sm text-slate-800 truncate">{tx.productCode}</span>
+                  <span className="font-black text-sm text-amber-500 shrink-0">{formatRp(tx.sellingPrice)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2 mt-0.5">
-                  <span className="text-xs text-white/40 font-mono truncate">{tx.customerNo}</span>
+                  <span className="text-xs text-slate-500 font-mono truncate">{tx.customerNo}</span>
                   <span
                     className="text-[10px] font-black px-2 py-0.5 rounded-full shrink-0"
                     style={{ background: statusBg(tx.status), color: statusColor(tx.status) }}
@@ -365,9 +365,9 @@ function TransactionsList() {
                     {statusLabel(tx.status)}
                   </span>
                 </div>
-                <div className="text-[10px] text-white/30 mt-0.5">{fmtDateShort(tx.createdAt)}</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">{fmtDateShort(tx.createdAt)}</div>
               </div>
-              <svg className="w-4 h-4 text-white/20 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </div>
@@ -380,13 +380,13 @@ function TransactionsList() {
         <button
           disabled={page <= 1}
           onClick={() => setPage((p) => p - 1)}
-          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 text-white disabled:opacity-30"
+          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-200 disabled:opacity-30"
         >← Prev</button>
-        <span className="text-xs text-white/40">Hal. {page}</span>
+        <span className="text-xs text-slate-500">Hal. {page}</span>
         <button
           disabled={!hasMore}
           onClick={() => setPage((p) => p + 1)}
-          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 text-white disabled:opacity-30"
+          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-200 disabled:opacity-30"
         >Next →</button>
       </div>
 
@@ -448,8 +448,8 @@ function DepositsList() {
             onClick={() => setFilterStatus(c.val)}
             className="px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all active:scale-95"
             style={filterStatus === c.val
-              ? { background: "linear-gradient(135deg,#1A56DB,#3B82F6)", color: "#fff", boxShadow: "0 2px 8px rgba(26,86,219,0.4)" }
-              : { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}
+              ? { background: "linear-gradient(135deg,#C81E3A,#9B1835)", color: "#fff", boxShadow: "0 2px 8px rgba(200,30,58,0.35)" }
+              : { background: "#EEF1F7", border: "1px solid #D8E0ED", color: "#4B5563" }}
           >
             {c.label}
           </button>
@@ -461,7 +461,7 @@ function DepositsList() {
         {filtered.length === 0 && (
           <div className="py-12 text-center">
             <div className="text-3xl mb-2">📭</div>
-            <p className="text-sm text-white/40">Tidak ada deposit ditemukan</p>
+            <p className="text-sm text-slate-500">Tidak ada deposit ditemukan</p>
           </div>
         )}
         {filtered.map((dep) => (
@@ -470,18 +470,19 @@ function DepositsList() {
             onClick={() => setSelected(dep)}
             className="w-full text-left rounded-xl p-3 transition-all active:scale-[0.98]"
             style={{
-              background: dep.status === "paid" ? "rgba(59,130,246,0.06)" : "rgba(255,255,255,0.04)",
-              border: `1px solid ${dep.status === "paid" ? "rgba(59,130,246,0.3)" : "rgba(255,255,255,0.08)"}`,
+              background: dep.status === "paid" ? "rgba(59,130,246,0.06)" : "#FFFFFF",
+              border: `1px solid ${dep.status === "paid" ? "rgba(59,130,246,0.25)" : "#DDE3EE"}`,
+              boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
             }}
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-                style={{ background: "rgba(255,255,255,0.06)" }}>
+                style={{ background: "#EEF1F7" }}>
                 💰
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-black text-sm text-emerald-400">{formatRp(dep.totalAmount)}</span>
+                  <span className="font-black text-sm text-emerald-600">{formatRp(dep.totalAmount)}</span>
                   <span
                     className="text-[10px] font-black px-2 py-0.5 rounded-full shrink-0"
                     style={{ background: statusBg(dep.status), color: statusColor(dep.status) }}
@@ -490,20 +491,20 @@ function DepositsList() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2 mt-0.5">
-                  <span className="text-xs text-white/50 uppercase font-semibold">{dep.method}</span>
+                  <span className="text-xs text-slate-500 uppercase font-semibold">{dep.method}</span>
                   {dep.uniqueCode > 0 && (
-                    <span className="text-[10px] text-amber-400/70 font-mono">+{dep.uniqueCode} unik</span>
+                    <span className="text-[10px] text-amber-500 font-mono">+{dep.uniqueCode} unik</span>
                   )}
                 </div>
-                <div className="text-[10px] text-white/30 mt-0.5">{fmtDateShort(dep.createdAt)}</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">{fmtDateShort(dep.createdAt)}</div>
               </div>
-              <svg className="w-4 h-4 text-white/20 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </div>
             {dep.status === "paid" && (
-              <div className="mt-2 px-3 py-1.5 rounded-lg text-xs font-bold text-blue-300 text-center"
-                style={{ background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.2)" }}>
+              <div className="mt-2 px-3 py-1.5 rounded-lg text-xs font-bold text-blue-600 text-center"
+                style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.2)" }}>
                 📸 Bukti diterima — menunggu konfirmasi admin
               </div>
             )}
@@ -516,13 +517,13 @@ function DepositsList() {
         <button
           disabled={page <= 1}
           onClick={() => setPage((p) => p - 1)}
-          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 text-white disabled:opacity-30"
+          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-200 disabled:opacity-30"
         >← Prev</button>
-        <span className="text-xs text-white/40">Hal. {page}</span>
+        <span className="text-xs text-slate-500">Hal. {page}</span>
         <button
           disabled={!hasMore}
           onClick={() => setPage((p) => p + 1)}
-          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 text-white disabled:opacity-30"
+          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-200 disabled:opacity-30"
         >Next →</button>
       </div>
 
@@ -567,7 +568,7 @@ function MutationsList() {
         {mutations.length === 0 && (
           <div className="py-12 text-center">
             <div className="text-3xl mb-2">📊</div>
-            <p className="text-sm text-white/40">Belum ada mutasi saldo</p>
+            <p className="text-sm text-slate-500">Belum ada mutasi saldo</p>
           </div>
         )}
         {mutations.map((m) => {
@@ -577,41 +578,42 @@ function MutationsList() {
               key={m.id}
               className="rounded-xl p-3"
               style={{
-                background: isCredit ? "rgba(16,185,129,0.05)" : "rgba(239,68,68,0.05)",
-                border: `1px solid ${isCredit ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)"}`,
+                background: "#FFFFFF",
+                border: `1px solid ${isCredit ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}`,
+                boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
               }}
             >
               <div className="flex items-center gap-3">
                 <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-base font-black"
                   style={{
-                    background: isCredit ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)",
-                    color: isCredit ? "#10B981" : "#EF4444",
+                    background: isCredit ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)",
+                    color: isCredit ? "#059669" : "#DC2626",
                   }}
                 >
                   {isCredit ? "+" : "−"}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold text-sm text-white">{mutationLabel(m.type)}</span>
+                    <span className="font-bold text-sm text-slate-800">{mutationLabel(m.type)}</span>
                     <span
                       className="font-black text-sm shrink-0"
-                      style={{ color: isCredit ? "#10B981" : "#EF4444" }}
+                      style={{ color: isCredit ? "#059669" : "#DC2626" }}
                     >
                       {isCredit ? "+" : "−"}{formatRp(Math.abs(m.amount))}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2 mt-0.5">
-                    <span className="text-[10px] text-white/40 truncate">
+                    <span className="text-[10px] text-slate-500 truncate">
                       {m.note ?? m.refId ?? "—"}
                     </span>
-                    <span className="text-[10px] text-white/50 font-mono shrink-0">{formatRp(m.balanceAfter)}</span>
+                    <span className="text-[10px] text-slate-500 font-mono shrink-0">{formatRp(m.balanceAfter)}</span>
                   </div>
-                  <div className="text-[10px] text-white/25 mt-0.5">{fmtDateShort(m.createdAt)}</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">{fmtDateShort(m.createdAt)}</div>
                 </div>
               </div>
               {/* Balance flow bar */}
-              <div className="mt-2 flex items-center gap-2 text-[10px] text-white/30">
+              <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-400">
                 <span className="font-mono">{formatRp(m.balanceBefore)}</span>
                 <div className="flex-1 h-px" style={{ background: isCredit ? "rgba(16,185,129,0.3)" : "rgba(239,68,68,0.3)" }} />
                 <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -631,13 +633,13 @@ function MutationsList() {
         <button
           disabled={page <= 1}
           onClick={() => setPage((p) => p - 1)}
-          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 text-white disabled:opacity-30"
+          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-200 disabled:opacity-30"
         >← Prev</button>
-        <span className="text-xs text-white/40">Hal. {page}</span>
+        <span className="text-xs text-slate-500">Hal. {page}</span>
         <button
           disabled={!hasMore}
           onClick={() => setPage((p) => p + 1)}
-          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 text-white disabled:opacity-30"
+          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-200 disabled:opacity-30"
         >Next →</button>
       </div>
     </>
@@ -677,10 +679,10 @@ export default function HistoryPage() {
     <div className="min-h-dvh pb-24">
       {/* Sticky header */}
       <div className="sticky top-0 z-20"
-        style={{ background: "linear-gradient(180deg, rgba(11,15,26,1) 85%, rgba(11,15,26,0) 100%)" }}>
+        style={{ background: "linear-gradient(160deg, #C81E3A 0%, #9B1835 100%)", boxShadow: "0 4px 20px rgba(155,24,53,0.3)" }}>
         <div className="px-4 pt-safe-top pt-4 pb-2">
           <h1 className="text-xl font-black text-white">Riwayat</h1>
-          <p className="text-xs text-white/40 mt-0.5">Transaksi, deposit &amp; mutasi saldo</p>
+          <p className="text-xs text-white/75 mt-0.5">Transaksi, deposit &amp; mutasi saldo</p>
         </div>
         {/* Tab selector */}
         <div className="flex px-4 pb-3 gap-2">
@@ -690,8 +692,8 @@ export default function HistoryPage() {
               onClick={() => setTab(t.id)}
               className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95"
               style={tab === t.id
-                ? { background: "linear-gradient(135deg,#1A56DB,#3B82F6)", color: "#fff", boxShadow: "0 2px 12px rgba(26,86,219,0.35)" }
-                : { background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.45)", border: "1px solid rgba(255,255,255,0.09)" }}
+                ? { background: "rgba(255,255,255,0.28)", color: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }
+                : { background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.72)", border: "1px solid rgba(255,255,255,0.18)" }}
             >
               <span>{t.icon}</span>
               <span>{t.label}</span>
