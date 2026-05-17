@@ -21,6 +21,74 @@ const BCA_INFO = {
   atasNama: "Isriatul Bahroni",
 };
 
+/* Info Virtual Account DANA */
+const VA_DANA_INFO = {
+  noVA: "88810081288080752",
+  bank: "Permata / DANA",
+  atasNama: "Isriatul Bahroni",
+};
+
+/* Info DANA untuk Alfamart / Indomaret */
+const DANA_ALFAMART = "081288080752";
+
+/* ─── Logo komponen tiap metode ─── */
+function LogoDANA({ size = 36 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+      <rect width="36" height="36" rx="10" fill="#108EE9"/>
+      <text x="18" y="23" textAnchor="middle" fontSize="9" fontWeight="900" fill="white" fontFamily="Arial,sans-serif">DANA</text>
+    </svg>
+  );
+}
+
+function LogoBCA({ size = 36 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+      <rect width="36" height="36" rx="10" fill="#005DAA"/>
+      <text x="18" y="23" textAnchor="middle" fontSize="10" fontWeight="900" fill="white" fontFamily="Arial,sans-serif">BCA</text>
+    </svg>
+  );
+}
+
+function LogoPermata({ size = 36 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+      <rect width="36" height="36" rx="10" fill="#00529B"/>
+      <text x="18" y="16" textAnchor="middle" fontSize="6.5" fontWeight="800" fill="white" fontFamily="Arial,sans-serif">BANK</text>
+      <text x="18" y="26" textAnchor="middle" fontSize="7" fontWeight="900" fill="#F5C518" fontFamily="Arial,sans-serif">PERMATA</text>
+    </svg>
+  );
+}
+
+function LogoAlfamart({ size = 36 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+      <rect width="36" height="36" rx="10" fill="#E31E24"/>
+      <text x="18" y="16" textAnchor="middle" fontSize="5.5" fontWeight="800" fill="white" fontFamily="Arial,sans-serif">alfa</text>
+      <text x="18" y="25" textAnchor="middle" fontSize="5" fontWeight="700" fill="white" fontFamily="Arial,sans-serif">mart</text>
+    </svg>
+  );
+}
+
+function LogoIndomaret({ size = 36 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+      <rect width="36" height="36" rx="10" fill="#003F8A"/>
+      <text x="18" y="15" textAnchor="middle" fontSize="5.5" fontWeight="800" fill="#FFCE00" fontFamily="Arial,sans-serif">indo</text>
+      <text x="18" y="24" textAnchor="middle" fontSize="5" fontWeight="700" fill="white" fontFamily="Arial,sans-serif">maret</text>
+    </svg>
+  );
+}
+
+function LogoWA({ size = 36 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+      <rect width="36" height="36" rx="10" fill="#25D366"/>
+      <path d="M18 8C12.477 8 8 12.477 8 18c0 1.84.498 3.562 1.365 5.044L8 28l5.098-1.34A9.953 9.953 0 0018 28c5.523 0 10-4.477 10-10S23.523 8 18 8zm0 18a7.963 7.963 0 01-4.066-1.114l-.292-.173-3.023.795.808-2.954-.19-.304A7.963 7.963 0 0110 18c0-4.411 3.589-8 8-8s8 3.589 8 8-3.589 8-8 8zm4.39-5.956c-.24-.12-1.42-.702-1.64-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1.014-.374-1.931-1.19-.714-.636-1.196-1.422-1.336-1.662-.14-.24-.016-.37.105-.49.108-.107.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.3-.74-1.78-.195-.468-.394-.404-.54-.412l-.46-.008c-.16 0-.42.06-.64.3-.22.24-.84.82-.84 2s.86 2.32.98 2.48c.12.16 1.694 2.587 4.107 3.628.574.248 1.022.396 1.37.507.576.183 1.1.157 1.514.095.462-.069 1.42-.582 1.62-1.144.2-.562.2-1.044.14-1.144-.058-.1-.218-.16-.46-.28z" fill="white"/>
+    </svg>
+  );
+}
+
 const PRESET_AMOUNTS = [50_000, 100_000, 200_000, 500_000, 1_000_000, 2_000_000];
 
 /* ─── Helper: format rupiah ringkas ─── */
@@ -359,6 +427,139 @@ function PaymentInstructions({
         </div>
       )}
 
+      {/* Instruksi Virtual Account DANA */}
+      {!isExpired && deposit.status === "pending" && deposit.method === "va_dana" && (
+        <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(16,142,233,0.35)", background: "rgba(16,142,233,0.04)" }}>
+          <div className="px-4 py-3 text-center" style={{ background: "linear-gradient(135deg, rgba(16,142,233,0.2), rgba(0,82,155,0.2))", borderBottom: "1px solid rgba(16,142,233,0.2)" }}>
+            <p className="text-xs font-black tracking-widest uppercase text-blue-300 mb-0.5">Virtual Account DANA</p>
+            <p className="text-base font-black text-white leading-snug">
+              TRANSFER KE NO. VA BERIKUT<br />
+              <span style={{ color: "#FBBF24" }}>TEPAT NOMINAL + KODE UNIK</span>
+            </p>
+          </div>
+          <div className="px-4 py-4 space-y-3">
+            {/* Info VA */}
+            <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(16,142,233,0.25)", background: "rgba(16,142,233,0.06)" }}>
+              <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid rgba(16,142,233,0.15)", background: "rgba(16,142,233,0.1)" }}>
+                <LogoDANA size={34} />
+                <LogoPermata size={34} />
+                <div className="ml-1">
+                  <p className="text-xs font-black text-white">Virtual Account DANA</p>
+                  <p className="text-[10px] text-blue-300/80">via Bank Permata</p>
+                </div>
+              </div>
+              <div className="px-4 py-3 space-y-3">
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Nomor Virtual Account</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-lg font-black text-white tracking-wider">{VA_DANA_INFO.noVA}</p>
+                    <CopyBtn text={VA_DANA_INFO.noVA} />
+                  </div>
+                </div>
+                <div className="h-px bg-white/8" />
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Atas Nama</span>
+                  <span className="font-semibold text-white">{VA_DANA_INFO.atasNama}</span>
+                </div>
+              </div>
+            </div>
+            {/* Nominal */}
+            <div className="rounded-xl px-4 py-3 space-y-2" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)" }}>
+              <p className="text-xs font-black text-red-300 uppercase tracking-wider">⚠️ Transfer TEPAT nominal ini</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-2xl font-black text-white">{rp(totalAmount)}</p>
+                <CopyBtn text={String(totalAmount)} />
+              </div>
+              <p className="text-xs text-red-300/80">Nominal berbeda = tidak terdeteksi otomatis</p>
+            </div>
+            {/* Langkah */}
+            <div className="space-y-2">
+              {[
+                { no: "1", text: "Buka m-banking atau ATM bank manapun (BCA, BNI, Mandiri, dll)" },
+                { no: "2", text: `Pilih Transfer → Virtual Account → masukkan ${VA_DANA_INFO.noVA}` },
+                { no: "3", text: `Masukkan nominal TEPAT ${rp(totalAmount)} (sudah termasuk kode unik)` },
+                { no: "4", text: "Konfirmasi nama penerima: " + VA_DANA_INFO.atasNama },
+                { no: "5", text: "Screenshot / cetak struk bukti transfer" },
+                { no: "6", text: "Upload struk di bawah → saldo otomatis masuk ⚡" },
+              ].map((s) => (
+                <div key={s.no} className="flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs font-black mt-0.5"
+                    style={{ background: "rgba(16,142,233,0.25)", color: "#60A5FA" }}>{s.no}</div>
+                  <p className="text-xs text-white/70 leading-relaxed">{s.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Instruksi Alfamart / Indomaret */}
+      {!isExpired && deposit.status === "pending" && deposit.method === "alfamart" && (
+        <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(227,30,36,0.35)", background: "rgba(227,30,36,0.04)" }}>
+          <div className="px-4 py-3 text-center" style={{ background: "linear-gradient(135deg, rgba(227,30,36,0.2), rgba(0,63,138,0.2))", borderBottom: "1px solid rgba(227,30,36,0.2)" }}>
+            <p className="text-xs font-black tracking-widest uppercase text-red-300 mb-0.5">Alfamart / Indomaret</p>
+            <p className="text-base font-black text-white leading-snug">
+              BAYAR DI KASIR<br />
+              <span style={{ color: "#FBBF24" }}>UPLOAD STRUK FISIK</span>
+            </p>
+          </div>
+          <div className="px-4 py-4 space-y-3">
+            {/* Logo minimarket */}
+            <div className="flex items-center gap-3 rounded-xl px-4 py-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <LogoAlfamart size={38} />
+              <LogoIndomaret size={38} />
+              <div className="ml-1">
+                <p className="text-xs font-black text-white">Alfamart & Indomaret</p>
+                <p className="text-[10px] text-muted-foreground">Bayar melalui DANA di kasir</p>
+              </div>
+            </div>
+
+            {/* Info DANA untuk kasir */}
+            <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(16,142,233,0.3)", background: "rgba(16,142,233,0.06)" }}>
+              <div className="px-4 py-2 flex items-center gap-2" style={{ background: "rgba(16,142,233,0.12)", borderBottom: "1px solid rgba(16,142,233,0.15)" }}>
+                <LogoDANA size={22} />
+                <p className="text-xs font-black text-blue-300">Nomor DANA untuk disebutkan ke kasir</p>
+              </div>
+              <div className="px-4 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-2xl font-black text-white tracking-widest">{DANA_ALFAMART}</p>
+                  <CopyBtn text={DANA_ALFAMART} />
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">a.n. Isriatul Bahroni</p>
+              </div>
+            </div>
+
+            {/* Nominal */}
+            <div className="rounded-xl px-4 py-3 space-y-2" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)" }}>
+              <p className="text-xs font-black text-red-300 uppercase tracking-wider">⚠️ Sebutkan nominal TEPAT ini ke kasir</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-2xl font-black text-white">{rp(totalAmount)}</p>
+                <CopyBtn text={String(totalAmount)} />
+              </div>
+              <p className="text-xs text-red-300/80">Nominal berbeda = tidak terdeteksi otomatis</p>
+            </div>
+
+            {/* Langkah */}
+            <div className="space-y-2">
+              {[
+                { no: "1", text: "Pergi ke Alfamart atau Indomaret terdekat" },
+                { no: "2", text: `Ke kasir: "Mau kirim DANA ke nomor ${DANA_ALFAMART}"` },
+                { no: "3", text: `Sebutkan nominal TEPAT ${rp(totalAmount)} (termasuk kode unik)` },
+                { no: "4", text: "Bayar tunai ke kasir dan minta struk" },
+                { no: "5", text: "Foto / scan struk fisik dari kasir" },
+                { no: "6", text: "Upload foto struk di bawah → saldo otomatis masuk ⚡" },
+              ].map((s) => (
+                <div key={s.no} className="flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs font-black mt-0.5"
+                    style={{ background: "rgba(227,30,36,0.25)", color: "#F87171" }}>{s.no}</div>
+                  <p className="text-xs text-white/70 leading-relaxed">{s.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Instruksi Manual/WA */}
       {!isExpired && deposit.status === "pending" && deposit.method === "manual" && (
         <div className="rounded-2xl px-4 py-4 space-y-2" style={{ border: "1px solid rgba(16,185,129,0.3)", background: "rgba(16,185,129,0.04)" }}>
@@ -521,7 +722,7 @@ function NewDepositForm({
 }) {
   const [amount, setAmount] = useState("");
   const [preset, setPreset] = useState<number | null>(null);
-  const [method, setMethod] = useState<"qris" | "transfer" | "manual">("qris");
+  const [method, setMethod] = useState<"qris" | "transfer" | "va_dana" | "alfamart" | "manual">("qris");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -578,30 +779,74 @@ function NewDepositForm({
       <div className="rounded-2xl p-5 space-y-3" style={{ border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>
         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Metode Bayar</p>
         <div className="space-y-2">
-          {([
-            { v: "qris",     label: "QRIS DANA Bisnis",          sub: "GoPay · OVO · DANA · ShopeePay", color: "#A855F7" },
-            { v: "transfer", label: "Transfer Bank BCA",         sub: "No. Rek 7255211277 · a.n. Isriatul Bahroni", color: "#3B82F6" },
-            { v: "manual",   label: "Manual (konfirmasi WA)",    sub: "Hubungi admin langsung",          color: "#10B981" },
-          ] as const).map((m) => (
+          {/* QRIS DANA */}
+          {([ 
+            {
+              v: "qris" as const,
+              label: "QRIS DANA Bisnis",
+              sub: "GoPay · OVO · DANA · ShopeePay",
+              color: "#108EE9",
+              logo: <LogoDANA size={36} />,
+            },
+            {
+              v: "transfer" as const,
+              label: "Transfer Bank BCA",
+              sub: "No. Rek 7255211277 · a.n. Isriatul Bahroni",
+              color: "#005DAA",
+              logo: <LogoBCA size={36} />,
+            },
+            {
+              v: "va_dana" as const,
+              label: "Virtual Account DANA",
+              sub: "VA 88810081288080752 · Bank Permata",
+              color: "#108EE9",
+              logo: (
+                <div className="flex gap-1">
+                  <LogoDANA size={28} />
+                  <LogoPermata size={28} />
+                </div>
+              ),
+            },
+            {
+              v: "alfamart" as const,
+              label: "Alfamart / Indomaret",
+              sub: "Bayar di kasir · Upload struk fisik",
+              color: "#E31E24",
+              logo: (
+                <div className="flex gap-1">
+                  <LogoAlfamart size={28} />
+                  <LogoIndomaret size={28} />
+                </div>
+              ),
+            },
+            {
+              v: "manual" as const,
+              label: "Konfirmasi via WhatsApp",
+              sub: "Hubungi admin langsung",
+              color: "#25D366",
+              logo: <LogoWA size={36} />,
+            },
+          ]).map((m) => (
             <button key={m.v} onClick={() => setMethod(m.v)}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all"
+              className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all"
               style={method === m.v
-                ? { background: `${m.color}18`, border: `1px solid ${m.color}40` }
+                ? { background: `${m.color}15`, border: `1px solid ${m.color}50` }
                 : { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                style={{ background: `${m.color}20` }}>
-                <div className="w-2 h-2 rounded-full transition-all"
-                  style={{ background: method === m.v ? m.color : "rgba(255,255,255,0.2)" }} />
-              </div>
+              <div className="shrink-0 flex items-center">{m.logo}</div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white">{m.label}</p>
-                <p className="text-xs text-muted-foreground">{m.sub}</p>
+                <p className="text-sm font-semibold text-white leading-tight">{m.label}</p>
+                <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">{m.sub}</p>
               </div>
-              {method === m.v && (
-                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: m.color }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
+              <div className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center border-2 transition-all"
+                style={method === m.v
+                  ? { borderColor: m.color, background: m.color }
+                  : { borderColor: "rgba(255,255,255,0.2)", background: "transparent" }}>
+                {method === m.v && (
+                  <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none">
+                    <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </div>
             </button>
           ))}
         </div>
