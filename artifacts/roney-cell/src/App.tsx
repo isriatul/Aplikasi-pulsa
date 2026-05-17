@@ -103,7 +103,7 @@ export default function App() {
   return (
     <div className="min-h-dvh">
       <div style={{ display: activeTab === "home" ? "block" : "none" }}>
-        <Home member={member!} onMemberUpdate={handleMemberUpdate} />
+        <Home member={member!} onMemberUpdate={handleMemberUpdate} onNavigate={setActiveTab} />
       </div>
       <div style={{ display: activeTab === "deposit" ? "block" : "none" }}>
         <DepositPage />

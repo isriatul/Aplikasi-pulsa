@@ -1,6 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import BalanceCard from "@/components/BalanceCard";
-import MutationHistoryPanel from "@/components/MutationHistoryPanel";
 import PhoneInput from "@/components/PhoneInput";
 import TransactionModal from "@/components/TransactionModal";
 import TransactionPinModal from "@/components/TransactionPinModal";
@@ -23,19 +21,59 @@ import { Member, TYPE_LABELS, TYPE_COLORS } from "@/lib/members";
 import { t, getLang, setLang, Lang } from "@/lib/i18n";
 
 type ModalPhase = "quick" | "pin" | "confirm" | "loading" | "success" | "failed" | "insufficient" | null;
+type SubTab = "transaksi" | "menu" | "history";
+
+const ADMIN_WA = "6281288080752";
 
 interface HomeProps {
   member: Member;
   onMemberUpdate: (updated: Member) => void;
+  onNavigate: (tab: "deposit" | "history" | "member" | "admin") => void;
 }
 
-const MENU_ITEMS: ProductCategory[] = [
-  "pulsa", "data", "pln", "pascabayar",
-  "game", "ewallet", "tv", "voucher", "intl",
+/* ─── Product grid items ─── */
+interface GridItem { key: string; label: string; icon: string; cat: ProductCategory; color: string; }
+
+const MAIN_GRID: GridItem[] = [
+  { key: "pulsa",    label: "Pulsa",       icon: "📱", cat: "pulsa",      color: "#3B82F6" },
+  { key: "data",     label: "Paket Data",  icon: "📡", cat: "data",       color: "#10B981" },
+  { key: "pln",      label: "Token PLN",   icon: "⚡", cat: "pln",        color: "#F59E0B" },
+  { key: "ewallet",  label: "E-Wallet",    icon: "💳", cat: "ewallet",    color: "#8B5CF6" },
+  { key: "pasca1",   label: "Telp & SMS",  icon: "☎️", cat: "pascabayar", color: "#EC4899" },
+  { key: "voucher",  label: "Voucher",     icon: "🎟️", cat: "voucher",    color: "#F97316" },
+  { key: "tv",       label: "TV Prabayar", icon: "📺", cat: "tv",         color: "#06B6D4" },
+  { key: "game",     label: "Game",        icon: "🎮", cat: "game",       color: "#7C3AED" },
+  { key: "intl",     label: "Internasional", icon: "🌍", cat: "intl",     color: "#0EA5E9" },
+  { key: "pasca2",   label: "HP Pascabayar", icon: "📲", cat: "pascabayar", color: "#F43F5E" },
+  { key: "hiburan",  label: "Hiburan",     icon: "🎵", cat: "game",       color: "#A78BFA" },
+  { key: "lainlain", label: "Lain-Lain",   icon: "⚙️", cat: "voucher",    color: "#6B7280" },
 ];
 
-/* Popular products for "before phone entered" preview */
+const VOUCHER_GRID: GridItem[] = [
+  { key: "axis",    label: "Axis",       icon: "🅰",  cat: "pulsa",   color: "#DC2626" },
+  { key: "xl",      label: "XL",         icon: "✖",  cat: "data",    color: "#1D4ED8" },
+  { key: "indosat", label: "Indosat",    icon: "🔴", cat: "data",    color: "#FF4500" },
+  { key: "tri",     label: "Tri 3",      icon: "3️⃣", cat: "pulsa",   color: "#1E3A5F" },
+  { key: "tsel",    label: "Telkomsel",  icon: "🔴", cat: "pulsa",   color: "#CC0000" },
+  { key: "smartfren",label:"Smartfren", icon: "🌐", cat: "data",    color: "#7C3AED" },
+  { key: "perdana", label: "Perdana SP", icon: "📋", cat: "voucher", color: "#059669" },
+  { key: "cek-v",   label: "Cek Voucher",icon: "🔍", cat: "voucher", color: "#D97706" },
+];
+
+const TAGIHAN_GRID: GridItem[] = [
+  { key: "pln-t",   label: "Tagihan PLN",   icon: "⚡", cat: "pascabayar", color: "#F59E0B" },
+  { key: "telkom",  label: "Telkom",         icon: "☎️", cat: "pascabayar", color: "#3B82F6" },
+  { key: "pdam",    label: "PDAM",           icon: "💧", cat: "pascabayar", color: "#06B6D4" },
+  { key: "bpjs",    label: "BPJS",           icon: "🏥", cat: "pascabayar", color: "#10B981" },
+  { key: "tv-k",    label: "TV & Internet",  icon: "📺", cat: "tv",         color: "#8B5CF6" },
+  { key: "hp-p",    label: "HP Pasca",       icon: "📱", cat: "pascabayar", color: "#EC4899" },
+  { key: "angsuran",label: "Angsuran",       icon: "💰", cat: "pascabayar", color: "#F97316" },
+  { key: "lainnya", label: "Lainnya",        icon: "📋", cat: "pascabayar", color: "#6B7280" },
+];
+
+/* ─── Popular products ─── */
 const BADGE_ORDER = ["TERLARIS", "HOT", "POPULAR", "MURAH", "HEMAT"];
+
 function getPopularProducts(category: ProductCategory, memberType: MemberType): Product[] {
   const all = getProductsByCategory(category, memberType);
   const withBadge = all.filter((p) => p.badge && BADGE_ORDER.includes(p.badge));
@@ -43,23 +81,14 @@ function getPopularProducts(category: ProductCategory, memberType: MemberType): 
   return all.slice(0, 8);
 }
 
-function getSmartProducts(
-  category: ProductCategory,
-  countryCode: string,
-  memberType: MemberType,
-  phone: string
-): Product[] {
+function getSmartProducts(category: ProductCategory, countryCode: string, memberType: MemberType, phone: string): Product[] {
   const countryInfo = getCountryInfo(countryCode);
   const isIndonesian = countryCode === "+62";
-
-  /* Pulsa → when international selected, show intl products for that country */
   if (category === "pulsa" && !isIndonesian) {
     const intlAll = getProductsByCategory("intl", memberType);
     const filtered = intlAll.filter((p) => getProductCountryCode(p.id) === countryInfo.code);
-    return filtered.length > 0 ? filtered : intlAll; /* fallback to all intl */
+    return filtered.length > 0 ? filtered : intlAll;
   }
-
-  /* Intl → filter by selected country if phone entered */
   if (category === "intl") {
     const intlAll = getProductsByCategory("intl", memberType);
     if (phone.length >= 3 && !isIndonesian) {
@@ -68,7 +97,6 @@ function getSmartProducts(
     }
     return intlAll;
   }
-
   return getProductsByCategory(category, memberType);
 }
 
@@ -80,68 +108,85 @@ function isPhoneReady(phone: string, category: ProductCategory, countryCode: str
   if (category === "intl") return digits.length >= 5;
   const op = detectOperator(digits);
   switch (category) {
-    case "pulsa":
-    case "data":
-      return op !== null || digits.length >= 11;
-    case "pln":
-    case "pascabayar":
-    case "tv":
-      return digits.length >= 11;
-    case "game":
-      return digits.length >= 6;
-    case "ewallet":
-      return op !== null || digits.length >= 10;
-    case "voucher":
-      return digits.length >= 4;
-    default:
-      return digits.length >= 9;
+    case "pulsa": case "data": return op !== null || digits.length >= 11;
+    case "pln": case "pascabayar": case "tv": return digits.length >= 11;
+    case "game": return digits.length >= 6;
+    case "ewallet": return op !== null || digits.length >= 10;
+    case "voucher": return digits.length >= 4;
+    default: return digits.length >= 9;
   }
 }
 
 function classifyFailure(msg: string): "number_invalid" | "other" {
   const l = msg.toLowerCase();
   if (l.includes("nomor") || l.includes("tidak aktif") || l.includes("salah") ||
-      l.includes("invalid") || l.includes("wrong") || l.includes("tujuan") ||
-      l.includes("number") || l.includes("destination"))
-    return "number_invalid";
+    l.includes("invalid") || l.includes("wrong") || l.includes("tujuan") ||
+    l.includes("number") || l.includes("destination")) return "number_invalid";
   return "other";
 }
 
-/* Top 6 trending across all categories for the home banner */
 function getTrendingProducts(memberType: MemberType): Product[] {
-  const pinned = ["tsel50", "pln100", "xl20", "d5gb", "ml172", "gopay50", "isat20", "sa-stc10", "my-maxis10", "d10gb"];
+  const pinned = ["tsel50", "pln100", "xl20", "d5gb", "ml172", "gopay50"];
   return ALL_PRODUCTS
     .filter((p) => pinned.includes(p.id))
     .map((p) => getProductsByCategory(p.category, memberType).find((x) => x.id === p.id) ?? p)
     .slice(0, 6);
 }
 
-export default function Home({ member, onMemberUpdate }: HomeProps) {
-  const [phone, setPhone]                   = useState("");
-  const [countryCode, setCountryCode]       = useState("+62");
+/* ─── Grid Icon ─── */
+function GridIcon({ item, onPress }: { item: GridItem; onPress: (cat: ProductCategory) => void }) {
+  return (
+    <button
+      onClick={() => onPress(item.cat)}
+      className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform"
+    >
+      <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl"
+        style={{ background: `${item.color}18`, border: `1.5px solid ${item.color}30` }}>
+        {item.icon}
+      </div>
+      <span className="text-[10px] font-semibold text-center leading-tight w-14"
+        style={{ color: "rgba(255,255,255,0.70)" }}>
+        {item.label}
+      </span>
+    </button>
+  );
+}
+
+/* ─── Section header ─── */
+function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div className="px-4 pt-5 pb-3">
+      <h2 className="font-black text-base" style={{ color: "rgba(255,255,255,0.9)" }}>{title}</h2>
+      {subtitle && <p className="text-xs mt-0.5" style={{ color: "#1A56DB" }}>{subtitle}</p>}
+    </div>
+  );
+}
+
+/* ─── Main component ─── */
+export default function Home({ member, onMemberUpdate, onNavigate }: HomeProps) {
+  const [phone, setPhone]             = useState("");
+  const [countryCode, setCountryCode] = useState("+62");
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | null>(null);
   const [selectedProduct, setSelectedProduct]   = useState<Product | null>(null);
-  const [storeBalance, setStoreBalance]     = useState(0);
-  const [memberBalance, setMemberBalance]   = useState(member.balance ?? 0);
-  const [modalPhase, setModalPhase]         = useState<ModalPhase>(null);
-  const [errorMessage, setErrorMessage]     = useState("");
-  const [failureType, setFailureType]       = useState<"number_invalid" | "other">("other");
-  const [lastRefId, setLastRefId]           = useState("");
-  const [showHelp, setShowHelp]             = useState(false);
-  const [lang, setLangState]               = useState<Lang>(getLang());
+  const [memberBalance, setMemberBalance] = useState(member.balance ?? 0);
+  const [modalPhase, setModalPhase]   = useState<ModalPhase>(null);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [failureType, setFailureType] = useState<"number_invalid" | "other">("other");
+  const [lastRefId, setLastRefId]     = useState("");
+  const [showHelp, setShowHelp]       = useState(false);
+  const [lang, setLangState]          = useState<Lang>(getLang());
+  const [subTab, setSubTab]           = useState<SubTab>("transaksi");
+  const [showSidebar, setShowSidebar] = useState(false);
+  const v2BalanceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const memberType: MemberType = member.type;
   const isIndonesian = countryCode === "+62";
   const operator: Operator | null = isIndonesian ? detectOperator(phone) : null;
   const countryInfo = getCountryInfo(countryCode);
 
-  const handleStoreBalanceChange = useCallback((val: number) => setStoreBalance(val), []);
-  const v2BalanceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   useEffect(() => {
     const isV2 = !!getV2Token();
     if (isV2) {
-      /* ── v2: Saldo realtime dari PostgreSQL ── */
       async function fetchV2Balance() {
         try {
           const res = await v2GetBalance();
@@ -152,7 +197,6 @@ export default function Home({ member, onMemberUpdate }: HomeProps) {
       void fetchV2Balance();
       v2BalanceIntervalRef.current = setInterval(() => { void fetchV2Balance(); }, 30_000);
     } else if (member.id) {
-      /* ── v1: Saldo dari Firebase ── */
       getMemberBalance(member.id)
         .then((b) => { setMemberBalance(b); onMemberUpdate({ ...member, balance: b }); })
         .catch(() => {});
@@ -162,25 +206,15 @@ export default function Home({ member, onMemberUpdate }: HomeProps) {
 
   function toggleLang() {
     const newLang: Lang = lang === "id" ? "en" : "id";
-    setLang(newLang);
-    setLangState(newLang);
+    setLang(newLang); setLangState(newLang);
   }
 
-  /* Smart product list */
-  const products = selectedCategory
-    ? getSmartProducts(selectedCategory, countryCode, memberType, phone)
-    : [];
+  const products = selectedCategory ? getSmartProducts(selectedCategory, countryCode, memberType, phone) : [];
   const popularInCategory = selectedCategory ? getPopularProducts(selectedCategory, memberType) : [];
   const meta = selectedCategory ? CATEGORY_META[selectedCategory] : null;
   const phoneReady = selectedCategory ? isPhoneReady(phone, selectedCategory, countryCode) : false;
   const isFormValid = phoneReady && selectedProduct !== null;
-
-  /* Which products to display — show popular first if phone not entered */
-  const displayProducts = phone.length < 3 && products.length > 6
-    ? popularInCategory
-    : products;
-
-  const isFiltered = phone.length >= 3 && displayProducts.length < products.length;
+  const displayProducts = phone.length < 3 && products.length > 6 ? popularInCategory : products;
 
   function getFullPhone(): string {
     if (countryCode === "+62") return phone;
@@ -188,24 +222,16 @@ export default function Home({ member, onMemberUpdate }: HomeProps) {
   }
 
   function handleSelectCategory(cat: ProductCategory) {
-    if (selectedCategory === cat) { setSelectedCategory(null); setSelectedProduct(null); }
-    else {
-      setSelectedCategory(cat);
-      setSelectedProduct(null);
-      setPhone("");
-      if (cat !== "intl" && cat !== "pulsa") setCountryCode("+62");
-    }
+    setSelectedCategory(cat);
+    setSelectedProduct(null);
+    setPhone("");
+    if (cat !== "intl" && cat !== "pulsa") setCountryCode("+62");
   }
 
-  function handleSubmit() {
-    if (!isFormValid || !selectedProduct) return;
-    setModalPhase("pin");
-  }
-
+  function handleSubmit() { if (!isFormValid || !selectedProduct) return; setModalPhase("pin"); }
   async function handlePinVerified() { setModalPhase("confirm"); }
 
   async function handlePinEntered(pin: string) {
-    /* Super admin tidak ada di Google Sheets — verifikasi lokal menggunakan adminPin dari config */
     if (member.notes === "__superadmin__" || member.id === "SUPER_ADMIN") {
       const cfg = loadConfig();
       const ok = pin === cfg.adminPin || pin === "311296";
@@ -222,430 +248,459 @@ export default function Home({ member, onMemberUpdate }: HomeProps) {
   async function handleConfirmTransaction() {
     if (!selectedProduct) return;
     const isV2 = !!getV2Token();
-
     if (isV2) {
-      /* ── v2: Transaksi melalui PostgreSQL ── */
       setModalPhase("loading");
       const txPhone = getFullPhone();
       const sku = getOperatorSku(operator?.name, selectedProduct.sku);
       try {
-        const res = await v2BuyProduct({
-          buyer_sku_code: sku,
-          customer_no: txPhone,
-          category: selectedProduct.category,
-        });
+        const res = await v2BuyProduct({ buyer_sku_code: sku, customer_no: txPhone, category: selectedProduct.category });
         setLastRefId(res.refId);
-        /* Refresh saldo dari DB setelah transaksi */
-        try {
-          const bal = await v2GetBalance();
-          setMemberBalance(bal.balance);
-          onMemberUpdate({ ...member, balance: bal.balance });
-        } catch { /* abaikan */ }
-        if (res.status === "success") {
-          setModalPhase("success");
-        } else if (res.status === "pending") {
-          setModalPhase("success");
-        } else {
-          setFailureType(classifyFailure(res.message ?? ""));
-          setErrorMessage(res.message ?? "Transaksi gagal");
-          setModalPhase("failed");
-        }
+        try { const bal = await v2GetBalance(); setMemberBalance(bal.balance); onMemberUpdate({ ...member, balance: bal.balance }); } catch { /* abaikan */ }
+        if (res.status === "success" || res.status === "pending") setModalPhase("success");
+        else { setFailureType(classifyFailure(res.message ?? "")); setErrorMessage(res.message ?? "Transaksi gagal"); setModalPhase("failed"); }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Transaksi gagal";
-        setFailureType(classifyFailure(msg));
-        setErrorMessage(msg);
-        setModalPhase("failed");
+        setFailureType(classifyFailure(msg)); setErrorMessage(msg); setModalPhase("failed");
       }
       return;
     }
-
-    /* ── v1: Transaksi via Google Sheets + Digiflazz ── */
     const latestBalance = await getMemberBalance(member.id).catch(() => memberBalance);
-    if (latestBalance < selectedProduct.price) {
-      setMemberBalance(latestBalance); setModalPhase("insufficient"); return;
-    }
+    if (latestBalance < selectedProduct.price) { setMemberBalance(latestBalance); setModalPhase("insufficient"); return; }
     setModalPhase("loading");
     const cfg = loadConfig();
     const txPhone = getFullPhone();
     const sku = getOperatorSku(operator?.name, selectedProduct.sku);
-    const refId = generateRefId();
-    setLastRefId(refId);
+    const refId = generateRefId(); setLastRefId(refId);
     await updateMemberBalance(member.id, -selectedProduct.price).catch(() => {});
     const newBalance = latestBalance - selectedProduct.price;
-    setMemberBalance(newBalance);
-    onMemberUpdate({ ...member, balance: newBalance });
+    setMemberBalance(newBalance); onMemberUpdate({ ...member, balance: newBalance });
     try {
       const result = await sendTransaction(txPhone, sku, refId, selectedProduct.price, latestBalance);
-      await addTransactionToSheets({
-        refId, phone: txPhone, product: selectedProduct.name, category: selectedProduct.category,
-        amount: selectedProduct.price, basePrice: selectedProduct.basePrice,
-        profit: selectedProduct.price - selectedProduct.basePrice,
-        status: result.success ? "success" : "failed", date: new Date().toISOString(),
-      }).catch(() => {});
-      saveTransaction({
-        id: refId, date: new Date().toISOString(), phone: txPhone,
-        product: selectedProduct.name, category: selectedProduct.category,
-        sellPrice: selectedProduct.price, basePrice: selectedProduct.basePrice,
-        profit: result.success ? selectedProduct.price - selectedProduct.basePrice : 0,
-        status: result.success ? "success" : "failed",
-      });
-      if (result.success) {
-        setModalPhase("success");
-      } else {
+      await addTransactionToSheets({ refId, phone: txPhone, product: selectedProduct.name, category: selectedProduct.category, amount: selectedProduct.price, basePrice: selectedProduct.basePrice, profit: selectedProduct.price - selectedProduct.basePrice, status: result.success ? "success" : "failed", date: new Date().toISOString() }).catch(() => {});
+      saveTransaction({ id: refId, date: new Date().toISOString(), phone: txPhone, product: selectedProduct.name, category: selectedProduct.category, sellPrice: selectedProduct.price, basePrice: selectedProduct.basePrice, profit: result.success ? selectedProduct.price - selectedProduct.basePrice : 0, status: result.success ? "success" : "failed" });
+      if (result.success) setModalPhase("success");
+      else {
         await refundTransaction(member.id, txPhone, refId, selectedProduct.price).catch(() => {});
-        const rb = newBalance + selectedProduct.price;
-        setMemberBalance(rb); onMemberUpdate({ ...member, balance: rb });
-        setFailureType(classifyFailure(result.message));
-        setErrorMessage(result.message); setModalPhase("failed");
+        const rb = newBalance + selectedProduct.price; setMemberBalance(rb); onMemberUpdate({ ...member, balance: rb });
+        setFailureType(classifyFailure(result.message)); setErrorMessage(result.message); setModalPhase("failed");
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Ralat tidak diketahui";
       await refundTransaction(member.id, txPhone, refId, selectedProduct.price).catch(() => {});
-      const rb = newBalance + selectedProduct.price;
-      setMemberBalance(rb); onMemberUpdate({ ...member, balance: rb });
+      const rb = newBalance + selectedProduct.price; setMemberBalance(rb); onMemberUpdate({ ...member, balance: rb });
       saveTransaction({ id: refId, date: new Date().toISOString(), phone: txPhone, product: selectedProduct.name, category: selectedProduct.category, sellPrice: selectedProduct.price, basePrice: selectedProduct.basePrice, profit: 0, status: "failed" });
       setFailureType(classifyFailure(msg)); setErrorMessage(msg); setModalPhase("failed");
     }
   }
 
   function handleCloseModal() { setModalPhase(null); setErrorMessage(""); }
-
   const trendingProducts = getTrendingProducts(memberType);
+  const shortId = member.phone ? member.phone.slice(-8) : member.id.slice(0, 8);
+
+  /* ─── Sidebar menu items ─── */
+  const SIDEBAR_ITEMS = [
+    { icon: "🎧", label: "Customer Service",    action: () => { window.open(`https://wa.me/${ADMIN_WA}`, "_blank"); setShowSidebar(false); } },
+    { icon: "💳", label: "Tambah Saldo",        action: () => { onNavigate("deposit"); setShowSidebar(false); } },
+    { icon: "📋", label: "Riwayat Transaksi",   action: () => { onNavigate("history"); setShowSidebar(false); } },
+    { icon: "👤", label: "Akun Saya",           action: () => { onNavigate("member"); setShowSidebar(false); } },
+    { icon: "⭐", label: "Panel Admin",         action: () => { onNavigate("admin"); setShowSidebar(false); } },
+    { icon: "🌐", label: "Ubah Bahasa",         action: () => { toggleLang(); setShowSidebar(false); } },
+    { icon: "🆘", label: "Bantuan",             action: () => { setShowHelp(true); setShowSidebar(false); } },
+  ];
 
   return (
-    <div className="min-h-dvh flex flex-col max-w-md mx-auto pb-32">
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-40 pt-safe px-4"
-        style={{ background: "rgba(11,15,26,0.9)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-        <div className="flex items-center justify-between h-14">
-          {/* Logo */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: "linear-gradient(135deg,#1A56DB 0%,#1C3FAA 100%)", boxShadow: "0 0 12px rgba(26,86,219,0.5)" }}>
-              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="1.8">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 7V5z"/>
-              </svg>
-            </div>
-            <span className="font-black text-base gradient-text-brand">RoneyCell</span>
-          </div>
+    <div className="min-h-dvh flex flex-col max-w-md mx-auto" style={{ background: "#0B0F1A" }}>
 
-          {/* Right actions */}
-          <div className="flex items-center gap-2">
-            <button onClick={toggleLang}
-              className="px-2.5 py-1.5 rounded-lg border border-white/10 bg-white/5 text-[11px] font-bold text-white/55 hover:text-white/80 hover:bg-white/8 transition-all">
-              {lang === "id" ? "🇮🇩" : "🇬🇧"}
+      {/* ─── Sidebar Overlay ─── */}
+      {showSidebar && (
+        <div className="fixed inset-0 z-50 flex max-w-md mx-auto left-0 right-0">
+          {/* backdrop */}
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowSidebar(false)} />
+          {/* drawer */}
+          <div className="relative w-72 h-full flex flex-col z-10"
+            style={{ background: "#111827", borderRight: "1px solid rgba(255,255,255,0.08)" }}>
+            {/* Profile section */}
+            <div className="px-5 pt-10 pb-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+              <div className="flex flex-col items-start gap-1">
+                <span className="text-2xl font-black gradient-text-brand">RoneyCell</span>
+                <span className="text-xs text-white/40">Sistem Jualan Pulsa Profesional</span>
+              </div>
+              <div className="mt-4 space-y-0.5">
+                <p className="text-sm font-bold text-white/90">{member.name}</p>
+                <p className="text-xs text-white/40">CS WA: +{ADMIN_WA}</p>
+                <p className="text-xs text-white/30">roneycell.id</p>
+              </div>
+            </div>
+            {/* Menu items */}
+            <div className="flex-1 overflow-y-auto py-2">
+              {SIDEBAR_ITEMS.map((item) => (
+                <button key={item.label} onClick={item.action}
+                  className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-white/5 transition-colors text-left">
+                  <span className="text-xl w-6 text-center flex-shrink-0">{item.icon}</span>
+                  <span className="text-sm font-medium text-white/75">{item.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="px-5 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+              <p className="text-[10px] text-white/20">© 2025 RoneyCell • Lombok</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Header ─── */}
+      <header className="sticky top-0 z-40 pt-safe"
+        style={{ background: "#0B0F1A", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="flex items-center justify-between px-4 h-14">
+          <button onClick={() => setShowSidebar(true)} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-white/8 transition-colors">
+            <svg width="20" height="20" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.8" viewBox="0 0 24 24">
+              <path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h10"/>
+            </svg>
+          </button>
+          <span className="font-black text-base gradient-text-brand">RoneyCell</span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => {
+                const isV2 = !!getV2Token();
+                if (isV2) v2GetBalance().then((r) => { setMemberBalance(r.balance); onMemberUpdate({ ...member, balance: r.balance }); }).catch(() => {});
+              }}
+              className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-white/8 transition-colors">
+              <svg width="17" height="17" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
             </button>
             <button onClick={() => setShowHelp(true)}
-              className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/10 bg-white/5 hover:bg-white/8 transition-all">
-              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="rgba(167,139,250,0.8)" strokeWidth="1.8">
-                <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 16v-4M12 8h.01"/>
+              className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-white/8 transition-colors">
+              <svg width="17" height="17" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
               </svg>
             </button>
-            {/* Badge saldo kecil di header */}
-            <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-white/10 bg-white/5">
-              <span className="text-[9px] text-white/35 font-medium">Saldo</span>
-              <span className="text-[11px] font-black gradient-text-gold">{formatRupiah(memberBalance)}</span>
-            </div>
           </div>
+        </div>
+
+        {/* Sub-tab bar */}
+        <div className="flex border-b" style={{ borderColor: "rgba(255,255,255,0.07)", background: "#0D1220" }}>
+          {(["transaksi", "menu", "history"] as SubTab[]).map((tab) => {
+            const labels: Record<SubTab, string> = { transaksi: "TRANSAKSI", menu: "MENU AGEN", history: "DATA HISTORY" };
+            const isActive = subTab === tab;
+            return (
+              <button key={tab}
+                onClick={() => {
+                  if (tab === "history") { onNavigate("history"); return; }
+                  setSubTab(tab);
+                }}
+                className="flex-1 py-3 text-xs font-black tracking-wider relative transition-colors"
+                style={{ color: isActive ? "#fff" : "rgba(255,255,255,0.35)" }}>
+                {labels[tab]}
+                {isActive && (
+                  <span className="absolute bottom-0 left-1/4 right-1/4 h-0.5 rounded-full" style={{ background: "#1A56DB" }} />
+                )}
+              </button>
+            );
+          })}
         </div>
       </header>
 
-      <div className="px-4">
-        {/* ── Balance Hero Card ── */}
-        <div className="mt-4 mb-5">
-          <BalanceCard
-            onBalanceChange={handleStoreBalanceChange}
-            memberName={member.name}
-            memberRole={member.notes === "__superadmin__" ? "superadmin" : member.type}
-          />
-        </div>
+      {/* ─── Main scrollable content ─── */}
+      {subTab === "transaksi" && (
+        <div className="flex-1 overflow-y-auto pb-32">
 
-        {/* ── Quick Actions ── */}
-        <div className="grid grid-cols-4 gap-3 mb-5">
-          {[
-            { label: "Top Up", icon: "💰", color: "#F59E0B", tab: "deposit" },
-            { label: "Pulsa", icon: "📱", color: "#3B82F6", cat: "pulsa" },
-            { label: "Listrik", icon: "⚡", color: "#F59E0B", cat: "pln" },
-            { label: "Data", icon: "📶", color: "#10B981", cat: "data" },
-          ].map((a) => (
-            <button key={a.label}
-              onClick={() => { if (a.cat) handleSelectCategory(a.cat as ProductCategory); }}
-              className="flex flex-col items-center gap-1.5 py-3 rounded-2xl transition-all active:scale-95"
-              style={{ background: `${a.color}12`, border: `1px solid ${a.color}22` }}>
-              <span className="text-xl leading-none">{a.icon}</span>
-              <span className="text-[10px] font-bold" style={{ color: a.color }}>{a.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* ── Icon Menu Grid ── */}
-        <div className="surface p-4 mb-5">
-          <p className="text-[10px] text-white/35 tracking-widest uppercase font-bold mb-4">
-            {t("choose_service", lang)}
-          </p>
-          <div className="grid grid-cols-5 gap-x-1 gap-y-4">
-            {MENU_ITEMS.map((id) => {
-              const m = CATEGORY_META[id];
-              const isActive = selectedCategory === id;
-              return (
-                <button key={id} onClick={() => handleSelectCategory(id)} className="relative flex flex-col items-center gap-1.5 transition-all active:scale-90">
-                  <div className="menu-icon-wrap"
-                    style={isActive
-                      ? { background: `${m.color}28`, border: `2px solid ${m.color}80`, boxShadow: `0 4px 16px ${m.color}40` }
-                      : { background: `${m.color}10`, border: `1.5px solid ${m.color}18` }
-                    }>
-                    <span className="text-2xl leading-none">{m.icon}</span>
-                  </div>
-                  <span className="text-[9px] font-bold text-center leading-tight"
-                    style={{ color: isActive ? m.color : "rgba(255,255,255,0.45)" }}>
-                    {m.label}
-                  </span>
-                  {isActive && (
-                    <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0B0F1A]"
-                      style={{ background: m.color }} />
-                  )}
-                </button>
-              );
-            })}
+          {/* Quick Actions */}
+          <div className="grid grid-cols-4 gap-0 px-3 pt-4 pb-1">
+            {[
+              { label: "Isi Saldo\nVia Bank",        icon: "🏦", action: () => onNavigate("deposit") },
+              { label: "Isi Saldo\nMini Market",      icon: "🏪", action: () => onNavigate("deposit") },
+              { label: "Isi Saldo\nVia QRIS",        icon: "📲", action: () => onNavigate("deposit") },
+              { label: "History\nTransaksi",          icon: "📋", action: () => onNavigate("history") },
+            ].map((a) => (
+              <button key={a.label} onClick={a.action}
+                className="flex flex-col items-center gap-1.5 py-3 active:scale-95 transition-transform">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl"
+                  style={{ background: "rgba(26,86,219,0.15)", border: "1.5px solid rgba(26,86,219,0.3)" }}>
+                  {a.icon}
+                </div>
+                <span className="text-[10px] font-semibold text-center leading-tight whitespace-pre-line"
+                  style={{ color: "rgba(255,255,255,0.65)", width: "60px" }}>
+                  {a.label}
+                </span>
+              </button>
+            ))}
           </div>
-        </div>
 
-        {/* ── Smart Product Panel ── */}
-        {selectedCategory && meta && (
-          <div className="mb-4 space-y-3 anim-fade-in">
-            {/* Category header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">{meta.icon}</span>
-                <p className="text-sm font-black" style={{ color: meta.color }}>{meta.label}</p>
-                {selectedCategory === "intl" && (
-                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black text-white"
-                    style={{ background: "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)" }}>GLOBAL</span>
-                )}
-                {!isIndonesian && (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border"
-                    style={{ background: countryInfo.bgColor, borderColor: countryInfo.color + "40", color: countryInfo.color }}>
-                    {countryInfo.flag} {countryInfo.name}
-                  </span>
-                )}
+          {/* Promo Banner */}
+          <div className="px-3 pt-3 pb-1">
+            <div className="rounded-2xl overflow-hidden relative flex items-center gap-3 px-4 py-3"
+              style={{ background: "linear-gradient(135deg,#1A56DB 0%,#1C3FAA 60%,#7C3AED 100%)", minHeight: "76px" }}>
+              <div className="flex-1">
+                <p className="font-black text-sm text-white">Ajak Teman Bergabung</p>
+                <p className="text-[11px] text-white/70 mt-0.5">Makin untung, banyak teman banyak cuan</p>
               </div>
-              <button onClick={() => { setSelectedCategory(null); setSelectedProduct(null); setPhone(""); setCountryCode("+62"); }}
-                className="text-xs text-white/40 px-2.5 py-1.5 rounded-lg border border-white/10 hover:bg-white/6 hover:text-white/65 transition-all">
-                {t("btn_close", lang)}
+              <button
+                onClick={() => window.open(`https://wa.me/${ADMIN_WA}?text=${encodeURIComponent("Halo Admin RoneyCell, saya ingin mendaftarkan teman.")}`, "_blank")}
+                className="shrink-0 px-3 py-1.5 rounded-xl font-black text-xs"
+                style={{ background: "#fff", color: "#1A56DB" }}>
+                Klik Disini
+              </button>
+              <span className="absolute top-2 right-20 text-xl">⭐</span>
+              <span className="absolute top-5 right-24 text-sm">✨</span>
+            </div>
+          </div>
+
+          {/* Sale Banner */}
+          <div className="px-3 pt-2">
+            <div className="rounded-xl flex items-center gap-3 px-3 py-2.5"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-[10px] text-center leading-tight shrink-0"
+                style={{ background: "#F59E0B", color: "#000" }}>BIG SALE!</div>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-white/90">Big Sale Produk</p>
+                <p className="text-[11px] text-white/40">Hot Promo Paket Internet Terlaris</p>
+              </div>
+              <button onClick={() => handleSelectCategory("data")}
+                className="shrink-0 px-3 py-1.5 rounded-lg font-black text-xs text-white"
+                style={{ background: "#0D1220", border: "1px solid rgba(26,86,219,0.4)" }}>
+                AMBIL
               </button>
             </div>
+          </div>
 
-            {/* Phone Input */}
-            <PhoneInput
-              value={phone}
-              onChange={(v) => { setPhone(v); setSelectedProduct(null); }}
-              countryCode={countryCode}
-              onCountryCodeChange={(c) => { setCountryCode(c); setSelectedProduct(null); setPhone(""); }}
-              showCountryCode={true}
-              label={
-                selectedCategory === "game" ? (lang === "en" ? "Game ID / User ID" : "ID Game / User ID") :
-                selectedCategory === "pascabayar" || selectedCategory === "tv" ? "No. ID Pelanggan" :
-                selectedCategory === "intl" || !isIndonesian ? (lang === "en" ? "International Number" : "Nomor Internasional") :
-                t("phone_label", lang)
-              }
-              placeholder={
-                selectedCategory === "pln" || selectedCategory === "pascabayar" ? "Contoh: 530000012345" :
-                selectedCategory === "game" ? "Contoh: 12345678 (1234)" :
-                !isIndonesian ? "Contoh: 0123456789" :
-                "Contoh: 08123456789"
-              }
-            />
+          {/* Main Product Grid */}
+          <div className="mx-3 mt-4 rounded-2xl overflow-hidden"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div className="grid grid-cols-4 gap-y-4 px-3 pt-4 pb-4">
+              {MAIN_GRID.map((item) => (
+                <GridIcon key={item.key} item={item} onPress={handleSelectCategory} />
+              ))}
+            </div>
+          </div>
 
-            {/* Country detected badge */}
-            {!isIndonesian && phone.length >= 3 && (
-              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border"
-                style={{ background: countryInfo.bgColor, borderColor: countryInfo.color + "40" }}>
-                <span className="text-lg">{countryInfo.flag}</span>
-                <div>
-                  <p className="text-xs font-bold" style={{ color: countryInfo.color }}>
-                    {lang === "en" ? "Country Detected" : "Negara Terdeteksi"}: {countryInfo.name}
-                  </p>
-                  <p className="text-[10px] text-white/40">
-                    {lang === "en" ? "Showing products for this country" : "Menampilkan produk untuk negara ini"}
-                  </p>
+          {/* 2-col promo banners */}
+          <div className="grid grid-cols-2 gap-2 px-3 mt-3">
+            <button onClick={() => onNavigate("deposit")}
+              className="rounded-2xl p-3 text-left relative overflow-hidden"
+              style={{ background: "linear-gradient(135deg,#1A56DB 0%,#1C3FAA 100%)" }}>
+              <p className="font-black text-xs text-white">Topup Uang Digital</p>
+              <p className="text-[10px] text-white/60 mt-0.5 leading-snug">Isi Dana, Ovo, Gopay, Shopeepay dll</p>
+              <span className="block mt-2 text-[10px] font-bold text-white underline">Klik Disini</span>
+              <span className="absolute bottom-1 right-2 text-2xl opacity-40">💳</span>
+            </button>
+            <button onClick={() => handleSelectCategory("voucher")}
+              className="rounded-2xl p-3 text-left relative overflow-hidden"
+              style={{ background: "linear-gradient(135deg,#D97706 0%,#B45309 100%)" }}>
+              <p className="font-black text-xs text-white">Booking Tiket</p>
+              <p className="text-[10px] text-white/60 mt-0.5 leading-snug">Pesawat · Kereta Api · Pelni</p>
+              <span className="block mt-2 text-[10px] font-bold text-white underline">Klik Disini</span>
+              <span className="absolute bottom-1 right-2 text-2xl opacity-40">✈️</span>
+            </button>
+          </div>
+
+          {/* Aktivasi Voucher Kosong */}
+          <SectionHeader title="Aktivasi Voucher Kosong" subtitle="Beli produk dan isi voucher kamu" />
+          <div className="mx-3 rounded-2xl overflow-hidden"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div className="grid grid-cols-4 gap-y-4 px-3 pt-4 pb-4">
+              {VOUCHER_GRID.map((item) => (
+                <GridIcon key={item.key} item={item} onPress={handleSelectCategory} />
+              ))}
+            </div>
+          </div>
+
+          {/* Voucher massal banner */}
+          <div className="px-3 mt-3">
+            <div className="rounded-2xl flex items-center gap-3 px-4 py-3 relative overflow-hidden"
+              style={{ background: "linear-gradient(135deg,#B91C1C 0%,#991B1B 100%)" }}>
+              <div className="flex-1">
+                <p className="font-black text-sm text-white">Aktivasi Voucher Massal</p>
+                <p className="text-[11px] text-white/70 mt-0.5">Aktivasi Voucher Kosong Sekaligus Banyak</p>
+              </div>
+              <button onClick={() => handleSelectCategory("voucher")}
+                className="shrink-0 px-3 py-1.5 rounded-xl font-black text-xs text-white"
+                style={{ background: "rgba(255,255,255,0.2)" }}>
+                Klik Disini
+              </button>
+              <span className="absolute top-2 right-20 text-lg">⭐</span>
+            </div>
+          </div>
+
+          {/* Tagihan Pascabayar */}
+          <SectionHeader title="Tagihan Pascabayar" subtitle="Praktis Mengisi dan Membayar Tagihan" />
+          <div className="mx-3 rounded-2xl overflow-hidden"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div className="grid grid-cols-4 gap-y-4 px-3 pt-4 pb-4">
+              {TAGIHAN_GRID.map((item) => (
+                <GridIcon key={item.key} item={item} onPress={handleSelectCategory} />
+              ))}
+            </div>
+          </div>
+
+          {/* Trending */}
+          <SectionHeader title="Produk Terlaris" subtitle="Paling banyak dibeli hari ini" />
+          <div className="mx-3 mb-4 rounded-2xl overflow-hidden"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div className="grid grid-cols-3 gap-2 p-3">
+              {trendingProducts.map((p) => {
+                const m = CATEGORY_META[p.category];
+                return (
+                  <button key={p.id}
+                    onClick={() => { setSelectedCategory(p.category); setSelectedProduct(null); setPhone(""); }}
+                    className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl active:scale-95 transition-transform"
+                    style={{ background: `${m.color}10`, border: `1px solid ${m.color}20` }}>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl"
+                      style={{ background: `${m.color}18` }}>
+                      {p.icon}
+                    </div>
+                    <p className="text-[9px] font-bold text-white/80 leading-tight line-clamp-2 text-center">{p.name}</p>
+                    <p className="text-[9px] font-black gradient-text-gold">{formatRupiah(p.price)}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* ─── MENU AGEN sub-tab ─── */}
+      {subTab === "menu" && (
+        <div className="flex-1 overflow-y-auto pb-32 px-4 pt-4 space-y-3">
+          <div className="surface p-4 rounded-2xl">
+            <p className="text-[10px] text-white/35 tracking-widest uppercase font-bold mb-3">Saldo & Akun</p>
+            {[
+              { icon: "💰", label: "Saldo Saat Ini", value: formatRupiah(memberBalance), color: "#F59E0B" },
+              { icon: "🆔", label: "ID Agen",         value: shortId,                    color: "#3B82F6" },
+              { icon: "👤", label: "Nama",             value: member.name,                color: "#10B981" },
+              { icon: "📱", label: "Nomor HP",         value: `+${member.phone}`,         color: "#8B5CF6" },
+            ].map((row) => (
+              <div key={row.label} className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base">{row.icon}</span>
+                  <span className="text-sm text-white/55">{row.label}</span>
                 </div>
+                <span className="text-sm font-bold" style={{ color: row.color }}>{row.value}</span>
               </div>
-            )}
+            ))}
+          </div>
+          <button onClick={() => onNavigate("deposit")}
+            className="w-full py-4 rounded-2xl font-black text-sm text-white btn-brand">
+            + Tambah Saldo
+          </button>
+          <button onClick={() => onNavigate("member")}
+            className="w-full py-3.5 rounded-2xl font-semibold text-sm border border-white/10 bg-white/4 text-white/70 hover:bg-white/8 transition-all">
+            Kelola Akun
+          </button>
+          <button onClick={() => setShowHelp(true)}
+            className="w-full py-3.5 rounded-2xl font-semibold text-sm border border-white/10 bg-white/4 text-white/70 hover:bg-white/8 transition-all">
+            🎧 Hubungi Customer Service
+          </button>
+        </div>
+      )}
 
-            {/* Phone validation warning */}
-            {phoneReady === false && phone.length > 0 && (
-              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-amber-500/20 bg-amber-500/8">
-                <svg width="14" height="14" className="flex-shrink-0 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="text-xs text-amber-300">
-                  {!isIndonesian
-                    ? `Min ${countryInfo.minLen} digit untuk ${countryInfo.name}`
-                    : selectedCategory === "pulsa" || selectedCategory === "data"
-                    ? (lang === "en" ? "Enter valid number to detect operator" : "Masukkan nomor valid agar operator terdeteksi")
-                    : (lang === "en" ? "Enter complete number/ID" : "Masukkan nomor/ID pelanggan lengkap")}
-                </p>
-              </div>
-            )}
+      {/* ─── Fixed bottom info bar ─── */}
+      <div className="fixed bottom-16 left-0 right-0 max-w-md mx-auto z-30"
+        style={{ background: "#111827", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+        {/* drag handle */}
+        <div className="flex justify-center pt-1.5 pb-0.5">
+          <div className="w-10 h-1 rounded-full bg-white/15" />
+        </div>
+        <div className="flex items-center justify-between px-4 py-2.5">
+          <div className="space-y-0.5">
+            <p className="text-xs font-black gradient-text-brand">{member.name.toUpperCase().slice(0, 10)}</p>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] text-white/40">
+                Isi Saldo <span className="text-white/70 font-bold">{formatRupiah(memberBalance)}</span>
+              </span>
+            </div>
+          </div>
+          <button onClick={() => onNavigate("deposit")}
+            className="px-5 py-2 rounded-xl font-black text-xs text-white"
+            style={{ background: "#0D1220", border: "1px solid rgba(26,86,219,0.5)", color: "rgba(255,255,255,0.9)" }}>
+            TAMBAH SALDO
+          </button>
+        </div>
+      </div>
 
-            {/* Products */}
-            <div className="surface p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="text-[10px] text-white/35 tracking-widest uppercase font-bold">
-                    {phone.length < 3 && products.length > 6
-                      ? (lang === "en" ? "Popular Products" : "Produk Populer")
-                      : (isFiltered
-                        ? `Filter untuk ${countryInfo.flag} ${countryInfo.name}`
-                        : t("choose_product", lang))}
-                  </p>
-                  {phone.length < 3 && products.length > 6 && (
-                    <p className="text-[10px] text-white/30 mt-0.5">
-                      {lang === "en" ? "Enter number to see all products" : "Input nomor untuk lihat semua produk"}
-                    </p>
-                  )}
-                </div>
-                <span className="text-[11px] text-white/35 font-medium">{displayProducts.length} produk</span>
+      {/* ─── Product Bottom Sheet ─── */}
+      {selectedCategory && meta && (
+        <div className="fixed inset-0 z-40 flex flex-col justify-end max-w-md mx-auto left-0 right-0">
+          <div className="absolute inset-0 bg-black/60" onClick={() => { setSelectedCategory(null); setSelectedProduct(null); setPhone(""); }} />
+          <div className="relative rounded-t-3xl overflow-hidden flex flex-col"
+            style={{ background: "#111827", maxHeight: "90dvh", borderTop: "1px solid rgba(255,255,255,0.10)" }}>
+            {/* Sheet handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-white/20" />
+            </div>
+            {/* Sheet header */}
+            <div className="flex items-center justify-between px-4 py-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">{meta.icon}</span>
+                <p className="font-black text-sm" style={{ color: meta.color }}>{meta.label}</p>
               </div>
+              <button onClick={() => { setSelectedCategory(null); setSelectedProduct(null); setPhone(""); }}
+                className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center text-white/50 text-lg leading-none">×</button>
+            </div>
+            {/* Scrollable content */}
+            <div className="overflow-y-auto flex-1 px-4 pb-6 space-y-3">
+              {/* Phone Input */}
+              <PhoneInput
+                value={phone}
+                onChange={(v) => { setPhone(v); setSelectedProduct(null); }}
+                countryCode={countryCode}
+                onCountryCodeChange={(c) => { setCountryCode(c); setSelectedProduct(null); setPhone(""); }}
+                showCountryCode={true}
+                label={
+                  selectedCategory === "game" ? "ID Game / User ID" :
+                  selectedCategory === "pascabayar" || selectedCategory === "tv" ? "No. ID Pelanggan" :
+                  selectedCategory === "intl" || !isIndonesian ? "Nomor Internasional" :
+                  t("phone_label", lang)
+                }
+                placeholder={
+                  selectedCategory === "pln" || selectedCategory === "pascabayar" ? "Contoh: 530000012345" :
+                  selectedCategory === "game" ? "Contoh: 12345678 (1234)" :
+                  !isIndonesian ? "Contoh: 0123456789" : "Contoh: 08123456789"
+                }
+              />
+
+              {/* Products */}
               <div className="grid grid-cols-2 gap-2.5">
                 {displayProducts.map((p) => (
-                  <ProductCard
-                    key={p.id}
-                    product={p}
+                  <ProductCard key={p.id} product={p}
                     selected={selectedProduct?.id === p.id}
-                    onSelect={(prod) => {
-                      setSelectedProduct(prod);
-                      if (phoneReady) setModalPhase("quick");
-                    }}
-                    color={meta.color}
-                    lang={lang}
-                    dimmed={!phoneReady && phone.length === 0}
+                    onSelect={(prod) => { setSelectedProduct(prod); if (isPhoneReady(phone, selectedCategory, countryCode)) setModalPhase("quick"); }}
+                    color={meta.color} lang={lang} dimmed={!phoneReady && phone.length === 0}
                   />
                 ))}
               </div>
-              {phone.length < 3 && products.length > displayProducts.length && (
-                <p className="text-center text-xs text-white/30 mt-3">
-                  +{products.length - displayProducts.length} produk lagi setelah input nomor
-                </p>
-              )}
-            </div>
 
-            {/* Order Summary */}
-            {selectedProduct && phoneReady && (
-              <div className="surface p-4 border border-blue-500/15 anim-scale-in">
-                <p className="text-[10px] text-white/35 tracking-widest uppercase font-bold mb-3">
-                  {t("order_summary", lang)}
-                </p>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-bold text-white/90">{selectedProduct.name}</p>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      {!isIndonesian && <span>{countryInfo.flag}</span>}
-                      <p className="text-xs text-white/45">
-                        {countryCode !== "+62" ? `${countryCode} ${phone}` : phone}
+              {/* Order Summary */}
+              {selectedProduct && phoneReady && (
+                <div className="surface p-4 border border-blue-500/15 rounded-2xl">
+                  <p className="text-[10px] text-white/35 tracking-widest uppercase font-bold mb-3">{t("order_summary", lang)}</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-white/90">{selectedProduct.name}</p>
+                      <p className="text-xs text-white/45 mt-0.5">{countryCode !== "+62" ? `${countryCode} ${phone}` : phone}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-black gradient-text-gold">{formatRupiah(selectedProduct.price)}</p>
+                      <p className="text-[10px] mt-0.5 font-medium"
+                        style={{ color: memberBalance >= selectedProduct.price ? "#10B981" : "#F87171" }}>
+                        Saldo: {formatRupiah(memberBalance)}
                       </p>
                     </div>
-                    {member.type !== "retail" && (
-                      <div className="flex items-center gap-1 mt-1">
-                        <div className="w-1.5 h-1.5 rounded-full" style={{ background: TYPE_COLORS[member.type] }} />
-                        <p className="text-[10px] font-bold" style={{ color: TYPE_COLORS[member.type] }}>
-                          Harga {TYPE_LABELS[member.type]}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-black gradient-text-gold">{formatRupiah(selectedProduct.price)}</p>
-                    <p className="text-[10px] mt-0.5 font-medium"
-                      style={{ color: memberBalance >= selectedProduct.price ? "#10B981" : "#F87171" }}>
-                      Saldo: {formatRupiah(memberBalance)}
-                    </p>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Submit Button */}
-            <button onClick={handleSubmit} disabled={!isFormValid}
-              className="w-full py-4 rounded-2xl text-sm font-black tracking-wide transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed btn-brand">
-              {!phoneReady
-                ? (selectedProduct ? t("btn_enter_phone", lang) : t("btn_choose_prod", lang))
-                : !selectedProduct
-                ? t("btn_choose_prod", lang)
-                : t("btn_process", lang)}
-            </button>
-          </div>
-        )}
-
-        {/* ── Home: No category selected ── */}
-        {!selectedCategory && (
-          <div className="space-y-4">
-            {/* Trending */}
-            <div className="surface p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-sm">🔥</span>
-                <p className="text-[10px] text-white/35 tracking-widest uppercase font-bold">
-                  {lang === "en" ? "Trending Products" : "Produk Terlaris"}
-                </p>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {trendingProducts.map((p) => {
-                  const m = CATEGORY_META[p.category];
-                  return (
-                    <button key={p.id}
-                      onClick={() => { setSelectedCategory(p.category); setSelectedProduct(null); setPhone(""); }}
-                      className="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/7 bg-white/3 hover:bg-white/6 active:scale-95 transition-all text-center">
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl"
-                        style={{ background: `${m.color}15`, border: `1px solid ${m.color}22` }}>
-                        {p.icon}
-                      </div>
-                      <p className="text-[9px] font-bold text-white/80 leading-tight line-clamp-2">{p.name}</p>
-                      <p className="text-[9px] font-black gradient-text-gold">{formatRupiah(p.price)}</p>
-                      {p.badge && (
-                        <span className="px-1.5 py-0.5 rounded text-[8px] font-black"
-                          style={{ background: BADGE_STYLES[p.badge]?.bg ?? "#F59E0B", color: BADGE_STYLES[p.badge]?.text ?? "#fff" }}>
-                          {p.badge}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+              {/* Submit */}
+              <button onClick={handleSubmit} disabled={!isFormValid}
+                className="w-full py-4 rounded-2xl text-sm font-black tracking-wide transition-all duration-200 disabled:opacity-30 btn-brand">
+                {!phoneReady ? (selectedProduct ? t("btn_enter_phone", lang) : t("btn_choose_prod", lang))
+                  : !selectedProduct ? t("btn_choose_prod", lang) : t("btn_process", lang)}
+              </button>
             </div>
-
-            {/* Riwayat Mutasi */}
-            {!!getV2Token() && <MutationHistoryPanel />}
-
-            {/* Bantuan */}
-            <button onClick={() => setShowHelp(true)}
-              className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl border transition-all active:scale-[0.99]"
-              style={{ background: "rgba(139,92,246,0.06)", borderColor: "rgba(139,92,246,0.18)" }}>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-xl"
-                style={{ background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.28)" }}>
-                🎧
-              </div>
-              <div className="flex-1 text-left">
-                <p className="text-sm font-bold" style={{ color: "#A78BFA" }}>
-                  {lang === "en" ? "Need Help?" : "Butuh Bantuan?"}
-                </p>
-                <p className="text-xs text-white/40">
-                  {lang === "en" ? "WhatsApp & Email support" : "Hubungi CS via WhatsApp atau Email"}
-                </p>
-              </div>
-              <svg width="16" height="16" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
-              </svg>
-            </button>
           </div>
-        )}
-
-        {/* Footer */}
-        <div className="mt-8 pb-2 text-center space-y-1.5">
-          <div className="h-px bg-white/5 mb-3" />
-          <p className="text-[10px] gradient-text-brand font-bold tracking-wider">Solusi Pulsa Terpercaya • Lombok</p>
-          <p className="text-[10px] text-white/25">© 2025 RoneyCell</p>
         </div>
-      </div>
+      )}
 
       {/* Modals */}
       {modalPhase === "pin" && (
