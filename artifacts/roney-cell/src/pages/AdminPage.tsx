@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 const AdminDashboardV2 = lazy(() => import("@/components/admin/AdminDashboardV2"));
 import { loadConfig, saveConfig } from "@/lib/config";
@@ -56,10 +57,12 @@ function PinGate({ onUnlock }: { onUnlock: () => void }) {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center px-8 max-w-md mx-auto">
+<div className="min-h-dvh flex flex-col bg-white text-gray-800">
       <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6"
         style={{ background: "linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)", boxShadow: "0 0 30px rgba(124,58,237,0.4)" }}>
-        <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+     
+   <svg className="w-8 h-8 text-gray-800" fill="no
+ne" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
             d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
@@ -390,7 +393,8 @@ function SheetsPendingSection({ onRefreshed }: { onRefreshed?: (count: number) =
                 <button
                   onClick={() => handleAction(u.id, "active")}
                   disabled={busy}
-                  className="flex-1 py-2.5 rounded-xl text-xs font-black transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2.5 rounded-xl 
+text-xs font-black transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
                   style={{ background: "linear-gradient(135deg,rgba(16,185,129,0.2) 0%,rgba(5,150,105,0.15) 100%)", border: "1px solid rgba(16,185,129,0.35)", color: "#34D399" }}>
                   {actionIds[u.id] === "approving"
                     ? <><span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> Memproses...</>
@@ -528,7 +532,8 @@ function V2PendingSection({ onCountChange }: { onCountChange?: (n: number) => vo
             <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-sm text-white"
               style={{ background: "linear-gradient(135deg,#3B82F6,#6366F1)" }}>
               {u.name.charAt(0).toUpperCase()}
-            </div>
+            
+</div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
                 <p className="font-black text-foreground truncate">{u.name}</p>
@@ -550,7 +555,7 @@ function V2PendingSection({ onCountChange }: { onCountChange?: (n: number) => vo
             <button
               onClick={() => doActivate(u)}
               disabled={actionState[u.id] === "loading" || actionState[u.id] === "ok"}
-              className="flex-1 py-2 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50"
+              className="flex-1 py-2 rounded-xl text-sm font-bold text-gray-800 transition-all disabled:opacity-50"
               style={{ background: "linear-gradient(135deg,#10B981,#059669)" }}>
               {actionState[u.id] === "loading" ? "Memproses..." : actionState[u.id] === "ok" ? "✓ Aktif" : "✅ Setujui & Aktifkan"}
             </button>
@@ -558,6 +563,7 @@ function V2PendingSection({ onCountChange }: { onCountChange?: (n: number) => vo
         </div>
       ))}
     </div>
+
   );
 }
 
