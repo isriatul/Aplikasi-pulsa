@@ -1,7 +1,7 @@
-import express = require("express");
-import cors = require("cors");
-import helmet = require("helmet");
-import pinoHttp = require("pino-http");
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet").default || require("helmet");
+const pinoHttp = require("pino-http").default || require("pino-http");
 
 const app = express();
 
