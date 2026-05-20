@@ -1,5 +1,4 @@
-import express, { t
-ype Express } from "express";
+import express, { type Express } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
@@ -12,10 +11,10 @@ import { requestTimeout } from "./middlewares/requestTimeout.js";
 
 const app: Express = express();
 
-/* Percaya proxy deployment */
+/* Percaya proxy */
 app.set("trust proxy", 1);
 
-/* ── Helmet: security headers ── */
+/* Security headers */
 app.use(
   helmet({
     contentSecurityPolicy: false,
@@ -23,7 +22,7 @@ app.use(
   }),
 );
 
-/* ── CORS ── */
+/* CORS */
 const allowedOrigins = process.env["REPLIT_DOMAINS"]
   ? process.env["REPLIT_DOMAINS"].split(",")
   : ["*"];
@@ -31,7 +30,7 @@ const allowedOrigins = process.env["REPLIT_DOMAINS"]
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
         cb(null, true);
       } else {
         cb(new Error("Origin tidak diizinkan"));
@@ -43,32 +42,28 @@ app.use(
   }),
 );
 
-/* ── Request timeout ── */
+/* Timeout */
 app.use(requestTimeout);
 
-/* ── Logging ── */
+/* Logging */
 app.use(
   pinoHttp({
     logger,
   }),
 );
 
-/* ── Body parser ── */
+/* Body parser */
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-/* ── Global rate limiter ── */
+/* Rate limiter */
 app.use(globalLimiter);
 
-/* ── Routes ── */
+/* Routes */
 app.use("/api", router);
 
-/* ── Health check ── */
-app.get("/healthz", (_req, res) => {
-  res.json({ status: "ok" });
-});
-
-/* ── Error handler ── */
+/* Error handler */
 app.use(errorHandler);
 
 export default app;
+
