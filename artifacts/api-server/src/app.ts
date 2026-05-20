@@ -1,7 +1,10 @@
 import express, { type Express } from "express";
+
 import cors from "cors";
-import helmet from "helmet";
-import pinoHttp from "pino-http";
+import helmet from "helmet"
+app.use(helmet());
+import pinoHttp from "pino-http"
+app.use(pinoHttp());
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { globalLimiter } from "./middlewares/rateLimiter.js";
