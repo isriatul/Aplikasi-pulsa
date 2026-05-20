@@ -1,19 +1,18 @@
-import express, { type Express } from "express";
-
+import express, { t
+ype Express } from "express";
 import cors from "cors";
-import helmet from "helmet"
-app.use(helmet());
-import pinoHttp from "pino-http"
-app.use(pinoHttp());
+import helmet from "helmet";
+import pinoHttp from "pino-http";
+
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { globalLimiter } from "./middlewares/rateLimiter.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
-import { requestTimeout } from "./middlewares/timeout.js";
+import { requestTimeout } from "./middlewares/requestTimeout.js";
 
 const app: Express = express();
 
-/* Percaya proxy Replit (untuk IP yang benar pada rate-limit & logging) */
+/* Percaya proxy deployment */
 app.set("trust proxy", 1);
 
 /* ── Helmet: security headers ── */
@@ -24,57 +23,39 @@ app.use(
   }),
 );
 
-/* ── CORS: izinkan hanya domain Replit di production ── */
+/* ── CORS ── */
 const allowedOrigins = process.env["REPLIT_DOMAINS"]
-  ? process.env["REPLIT_DOMAINS"].split(",").map((d) => `https://${d.trim()}`)
+  ? process.env["REPLIT_DOMAINS"].split(",")
   : ["*"];
 
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin)) {
         cb(null, true);
       } else {
-        cb(new Error("Origin tidak diizinkan oleh CORS"));
+        cb(new Error("Origin tidak diizinkan"));
       }
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
 
-/* ── Request timeout: 30 detik ── */
+/* ── Request timeout ── */
 app.use(requestTimeout);
 
-/* ── Logging dengan IP dan User-Agent ── */
+/* ── Logging ── */
 app.use(
   pinoHttp({
     logger,
-    serializers: {
-      req(req) {
-        return {
-          id: req.id,
-          method: req.method,
-          url: req.url?.split("?")[0],
-          ip:
-            (req.headers?.["x-forwarded-for"] as string | undefined)
-              ?.split(",")[0]
-              ?.trim() ?? req.socket?.remoteAddress ?? "unknown",
-          ua: ((req.headers?.["user-agent"] as string | undefined) ?? "").slice(0, 150),
-        };
-      },
-      res(res) {
-        return { statusCode: res.statusCode };
-      },
-    },
   }),
 );
 
-/* ── Body parsing ── */
-/* Limit 5MB untuk mendukung upload bukti deposit (base64 gambar terkompresi) */
+/* ── Body parser ── */
 app.use(express.json({ limit: "5mb" }));
-app.use(express.urlencoded({ extended: true, limit: "5mb" }));
+app.use(express.urlencoded({ extended: true }));
 
 /* ── Global rate limiter ── */
 app.use(globalLimiter);
@@ -82,7 +63,12 @@ app.use(globalLimiter);
 /* ── Routes ── */
 app.use("/api", router);
 
-/* ── Safe error handler (paling akhir) ── */
+/* ── Health check ── */
+app.get("/healthz", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
+/* ── Error handler ── */
 app.use(errorHandler);
 
 export default app;
